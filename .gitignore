@@ -36,3 +36,5 @@ VSMI-*/
 
 # Ancien projet imbriqué
 /vsmi/
+.vercel
+.env*
