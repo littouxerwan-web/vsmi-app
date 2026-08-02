@@ -1,0 +1,38 @@
+# Dépendances
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Variables sensibles
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# macOS
+.DS_Store
+
+# Vercel
+.vercel/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Archives et fichiers de livraison
+*.zip
+
+# Sauvegardes locales VSMI
+backup-*/
+sauvegarde-*/
+VSMI-*/
+
+# Ancien projet imbriqué
+/vsmi/
