@@ -7,6 +7,7 @@ import {
   CircleDollarSign,
   HeartHandshake,
   LayoutDashboard,
+  LockKeyhole,
   Plus,
 } from "lucide-react";
 
@@ -15,7 +16,7 @@ const items = [
   { href: "/mariages", label: "Mariages", icon: HeartHandshake },
   { href: "/mariages/nouveau", label: "Ajouter", icon: Plus, primary: true },
   { href: "/agenda", label: "Agenda", icon: CalendarDays },
-  { href: "/comptabilite", label: "Compta", icon: CircleDollarSign },
+  { href: "/perso", label: "Perso", icon: LockKeyhole },
 ];
 
 export function MobileNavigation() {

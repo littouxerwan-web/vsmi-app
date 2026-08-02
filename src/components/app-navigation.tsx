@@ -5,6 +5,7 @@ import {
   CircleDollarSign,
   HeartHandshake,
   LayoutDashboard,
+  LockKeyhole,
   Settings,
 } from "lucide-react";
 
@@ -13,6 +14,7 @@ const navigation = [
   { href: "/mariages", label: "Mes Mariages", icon: HeartHandshake },
   { href: "/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/comptabilite", label: "Comptabilité", icon: CircleDollarSign },
+  { href: "/perso", label: "PERSO", icon: LockKeyhole },
   { href: "/parametres", label: "Paramètres", icon: Settings },
 ];
 
