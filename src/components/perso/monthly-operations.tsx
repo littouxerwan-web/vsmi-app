@@ -1,71 +1,72 @@
 "use client";
 
-import { ChevronDown, CircleCheck, Clock3 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Camera, Check, Clock3, Pencil, Repeat2, Trash2 } from "lucide-react";
+import {
+  completeRecurrenceOccurrence,
+  deleteItem,
+  setRecurrenceOverride,
+  toggleMovement,
+  toggleUrssafContribution,
+  toggleWeddingPayment,
+  updateMovement,
+} from "@/app/(app)/perso/actions";
 
-type Account = { id: string; name: string };
-type Category = { id: string; name: string; parent_id: string | null };
-type Movement = { id: string; account_id: string; category_id: string | null; movement_type: string; label: string; amount: number; movement_date: string; status: string };
-type Recurrence = { id: string; account_id: string; destination_account_id: string | null; category_id: string | null; movement_type: "income" | "expense" | "transfer"; label: string; amount: number; frequency: "weekly" | "monthly" | "quarterly" | "yearly"; interval_count: number; start_date: string; end_date: string | null; annual_change_percent: number };
-type Operation = { id: string; accountId: string; categoryId: string | null; type: string; label: string; amount: number; date: string; status: "planned" | "completed"; projected: boolean };
+type Account={id:string;name:string};
+type Category={id:string;name:string;parent_id:string|null;monthly_budget:number;movement_type?:string;account_id?:string|null};
+type Movement={id:string;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;recurrence_id?:string|null;transfer_group_id?:string|null};
+type Recurrence={id:string;account_id:string;destination_account_id:string|null;category_id:string|null;movement_type:"income"|"expense"|"transfer";label:string;amount:number;frequency:"weekly"|"monthly"|"quarterly"|"yearly";interval_count:number;start_date:string;end_date:string|null};
+type Override={recurrence_id:string;occurrence_month:string;amount:number};
+type PhotoPayment={id:string;display_name:string;wedding_date:string|null;payment_type:"deposit"|"balance";amount:number;expected_date:string|null;received_date:string|null;status:"expected"|"received"|"cancelled";accounting_status?:"expected"|"received"|"cancelled";personal_account_id:string|null};
+type Operation=Movement&{projected:boolean;destination_account_id?:string|null};
+type UrssafState={contribution_month:string;account_id:string|null;is_completed:boolean;completed_date:string|null};
+const money=(v:number)=>new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"}).format(v);
+const monthName=(v:string)=>new Intl.DateTimeFormat("fr-FR",{month:"long",year:"numeric"}).format(new Date(`${v}-01T12:00:00`));
+const formatDate=(v:string)=>new Intl.DateTimeFormat("fr-FR").format(new Date(`${v}T12:00:00`));
+function add(d:Date,f:Recurrence["frequency"],n:number){const x=new Date(d);if(f==="weekly")x.setDate(x.getDate()+7*n);else if(f==="monthly")x.setMonth(x.getMonth()+n);else if(f==="quarterly")x.setMonth(x.getMonth()+3*n);else x.setFullYear(x.getFullYear()+n);return x;}
+function occurrences(r:Recurrence,month:string){const start=new Date(`${r.start_date}T12:00:00`),end=new Date(`${month}-01T12:00:00`);end.setMonth(end.getMonth()+1);let d=start,guard=0,out:string[]=[];while(d<end&&guard++<1000){const iso=d.toISOString().slice(0,10);if(iso.startsWith(month)&&(!r.end_date||iso<=r.end_date))out.push(iso);d=add(d,r.frequency,r.interval_count);}return out;}
+function photoLabel(p:PhotoPayment){const kind=p.payment_type==="deposit"?"Acompte":"Solde";const date=p.wedding_date?formatDate(p.wedding_date):"date à définir";return `Mariage ${p.display_name} ${date} · ${kind}`;}
 
-function iso(date: Date) { return date.toISOString().slice(0, 10); }
-function parse(value: string) { return new Date(`${value}T12:00:00`); }
-function money(value: number) { return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 2 }).format(value); }
-function add(date: Date, frequency: Recurrence["frequency"], count: number) {
-  const result = new Date(date);
-  if (frequency === "weekly") result.setDate(result.getDate() + 7 * count);
-  else if (frequency === "monthly") result.setMonth(result.getMonth() + count);
-  else if (frequency === "quarterly") result.setMonth(result.getMonth() + 3 * count);
-  else result.setFullYear(result.getFullYear() + count);
-  return result;
+export function MonthlyOperations({accounts,categories,movements,recurrences,overrides,photoPayments=[],photoDefaultAccountId=null,urssafDefaultAccountId=null,urssafStates=[]}:{accounts:Account[];categories:Category[];movements:Movement[];recurrences:Recurrence[];overrides:Override[];photoPayments?:PhotoPayment[];photoDefaultAccountId?:string|null;urssafDefaultAccountId?:string|null;urssafStates?:UrssafState[];budgetRows?:unknown[]}){
+ const now=new Date().toISOString().slice(0,7);const [month,setMonth]=useState(now);const [accountFilter,setAccountFilter]=useState("all");
+ const shiftMonth=(value:string,delta:number)=>{const d=new Date(`${value}-01T12:00:00`);d.setMonth(d.getMonth()+delta);return d.toISOString().slice(0,7);};
+ const photoAccountingMonth=(p:PhotoPayment)=>(p.accounting_status==="received"?(p.received_date??p.expected_date):p.expected_date)?.slice(0,7)??null;
+ const previousPhotoCa=photoPayments.filter(p=>p.status!=="cancelled"&&photoAccountingMonth(p)===shiftMonth(month,-1)).reduce((s,p)=>s+Number(p.amount),0);
+ const urssafAmount=Math.round(previousPhotoCa*0.216*100)/100; const urssafState=urssafStates.find(s=>String(s.contribution_month).slice(0,7)===month); const urssafAccountId=urssafState?.account_id??urssafDefaultAccountId; const urssafChecked=Boolean(urssafState?.is_completed); const monthEnd=(()=>{const d=new Date(`${month}-01T12:00:00`);d.setMonth(d.getMonth()+1);d.setDate(0);return d.toISOString().slice(0,10);})();
+ const ops=useMemo<Operation[]>(()=>{
+  const real=movements.filter(m=>m.movement_date.startsWith(month)&&m.movement_type!=="transfer_in").map(m=>({...m,projected:false}));
+  const existing=new Set(movements.filter(m=>m.recurrence_id&&m.movement_date.startsWith(month)).map(m=>`${m.recurrence_id}:${m.movement_date}`));
+  const projected:Operation[]=[];
+  for(const r of recurrences)for(const date of occurrences(r,month)){if(existing.has(`${r.id}:${date}`))continue;const ov=overrides.find(o=>o.recurrence_id===r.id&&o.occurrence_month.slice(0,7)===month);projected.push({id:`rec-${r.id}-${date}`,recurrence_id:r.id,account_id:r.account_id,destination_account_id:r.destination_account_id,category_id:r.category_id,movement_type:r.movement_type,label:r.label,amount:Number(ov?.amount??r.amount),movement_date:date,status:"planned",projected:true});}
+  return [...real,...projected].sort((a,b)=>a.movement_date.localeCompare(b.movement_date));
+ },[month,movements,recurrences,overrides]);
+ const photos=photoPayments.filter(p=>p.status!=="cancelled"&&(p.expected_date??p.received_date??"").startsWith(month));
+ const categoryById=new Map(categories.map(c=>[c.id,c]));
+ const rootFor=(id:string|null)=>{let c=id?categoryById.get(id):undefined;while(c?.parent_id)c=categoryById.get(c.parent_id);return c?.id??null;};
+ const incomingTransfers:Operation[]=accountFilter==="all"?[]:movements.filter(m=>m.movement_date.startsWith(month)&&m.movement_type==="transfer_in"&&m.account_id===accountFilter).map(m=>({...m,projected:false}));
+ const projectedIncomingTransfers:Operation[]=accountFilter==="all"?[]:ops.filter(o=>o.projected&&(o.movement_type==="transfer"||o.movement_type==="transfer_out")&&o.destination_account_id===accountFilter).map(o=>({...o,id:`${o.id}-incoming`,account_id:accountFilter,movement_type:"transfer_in",label:o.label}));
+ const visibleOps=(accountFilter==="all"?ops:ops.filter(o=>o.account_id===accountFilter).concat(incomingTransfers,projectedIncomingTransfers)).sort((a,b)=>a.movement_date.localeCompare(b.movement_date));
+ const visiblePhotos=photos.filter(p=>accountFilter==="all"||(p.personal_account_id??photoDefaultAccountId)===accountFilter);
+ const showUrssaf=urssafAmount>0&&(accountFilter==="all"||urssafAccountId===accountFilter);
+ const budgets=categories.filter(c=>!c.parent_id&&Number(c.monthly_budget||0)>0&&(accountFilter==="all"||c.account_id===accountFilter)).map(c=>{const spent=visibleOps.filter(o=>o.movement_type==="expense"&&rootFor(o.category_id)===c.id).reduce((s,o)=>s+Number(o.amount),0);return {...c,spent,remaining:Math.max(0,Number(c.monthly_budget)-spent)};});
+ const isCredit=(o:Operation)=>o.movement_type==="income"||o.movement_type==="transfer_in";
+ const isDebit=(o:Operation)=>o.movement_type==="expense"||o.movement_type==="transfer"||o.movement_type==="transfer_out";
+ const checkedCredits=visibleOps.filter(o=>o.status==="completed"&&isCredit(o)).reduce((s,o)=>s+Number(o.amount),0)+visiblePhotos.filter(p=>p.status==="received").reduce((s,p)=>s+Number(p.amount),0);
+ const uncheckedCredits=visibleOps.filter(o=>o.status!=="completed"&&isCredit(o)).reduce((s,o)=>s+Number(o.amount),0)+visiblePhotos.filter(p=>p.status!=="received").reduce((s,p)=>s+Number(p.amount),0);
+ const checkedDebits=visibleOps.filter(o=>o.status==="completed"&&isDebit(o)).reduce((s,o)=>s+Number(o.amount),0)+(showUrssaf&&urssafChecked?urssafAmount:0);
+ const uncheckedDebits=visibleOps.filter(o=>o.status!=="completed"&&isDebit(o)).reduce((s,o)=>s+Number(o.amount),0)+(showUrssaf&&!urssafChecked?urssafAmount:0);
+ return <section className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+  <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-end"><div><h2 className="text-xl font-semibold">Opérations du mois</h2><p className="mt-1 text-sm text-neutral-500">Décochée : visible et incluse dans la projection. Cochée : intégrée au disponible aujourd’hui, sans modifier la comptabilité photo.</p></div><div className="grid gap-2 sm:grid-cols-2"><label className="text-xs font-medium text-neutral-600">Compte<select value={accountFilter} onChange={e=>setAccountFilter(e.target.value)} className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"><option value="all">Tous les comptes</option>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label><label className="text-xs font-medium text-neutral-600">Mois<input type="month" value={month} onChange={e=>setMonth(e.target.value)} className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm"/></label></div></div>
+  <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Crédits cochés" value={money(checkedCredits)}/><Metric label="Crédits non cochés" value={money(uncheckedCredits)}/><Metric label="Débits cochés" value={money(checkedDebits)}/><Metric label="Débits non cochés" value={money(uncheckedDebits)}/></div>
+  <div className="mt-3"><Metric label="Budgets restant à débiter dans la projection" value={money(budgets.reduce((s,b)=>s+b.remaining,0))} dark/></div>
+  {budgets.length>0?<div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{budgets.map(b=><div key={b.id} className="rounded-2xl border border-amber-200 bg-amber-50 p-4"><div className="flex justify-between gap-3"><p className="font-medium">Budget {b.name}</p><p className="font-semibold">{money(b.remaining)}</p></div><p className="mt-1 text-xs text-neutral-600">Budget {money(Number(b.monthly_budget))} · mouvements {money(b.spent)} · reste prévisionnel à débiter · {accounts.find(a=>a.id===b.account_id)?.name??"Compte par défaut"}</p></div>)}</div>:null}
+  <div className="mt-5 space-y-2">
+   {showUrssaf?<div className="rounded-2xl border border-sky-200 bg-sky-50/50 p-4"><div className="flex items-center justify-between gap-4"><div className="flex min-w-0 items-center gap-3"><form action={toggleUrssafContribution.bind(null,month,!urssafChecked,urssafAccountId)}><button className={`grid size-7 place-items-center rounded-md border-2 ${urssafChecked?"border-black bg-black text-white":"border-black/30 bg-white"}`} aria-label="Pointer la cotisation URSSAF">{urssafChecked?<Check size={16}/>:null}</button></form><div><p className="font-medium">URSSAF · 21,6 % du CA photo de {monthName(shiftMonth(month,-1))}</p><p className="text-xs text-neutral-500">Échéance {formatDate(monthEnd)} · {accounts.find(a=>a.id===urssafAccountId)?.name??"Compte URSSAF à définir"} · {urssafChecked?"intégré au disponible":"maintenu en prévision"}</p></div></div><span className="font-semibold text-red-700">−{money(urssafAmount)}</span></div></div>:null}
+   {visiblePhotos.map(p=>{const date=p.expected_date??p.received_date??new Date().toISOString().slice(0,10);const accountId=p.personal_account_id??photoDefaultAccountId;const checked=p.status==="received";return <div key={`photo-${p.id}`} className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4"><div className="flex items-center justify-between gap-4"><div className="flex min-w-0 items-center gap-3"><form action={toggleWeddingPayment.bind(null,p.id,!checked,accountId)}><button className={`grid size-7 place-items-center rounded-md border-2 ${checked?"border-black bg-black text-white":"border-black/30 bg-white"}`} aria-label="Pointer seulement dans PERSO">{checked?<Check size={16}/>:null}</button></form><div className="min-w-0"><p className="flex items-center gap-2 truncate font-medium"><Camera size={15} className="shrink-0 text-emerald-700"/>{photoLabel(p)}</p><p className="text-xs text-neutral-500">Échéance {formatDate(date)} · {accounts.find(a=>a.id===accountId)?.name??"Compte photo à définir"} · {checked?"intégré au disponible":"maintenu en prévision"}</p></div></div><span className="font-semibold text-emerald-700">+{money(Number(p.amount))}</span></div></div>})}
+   {visibleOps.length===0&&visiblePhotos.length===0&&!showUrssaf?<p className="rounded-xl bg-neutral-50 p-4 text-sm text-neutral-500">Aucune opération en {monthName(month)}.</p>:visibleOps.map(o=>{const positive=o.movement_type==="income"||o.movement_type==="transfer_in";const isTransfer=o.movement_type==="transfer"||o.movement_type==="transfer_out";const source=accounts.find(a=>a.id===o.account_id)?.name??"Compte";const destination=o.destination_account_id?accounts.find(a=>a.id===o.destination_account_id)?.name:null;const savingsProposal=o.label.startsWith("Versement épargne proposé");return <div key={o.id} className={`rounded-2xl border p-4 ${savingsProposal?"border-violet-300 bg-violet-50":"border-black/10"}`}><div className="flex items-center justify-between gap-4"><div className="flex min-w-0 items-center gap-3">{o.projected?<form action={completeRecurrenceOccurrence.bind(null,o.recurrence_id!,o.movement_date)}><button className="grid size-7 place-items-center rounded-md border-2 border-black/30 bg-white" aria-label="Pointer cette échéance maintenant"/></form>:<form action={toggleMovement.bind(null,o.id,o.status!=="completed",o.transfer_group_id)}><button className={`grid size-7 place-items-center rounded-md border-2 ${o.status==="completed"?"border-black bg-black text-white":"border-black/30 bg-white"}`}>{o.status==="completed"?<Check size={16}/>:null}</button></form>}<div className="min-w-0"><p className="flex items-center gap-2 truncate font-medium">{isTransfer?<Repeat2 size={15} className="text-violet-600"/>:o.projected?<Clock3 size={15} className="text-violet-600"/>:null}{o.label}</p><p className="text-xs text-neutral-500">{formatDate(o.movement_date)} · {source}{isTransfer&&destination?` → ${destination}`:""} · {o.status==="completed"?"intégré au disponible":"prévision"}</p></div></div><span className={`font-semibold ${isTransfer?"text-violet-700":positive?"text-emerald-700":"text-red-700"}`}>{isTransfer?"↔":positive?"+":"−"}{money(Number(o.amount))}</span></div>
+    {!o.projected?<details className="mt-3"><summary className="flex cursor-pointer items-center gap-2 text-xs font-medium text-neutral-600"><Pencil size={14}/>Modifier ou supprimer</summary><form action={updateMovement} className="mt-3 grid gap-2 sm:grid-cols-2"><input type="hidden" name="id" value={o.id}/><input name="label" defaultValue={o.label} className="rounded-xl border px-3 py-2"/><input name="amount" type="number" step="0.01" min="0.01" defaultValue={o.amount} className="rounded-xl border px-3 py-2"/><input name="movement_date" type="date" defaultValue={o.movement_date} className="rounded-xl border px-3 py-2"/><select name="account_id" defaultValue={o.account_id} className="rounded-xl border px-3 py-2">{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select><select name="category_id" defaultValue={o.category_id??""} className="rounded-xl border px-3 py-2"><option value="">Sans catégorie</option>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><button className="rounded-xl bg-black px-4 py-2 text-sm text-white">Enregistrer</button></form><form action={deleteItem.bind(null,"personal_movements",o.id)} className="mt-2"><button className="flex items-center gap-2 text-xs font-medium text-red-700"><Trash2 size={14}/>Supprimer</button></form></details>:<details className="mt-3"><summary className="cursor-pointer text-xs font-medium text-neutral-600">Modifier uniquement pour {monthName(month)}</summary><form action={setRecurrenceOverride} className="mt-2 flex gap-2"><input type="hidden" name="recurrence_id" value={o.recurrence_id??""}/><input type="hidden" name="occurrence_month" value={month}/><input name="amount" type="number" step="0.01" min="0.01" defaultValue={o.amount} className="rounded-xl border px-3 py-2"/><button className="rounded-xl bg-black px-3 text-sm text-white">Enregistrer</button></form></details>}
+   </div>})}
+  </div>
+ </section>;
 }
-function monthKey(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`; }
-function monthTitle(key: string) { return new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(new Date(`${key}-01T12:00:00`)); }
-function dateLabel(value: string) { return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit" }).format(parse(value)); }
-
-export function MonthlyOperations({ accounts, categories, movements, recurrences }: { accounts: Account[]; categories: Category[]; movements: Movement[]; recurrences: Recurrence[] }) {
-  const now = new Date(); now.setHours(12, 0, 0, 0);
-  const months = Array.from({ length: 7 }, (_, index) => { const d = new Date(now.getFullYear(), now.getMonth() + index, 1, 12); return monthKey(d); });
-  const end = new Date(now.getFullYear(), now.getMonth() + 7, 0, 12);
-  const operations: Operation[] = movements
-    .filter(m => m.status !== "cancelled" && m.movement_date >= `${months[0]}-01` && parse(m.movement_date) <= end)
-    .map(m => ({ id: m.id, accountId: m.account_id, categoryId: m.category_id, type: m.movement_type, label: m.label, amount: Number(m.amount), date: m.movement_date, status: m.status === "completed" ? "completed" : "planned", projected: false }));
-
-  for (const recurrence of recurrences) {
-    let occurrence = parse(recurrence.start_date); let guard = 0;
-    while (occurrence <= end && guard++ < 500) {
-      if (occurrence >= new Date(`${months[0]}-01T12:00:00`) && (!recurrence.end_date || iso(occurrence) <= recurrence.end_date)) {
-        const years = Math.max(0, occurrence.getFullYear() - parse(recurrence.start_date).getFullYear());
-        const amount = Number(recurrence.amount) * Math.pow(1 + Number(recurrence.annual_change_percent || 0) / 100, years);
-        operations.push({ id: `rec-${recurrence.id}-${iso(occurrence)}`, accountId: recurrence.account_id, categoryId: recurrence.category_id, type: recurrence.movement_type, label: recurrence.label, amount, date: iso(occurrence), status: "planned", projected: true });
-      }
-      occurrence = add(occurrence, recurrence.frequency, recurrence.interval_count);
-    }
-  }
-
-  return <section className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-    <div><h2 className="text-xl font-semibold">Opérations mois par mois</h2><p className="mt-1 text-sm text-neutral-500">Le mois en cours est ouvert. Les six mois suivants sont consultables dans les menus déroulants.</p></div>
-    <div className="mt-6 space-y-3">{months.map((month, index) => {
-      const list = operations.filter(o => o.date.startsWith(month)).sort((a, b) => a.date.localeCompare(b.date));
-      const income = list.filter(o => ["income", "transfer_in"].includes(o.type)).reduce((s, o) => s + o.amount, 0);
-      const expense = list.filter(o => ["expense", "transfer_out", "transfer"].includes(o.type)).reduce((s, o) => s + o.amount, 0);
-      return <details key={month} open={index === 0} className="group rounded-2xl border border-black/10 bg-white">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-4">
-          <div><p className="font-semibold capitalize">{monthTitle(month)}</p><p className="mt-1 text-xs text-neutral-500">{list.length} opération{list.length > 1 ? "s" : ""} · Recettes {money(income)} · Dépenses {money(expense)}</p></div>
-          <ChevronDown size={18} className="shrink-0 transition group-open:rotate-180"/>
-        </summary>
-        <div className="border-t border-black/10 p-4">
-          {list.length === 0 ? <p className="rounded-xl bg-neutral-50 p-4 text-sm text-neutral-500">Aucune opération sur ce mois.</p> : <div className="space-y-2">{list.map(operation => {
-            const positive = ["income", "transfer_in"].includes(operation.type);
-            const account = accounts.find(a => a.id === operation.accountId)?.name ?? "Compte";
-            const category = categories.find(c => c.id === operation.categoryId)?.name;
-            return <div key={operation.id} className="flex items-center justify-between gap-4 rounded-xl border border-black/10 px-4 py-3">
-              <div className="min-w-0"><div className="flex items-center gap-2"><span className="truncate font-medium">{operation.label}</span>{operation.projected ? <span className="rounded-full bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-700">Récurrent</span> : operation.status === "completed" ? <CircleCheck size={15} className="text-emerald-600"/> : <Clock3 size={15} className="text-amber-600"/>}</div><p className="mt-1 truncate text-xs text-neutral-500">{dateLabel(operation.date)} · {account}{category ? ` · ${category}` : ""} · {operation.status === "completed" ? "Réalisé" : "Prévu"}</p></div>
-              <span className={`shrink-0 font-semibold ${positive ? "text-emerald-700" : "text-red-700"}`}>{positive ? "+" : "−"}{money(operation.amount)}</span>
-            </div>;
-          })}</div>}
-        </div>
-      </details>;
-    })}</div>
-  </section>;
-}
+function Metric({label,value,dark}:{label:string;value:string;dark?:boolean}){return <div className={`rounded-2xl p-4 ${dark?"bg-black text-white":"bg-neutral-100"}`}><p className="text-xs opacity-70">{label}</p><p className="mt-2 text-xl font-semibold">{value}</p></div>}
