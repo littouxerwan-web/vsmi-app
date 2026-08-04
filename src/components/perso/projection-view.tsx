@@ -7,7 +7,7 @@ import { calculateSavingsPlan, type SavingsProposalDecision } from "@/lib/perso/
 import { isBudgetActiveForMonth } from "@/lib/perso/budget-engine";
 
 type Account={id:string;name:string;account_type:"checking"|"savings";is_default?:boolean};
-type Category={id:string;name:string;parent_id:string|null;monthly_budget:number;movement_type?:string;account_id?:string|null;budget_period?:"monthly"|"specific_month";budget_month?:string|null};
+type Category={id:string;name:string;parent_id:string|null;monthly_budget:number;movement_type?:string;account_id?:string|null;budget_period?:"monthly"|"specific_month";budget_month?:string|null;is_primary_income?:boolean};
 type Snapshot={account_id:string;balance:number;snapshot_date:string};
 type Movement={id:string;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;recurrence_id?:string|null;transfer_group_id?:string|null};
 type Override={recurrence_id:string;occurrence_month:string;amount:number};
@@ -72,8 +72,8 @@ export function ProjectionView({accounts,categories,snapshots,movements,recurren
     if(row.proposal>0){
      const stored=proposalRows.find(p=>p.source_account_id===profile.sourceAccountId&&p.destination_account_id===profile.destinationAccountId&&String(p.source_month).slice(0,7)===row.month);
      if(stored?.status!=="accepted"&&stored?.status!=="deleted"){
-      const movementDate=`${row.month}-28`;
-      const meta:SavingsProposalMeta={sourceAccountId:profile.sourceAccountId!,destinationAccountId:profile.destinationAccountId!,sourceMonth:row.month,automaticAmount:Math.max(0,row.balanceAfterSavingsUse-row.requiredReserve),status:stored?.status==="pending"?"pending":"automatic",kind:"deposit"};
+      const movementDate=row.proposalDate??`${row.month}-28`;
+      const meta:SavingsProposalMeta={sourceAccountId:profile.sourceAccountId!,destinationAccountId:profile.destinationAccountId!,sourceMonth:row.month,automaticAmount:Number(row.proposal),status:stored?.status==="pending"?"pending":"automatic",kind:"deposit"};
       const label=`Versement épargne proposé · ${profile.label}`;
       ops.push({id:`saving-${profile.id}-${row.month}-out`,projected:false,account_id:profile.sourceAccountId!,category_id:null,movement_type:"transfer_out",label,amount:Number(row.proposal),movement_date:movementDate,status:"planned",savingsProposal:meta},{id:`saving-${profile.id}-${row.month}-in`,projected:false,account_id:profile.destinationAccountId!,category_id:null,movement_type:"transfer_in",label,amount:Number(row.proposal),movement_date:movementDate,status:"planned",savingsProposal:meta});
      }
@@ -81,7 +81,7 @@ export function ProjectionView({accounts,categories,snapshots,movements,recurren
     if(row.savingsUsed>0){
      const stored=proposalRows.find(p=>p.source_account_id===profile.destinationAccountId&&p.destination_account_id===profile.sourceAccountId&&String(p.source_month).slice(0,7)===row.month);
      if(stored?.status!=="accepted"&&stored?.status!=="deleted"){
-      const movementDate=firstDeficitDate(profile,row);
+      const movementDate=row.savingsUseDate??firstDeficitDate(profile,row);
       const meta:SavingsProposalMeta={sourceAccountId:profile.destinationAccountId!,destinationAccountId:profile.sourceAccountId!,sourceMonth:row.month,automaticAmount:Number(row.savingsUsed),status:stored?.status==="pending"?"pending":"automatic",kind:"use"};
       const label=`Utilisation épargne proposée · ${profile.label}`;
       ops.push({id:`saving-use-${profile.id}-${row.month}-out`,projected:false,account_id:profile.destinationAccountId!,category_id:null,movement_type:"transfer_out",label,amount:Number(row.savingsUsed),movement_date:movementDate,status:"planned",savingsProposal:meta},{id:`saving-use-${profile.id}-${row.month}-in`,projected:false,account_id:profile.sourceAccountId!,category_id:null,movement_type:"transfer_in",label,amount:Number(row.savingsUsed),movement_date:movementDate,status:"planned",savingsProposal:meta});

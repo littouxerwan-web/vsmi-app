@@ -30,13 +30,15 @@ export async function createAccount(fd: FormData) {
 export async function createCategory(fd: FormData) {
   const { supabase, user } = await auth();
   const name = text(fd, "name"); const movementType = text(fd, "movement_type"); const parentId = optional(fd, "parent_id"); const accountId = optional(fd, "account_id"); const monthlyBudget = Math.max(0, number(fd, "monthly_budget") || 0);
+  const isPrimaryIncome = movementType === "income" && text(fd, "is_primary_income") === "on";
   const budgetPeriod = text(fd, "budget_period") === "specific_month" ? "specific_month" : "monthly";
   const budgetMonthInput = optional(fd, "budget_month");
   const budgetMonth = budgetPeriod === "specific_month" && budgetMonthInput ? `${budgetMonthInput.slice(0, 7)}-01` : null;
   if (movementType === "expense" && monthlyBudget > 0 && budgetPeriod === "specific_month" && !budgetMonth) fail("Choisis le mois du budget ponctuel.");
   if (!name) fail("Indique le nom de la catégorie.");
   if (!["income", "expense"].includes(movementType)) fail("Type de catégorie incorrect.");
-  const { error } = await supabase.from("personal_categories").insert({ owner_id: user.id, name, movement_type: movementType, parent_id: parentId, monthly_budget: movementType === "expense" ? monthlyBudget : 0, account_id: movementType === "expense" ? accountId : null, budget_period: movementType === "expense" ? budgetPeriod : "monthly", budget_month: movementType === "expense" ? budgetMonth : null });
+  if (isPrimaryIncome) { const { error: resetError } = await supabase.from("personal_categories").update({ is_primary_income: false }).eq("owner_id", user.id).eq("is_primary_income", true); if (resetError) fail(resetError.message); }
+  const { error } = await supabase.from("personal_categories").insert({ owner_id: user.id, name, movement_type: movementType, parent_id: parentId, monthly_budget: movementType === "expense" ? monthlyBudget : 0, account_id: movementType === "expense" ? accountId : null, budget_period: movementType === "expense" ? budgetPeriod : "monthly", budget_month: movementType === "expense" ? budgetMonth : null, is_primary_income: isPrimaryIncome });
   if (error) fail(error.message); refresh(parentId ? "Sous-catégorie ajoutée." : "Catégorie ajoutée.");
 }
 
@@ -179,12 +181,14 @@ export async function updateAccount(fd: FormData) {
 export async function updateCategory(fd: FormData) {
   const { supabase, user } = await auth();
   const id = text(fd, "id"); const name = text(fd, "name"); const accountId = optional(fd, "account_id"); const monthlyBudget = Math.max(0, number(fd, "monthly_budget") || 0);
+  const isPrimaryIncome = text(fd, "movement_type") === "income" && text(fd, "is_primary_income") === "on";
   const budgetPeriod = text(fd, "budget_period") === "specific_month" ? "specific_month" : "monthly";
   const budgetMonthInput = optional(fd, "budget_month");
   const budgetMonth = budgetPeriod === "specific_month" && budgetMonthInput ? `${budgetMonthInput.slice(0, 7)}-01` : null;
   if (!id || !name) fail("Catégorie incomplète.");
   if (monthlyBudget > 0 && budgetPeriod === "specific_month" && !budgetMonth) fail("Choisis le mois du budget ponctuel.");
-  const { error } = await supabase.from("personal_categories").update({ name, monthly_budget: monthlyBudget, account_id: accountId, budget_period: budgetPeriod, budget_month: budgetMonth }).eq("id", id).eq("owner_id", user.id);
+  if (isPrimaryIncome) { const { error: resetError } = await supabase.from("personal_categories").update({ is_primary_income: false }).eq("owner_id", user.id).eq("is_primary_income", true).neq("id", id); if (resetError) fail(resetError.message); }
+  const { error } = await supabase.from("personal_categories").update({ name, monthly_budget: monthlyBudget, account_id: accountId, budget_period: budgetPeriod, budget_month: budgetMonth, is_primary_income: isPrimaryIncome }).eq("id", id).eq("owner_id", user.id);
   if (error) fail(error.message); revalidatePath(PATH, "page"); redirect(`${PATH}?vue=finances&succes=${encodeURIComponent("Catégorie modifiée et soldes recalculés.")}`);
 }
 
