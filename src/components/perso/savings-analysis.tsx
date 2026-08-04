@@ -1,89 +1,377 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ArrowRight, Sparkles } from "lucide-react";
+import {
+  calculateSavingsPlan,
+  type SavingsCategory,
+  type SavingsExclusion,
+  type SavingsMovement,
+  type SavingsOverride,
+  type SavingsPhotoPayment,
+  type SavingsRecurrence,
+  type SavingsUrssafState,
+  type SavingsProposalDecision,
+} from "@/lib/perso/savings-engine";
 
-type Account={id:string;name:string;account_type:"checking"|"savings"};
-type Category={id:string;parent_id:string|null;monthly_budget:number;account_id?:string|null};
-type Snapshot={account_id:string;balance:number;snapshot_date:string};
-type Movement={label:string;account_id:string;category_id:string|null;movement_type:string;amount:number;movement_date:string;status:string};
-type Recurrence={account_id:string;destination_account_id:string|null;category_id:string|null;movement_type:"income"|"expense"|"transfer";amount:number;frequency:string;interval_count:number;start_date:string;end_date:string|null};
-type PhotoPayment={amount:number;expected_date:string|null;received_date:string|null;status:string;personal_account_id:string|null};
-type MonthFlow={month:string;income:number;expense:number;net:number};
-type SavingsProposal={source_account_id:string;destination_account_id:string;source_month:string;amount:number;status:string;transfer_group_id?:string|null};
-type SavingsRow={month:string;checking:number;savings:number;proposal:number;income:number;expense:number;requiredReserve:number;proposalStatus:"automatic"|"modified"|"accepted"|"deleted"};
-const money=(v:number)=>new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",minimumFractionDigits:2}).format(v);
-const monthLabel=(v:string)=>new Intl.DateTimeFormat("fr-FR",{month:"long",year:"numeric"}).format(new Date(`${v}-01T12:00:00`));
-const shift=(m:string,n:number)=>{const d=new Date(`${m}-01T12:00:00`);d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,7)};
+type Account = { id: string; name: string; account_type: "checking" | "savings" };
+type Profile = {
+  id: "profile-1" | "profile-2";
+  label: string;
+  sourceAccountId: string | null;
+  destinationAccountId: string | null;
+  threshold: number;
+};
 
-export function SavingsAnalysis({accounts,categories,snapshots,movements,recurrences,photoPayments,proposals,sourceAccountId,destinationAccountId}:{accounts:Account[];categories:Category[];snapshots:Snapshot[];movements:Movement[];recurrences:Recurrence[];photoPayments:PhotoPayment[];proposals:SavingsProposal[];sourceAccountId:string|null;destinationAccountId:string|null}){
- const source=accounts.find(a=>a.id===sourceAccountId);const destination=accounts.find(a=>a.id===destinationAccountId);
- const rows=useMemo(()=>{
-  if(!source||!destination)return[];
-  const categoryById=new Map(categories.map(c=>[c.id,c]));
-  const root=(id:string|null)=>{let c=id?categoryById.get(id):undefined;while(c?.parent_id)c=categoryById.get(c.parent_id);return c?.id??null};
-  const roots=categories.filter(c=>!c.parent_id&&Number(c.monthly_budget)>0);
-  const latest=snapshots.filter(s=>s.account_id===source.id).sort((a,b)=>b.snapshot_date.localeCompare(a.snapshot_date))[0];
-  let checking=Number(latest?.balance??0);
-  const latestSave=snapshots.filter(s=>s.account_id===destination.id).sort((a,b)=>b.snapshot_date.localeCompare(a.snapshot_date))[0];
-  let savings=Number(latestSave?.balance??0);
-  const start=new Date();start.setDate(1);start.setHours(12,0,0,0);
+type CalculatedProfile = Profile & { initialChecking: number; initialSavings: number };
 
-  const flows:MonthFlow[]=[];
-  for(let i=0;i<60;i++){
-   const month=shift(start.toISOString().slice(0,7),i);
-   let income=0,expense=0;
-   const spentByRoot=new Map<string,number>();
-   for(const m of movements.filter(x=>x.movement_date.startsWith(month)&&!x.label?.startsWith("Versement épargne proposé"))){
-    const sign=["income","transfer_in"].includes(m.movement_type)?1:-1;
-    if(m.account_id===source.id){if(sign>0)income+=Number(m.amount);else expense+=Number(m.amount)}
-    if(m.movement_type==="expense"&&m.account_id===source.id){const r=root(m.category_id);if(r)spentByRoot.set(r,(spentByRoot.get(r)??0)+Number(m.amount));}
-   }
-   for(const r of recurrences){
-    if(r.end_date&&r.end_date.slice(0,7)<month)continue;
-    if(r.start_date.slice(0,7)>month)continue;
-    const amount=Number(r.amount);
-    if(r.movement_type==="income"&&r.account_id===source.id)income+=amount;
-    else if(r.movement_type==="expense"&&r.account_id===source.id){expense+=amount;const rt=root(r.category_id);if(rt)spentByRoot.set(rt,(spentByRoot.get(rt)??0)+amount)}
-    else if(r.movement_type==="transfer"){if(r.account_id===source.id)expense+=amount;if(r.destination_account_id===source.id)income+=amount}
-   }
-   for(const p of photoPayments.filter(x=>(x.expected_date??x.received_date??"").startsWith(month)&&x.status!=="cancelled"&&x.personal_account_id===source.id))income+=Number(p.amount);
-   for(const b of roots){if(b.account_id===source.id){const remaining=Math.max(0,Number(b.monthly_budget)-(spentByRoot.get(b.id)??0));expense+=remaining;}}
-   flows.push({month,income,expense,net:income-expense});
+type SavingsResult = {
+  profile: CalculatedProfile;
+  source: Account;
+  destination: Account;
+  rows: ReturnType<typeof calculateSavingsPlan>;
+};
+
+type Props = {
+  accounts: Account[];
+  categories: SavingsCategory[];
+  movements: SavingsMovement[];
+  recurrences: SavingsRecurrence[];
+  overrides?: SavingsOverride[];
+  exclusions?: SavingsExclusion[];
+  photoPayments: SavingsPhotoPayment[];
+  photoDefaultAccountId?: string | null;
+  urssafStates?: SavingsUrssafState[];
+  urssafDefaultAccountId?: string | null;
+  movementDefaultAccountId?: string | null;
+  profiles: Profile[];
+  currentBalances: Record<string, number>;
+  savingsProposals?: SavingsProposalDecision[];
+  startMonth: string;
+};
+
+const money = (value: number) =>
+  new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 2,
+  }).format(value);
+const monthLabel = (value: string) =>
+  new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(
+    new Date(`${value}-01T12:00:00`),
+  );
+const shift = (month: string, delta: number) => {
+  const date = new Date(`${month}-01T12:00:00`);
+  date.setMonth(date.getMonth() + delta);
+  return date.toISOString().slice(0, 7);
+};
+
+export function SavingsAnalysis(props: Props) {
+  const configuredProfiles = props.profiles.filter(
+    (profile) => profile.sourceAccountId && profile.destinationAccountId,
+  );
+  const [view, setView] = useState<string>("general");
+
+  const results = useMemo(
+    () =>
+      configuredProfiles.map((profile) => {
+        const source = props.accounts.find((account) => account.id === profile.sourceAccountId)!;
+        const destination = props.accounts.find(
+          (account) => account.id === profile.destinationAccountId,
+        )!;
+        const initialChecking = Number(props.currentBalances[source.id] ?? 0);
+        const initialSavings = Number(props.currentBalances[destination.id] ?? 0);
+        const rows = calculateSavingsPlan({
+          sourceAccountId: source.id,
+          destinationAccountId: destination.id,
+          accounts: props.accounts,
+          initialChecking,
+          initialSavings,
+          startMonth: props.startMonth,
+          categories: props.categories,
+          movements: props.movements,
+          recurrences: props.recurrences,
+          overrides: props.overrides,
+          exclusions: props.exclusions,
+          photoPayments: props.photoPayments,
+          photoDefaultAccountId: props.photoDefaultAccountId,
+          urssafStates: props.urssafStates,
+          urssafDefaultAccountId: props.urssafDefaultAccountId,
+          movementDefaultAccountId: props.movementDefaultAccountId,
+          savingsProposals: props.savingsProposals,
+          minReserve: profile.threshold,
+          months: 60,
+        });
+        return {
+          profile: { ...profile, initialChecking, initialSavings },
+          source,
+          destination,
+          rows,
+        };
+      }),
+    [configuredProfiles, props],
+  );
+
+  if (!results.length) {
+    return (
+      <section className="rounded-3xl border border-amber-200 bg-amber-50 p-6">
+        <h2 className="text-xl font-semibold">Analyse du potentiel d’épargne</h2>
+        <p className="mt-2 text-sm text-neutral-700">
+          Configure au moins un profil d’épargne dans Paramètres.
+        </p>
+      </section>
+    );
   }
 
-  // Pour chaque fin de mois, on conserve assez de trésorerie pour absorber
-  // le pire cumul négatif des mois suivants tout en gardant 500 € minimum.
-  const reserveAfterMonth=new Array<number>(flows.length).fill(500);
-  let futureCumulative=0;
-  let futureMinimum=0;
-  for(let i=flows.length-1;i>=0;i--){
-   reserveAfterMonth[i]=500+Math.max(0,-futureMinimum);
-   futureCumulative=flows[i].net+futureCumulative;
-   futureMinimum=Math.min(0,futureCumulative);
+  const selected = results.find((result) => result.profile.id === view);
+  const uniqueDestinationInitialSavings = new Map<string, number>();
+  for (const result of results) {
+    if (!uniqueDestinationInitialSavings.has(result.destination.id)) {
+      uniqueDestinationInitialSavings.set(result.destination.id, result.profile.initialSavings);
+    }
   }
+  const generalInitialSavings = [...uniqueDestinationInitialSavings.values()].reduce(
+    (sum, value) => sum + value,
+    0,
+  );
+  let cumulativeProposals = 0;
+  const generalRows = results[0].rows.map((row, index) => {
+    const proposal = results.reduce(
+      (sum, result) => sum + (result.rows[index]?.proposal ?? 0),
+      0,
+    );
+    cumulativeProposals += proposal;
+    return { month: row.month, savings: generalInitialSavings + cumulativeProposals, proposal };
+  });
+  const displayedRows = selected?.rows ?? generalRows;
+  const currentSavings = selected ? selected.profile.initialSavings : generalInitialSavings;
+  const max = Math.max(1, ...displayedRows.map((row) => row.savings));
+  const points = displayedRows
+    .map(
+      (row, index) =>
+        `${(index / Math.max(1, displayedRows.length - 1)) * 100},${92 - (row.savings / max) * 82}`,
+    )
+    .join(" ");
 
-  const proposalByMonth=new Map(proposals.filter(p=>p.source_account_id===source.id&&p.destination_account_id===destination.id).map(p=>[String(p.source_month).slice(0,7),p]));
-  const out:SavingsRow[]=[];
-  for(let i=0;i<flows.length;i++){
-   const flow=flows[i];
-   checking+=flow.net;
-   const requiredReserve=reserveAfterMonth[i];
-   const savedProposal=proposalByMonth.get(flow.month);
-   let proposalStatus:SavingsRow["proposalStatus"]="automatic";
-   let proposal=Math.max(0,checking-requiredReserve);
-   if(savedProposal?.status==="deleted"){proposal=0;proposalStatus="deleted";}
-   else if(savedProposal?.status==="accepted"){proposal=Math.max(0,Number(savedProposal.amount));proposalStatus="accepted";}
-   else if(savedProposal?.status==="modified"){proposal=Math.max(0,Number(savedProposal.amount));proposalStatus="modified";}
-   if(proposal>0){checking-=proposal;savings+=proposal;}
-   out.push({month:flow.month,checking,savings,proposal,income:flow.income,expense:flow.expense,requiredReserve,proposalStatus});
-  }
-  return out;
- },[source,destination,categories,snapshots,movements,recurrences,photoPayments,proposals]);
- if(!source||!destination)return <section className="rounded-3xl border border-amber-200 bg-amber-50 p-6"><h2 className="text-xl font-semibold">Analyse du potentiel d’épargne</h2><p className="mt-2 text-sm text-neutral-700">Choisis dans Paramètres le compte courant analysé et le compte d’épargne destinataire.</p></section>;
- const max=Math.max(1,...rows.map(r=>r.savings));const points=rows.map((r,i)=>`${(i/Math.max(1,rows.length-1))*100},${92-(r.savings/max)*82}`).join(" ");
- return <div className="space-y-7"><section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6"><div className="flex items-start gap-3"><span className="grid size-11 place-items-center rounded-2xl bg-emerald-100 text-emerald-800"><Sparkles size={20}/></span><div><h2 className="text-xl font-semibold">Analyse du potentiel d’épargne</h2><p className="mt-1 text-sm text-neutral-600">Le moteur conserve au minimum 500 € sur {source.name}, ainsi que la réserve nécessaire pour couvrir les déficits prévus des mois suivants, avant de proposer un virement vers {destination.name}.</p></div></div></section>
- <section className="rounded-3xl border bg-white p-6"><h3 className="text-lg font-semibold">Évolution projetée sur 5 ans</h3><div className="mt-4 overflow-hidden rounded-2xl bg-neutral-50 p-3"><svg viewBox="0 0 100 100" className="h-56 w-full" preserveAspectRatio="none"><polyline points={points} fill="none" stroke="currentColor" strokeWidth="1.8" vectorEffect="non-scaling-stroke"/></svg></div><div className="mt-4 grid gap-3 sm:grid-cols-3"><Metric label="Épargne actuelle" value={money(rows[0]?.savings-(rows[0]?.proposal??0) || 0)}/><Metric label="Épargne dans 12 mois" value={money(rows[11]?.savings??0)}/><Metric label="Épargne dans 5 ans" value={money(rows.at(-1)?.savings??0)} dark/></div></section>
- <section className="rounded-3xl border bg-white p-6"><h3 className="text-lg font-semibold">Virements proposés</h3><div className="mt-4 space-y-3">{rows.filter(r=>r.proposal>0).slice(0,24).map(r=><div key={r.month} className="rounded-2xl border border-violet-200 bg-violet-50 p-4"><div className="flex items-center justify-between gap-3"><div><p className="font-semibold text-violet-950">{r.proposalStatus==="accepted"?"Versement épargne accepté":r.proposalStatus==="modified"?"Versement épargne ajusté":"Versement épargne proposé"}</p><p className="mt-1 text-xs text-violet-800">1er {monthLabel(shift(r.month,1))} · {source.name} <ArrowRight className="inline" size={13}/> {destination.name}</p><p className="mt-1 text-xs text-violet-700">Réserve conservée après virement : {money(r.requiredReserve)}</p></div><p className="text-lg font-semibold text-violet-900">{money(r.proposal)}</p></div></div>)}</div></section></div>
+  return (
+    <div className="space-y-7">
+      <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <span className="grid size-11 place-items-center rounded-2xl bg-emerald-100 text-emerald-800">
+              <Sparkles size={20} />
+            </span>
+            <div>
+              <h2 className="text-xl font-semibold">Analyse du potentiel d’épargne</h2>
+              <p className="mt-1 text-sm text-neutral-600">
+                Vue générale cumulée ou analyse indépendante de chacun des deux comptes.
+              </p>
+            </div>
+          </div>
+          <select
+            value={view}
+            onChange={(event) => setView(event.target.value)}
+            className="rounded-xl border bg-white px-3 py-2 text-sm"
+          >
+            <option value="general">Vue générale</option>
+            {results.map(({ profile, source }) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.label} · {source.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border bg-white p-6">
+        <h3 className="text-lg font-semibold">Évolution projetée sur 5 ans</h3>
+        <div className="mt-4 overflow-hidden rounded-2xl bg-neutral-50 p-3">
+          <svg viewBox="0 0 100 100" className="h-56 w-full" preserveAspectRatio="none">
+            <polyline
+              points={points}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <Metric label="Épargne actuelle" value={money(Number(currentSavings ?? 0))} />
+          <Metric
+            label="Épargne dans 12 mois"
+            value={money(Number(displayedRows[11]?.savings ?? currentSavings ?? 0))}
+          />
+          <Metric
+            label="Épargne dans 5 ans"
+            value={money(Number(displayedRows.at(-1)?.savings ?? currentSavings ?? 0))}
+            dark
+          />
+        </div>
+      </section>
+
+      {selected ? (
+        <ProposalList result={selected} />
+      ) : (
+        <div className="grid gap-6 xl:grid-cols-2">
+          {results.map((result) => (
+            <ProposalList key={result.profile.id} result={result} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
-function Metric({label,value,dark}:{label:string;value:string;dark?:boolean}){return <div className={`rounded-2xl p-4 ${dark?"bg-black text-white":"bg-neutral-100"}`}><p className="text-xs opacity-70">{label}</p><p className="mt-2 text-xl font-semibold">{value}</p></div>}
+
+function ProposalList({ result }: { result: SavingsResult }) {
+  const [diagnosticMonth, setDiagnosticMonth] = useState(result.rows[0]?.month ?? "");
+  const diagnosticRow =
+    result.rows.find((row) => row.month === diagnosticMonth) ?? result.rows[0];
+  const proposedRows = result.rows.filter((row) => row.proposal > 0).slice(0, 24);
+
+  return (
+    <section className="rounded-3xl border bg-white p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold">{result.profile.label} · Virements proposés</h3>
+          <p className="mt-1 text-sm text-neutral-500">
+            Seuil conservé : {money(result.profile.threshold)} sur {result.source.name}
+          </p>
+        </div>
+        <select
+          value={diagnosticMonth}
+          onChange={(event) => setDiagnosticMonth(event.target.value)}
+          className="rounded-xl border bg-white px-3 py-2 text-sm"
+        >
+          {result.rows.map((row) => (
+            <option key={row.month} value={row.month}>
+              {monthLabel(row.month)}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {diagnosticRow ? (
+        <div className="mt-5 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="font-semibold text-sky-950">
+                Détail du calcul · {monthLabel(diagnosticRow.month)}
+              </p>
+              <p className="mt-1 text-xs text-sky-800">
+                Le mois suivant repart du solde conservé après la proposition de ce mois.
+              </p>
+            </div>
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                diagnosticRow.proposal > 0
+                  ? "bg-violet-100 text-violet-900"
+                  : "bg-white text-neutral-600"
+              }`}
+            >
+              Proposition : {money(diagnosticRow.proposal)}
+            </span>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <DiagnosticMetric label="Solde de départ" value={diagnosticRow.openingChecking} />
+            <DiagnosticMetric label="Crédits du mois" value={diagnosticRow.income} positive />
+            <DiagnosticMetric
+              label="Débits du mois"
+              value={diagnosticRow.debitExcludingBudgetRemaining}
+              negative
+            />
+            <DiagnosticMetric
+              label="Budgets restant à consommer"
+              value={diagnosticRow.budgetRemaining}
+              negative
+            />
+            <DiagnosticMetric
+              label="Solde avant épargne"
+              value={diagnosticRow.balanceBeforeSavings}
+            />
+            <DiagnosticMetric label="Seuil conservé" value={diagnosticRow.requiredReserve} />
+            <DiagnosticMetric
+              label="Versement proposé"
+              value={diagnosticRow.proposal}
+              positive={diagnosticRow.proposal > 0}
+            />
+            <DiagnosticMetric label="Solde après proposition" value={diagnosticRow.checking} />
+          </div>
+
+          {diagnosticRow.proposal <= 0 ? (
+            <p className="mt-4 rounded-xl bg-white p-3 text-sm text-neutral-700">
+              Aucune proposition : le solde avant épargne ({money(diagnosticRow.balanceBeforeSavings)})
+              ne dépasse pas le seuil configuré ({money(diagnosticRow.requiredReserve)}).
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="mt-5 space-y-3">
+        {proposedRows.length ? (
+          proposedRows.map((row) => (
+            <div
+              key={row.month}
+              className="rounded-2xl border border-violet-200 bg-violet-50 p-4"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-violet-950">Versement épargne proposé</p>
+                  <p className="mt-1 text-xs text-violet-800">
+                    1er {monthLabel(shift(row.month, 1))} · {result.source.name}{" "}
+                    <ArrowRight className="inline" size={13} /> {result.destination.name}
+                  </p>
+                  <p className="mt-1 text-xs text-violet-700">
+                    Solde avant épargne : {money(row.balanceBeforeSavings)} · Seuil :{" "}
+                    {money(row.requiredReserve)}
+                  </p>
+                </div>
+                <p className="text-lg font-semibold text-violet-900">{money(row.proposal)}</p>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="rounded-2xl border border-dashed p-4 text-sm text-neutral-500">
+            Aucun versement proposé sur la période avec les flux actuellement enregistrés.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function DiagnosticMetric({
+  label,
+  value,
+  positive,
+  negative,
+}: {
+  label: string;
+  value: number;
+  positive?: boolean;
+  negative?: boolean;
+}) {
+  const displayedValue = negative ? -Math.abs(value) : value;
+  return (
+    <div className="rounded-xl bg-white p-3">
+      <p className="text-xs text-neutral-500">{label}</p>
+      <p
+        className={`mt-1 font-semibold ${
+          positive ? "text-emerald-700" : negative ? "text-red-700" : "text-neutral-950"
+        }`}
+      >
+        {money(displayedValue)}
+      </p>
+    </div>
+  );
+}
+
+function Metric({ label, value, dark }: { label: string; value: string; dark?: boolean }) {
+  return (
+    <div className={`rounded-2xl p-4 ${dark ? "bg-black text-white" : "bg-neutral-100"}`}>
+      <p className="text-xs opacity-70">{label}</p>
+      <p className="mt-2 text-xl font-semibold">{value}</p>
+    </div>
+  );
+}

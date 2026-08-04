@@ -8,15 +8,32 @@ type CookieToSet = {
 };
 
 export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({
-    request,
-  });
+  const pathname = request.nextUrl.pathname;
+
+  const isPublicRoute =
+    pathname === "/connexion" ||
+    pathname.startsWith("/auth/") ||
+    pathname.startsWith("/_next/") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/manifest.json";
+
+  /*
+   * Ne jamais bloquer la page de connexion sur une requête Auth.
+   * L'authentification sera effectuée uniquement lors de l'envoi du formulaire.
+   */
+  if (isPublicRoute) {
+    return NextResponse.next({ request });
+  }
+
+  let response = NextResponse.next({ request });
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    return response;
+    const url = request.nextUrl.clone();
+    url.pathname = "/connexion";
+    return NextResponse.redirect(url);
   }
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -30,9 +47,7 @@ export async function updateSession(request: NextRequest) {
           request.cookies.set(name, value);
         });
 
-        response = NextResponse.next({
-          request,
-        });
+        response = NextResponse.next({ request });
 
         cookiesToSet.forEach(({ name, value, options }) => {
           response.cookies.set(name, value, options);
@@ -41,32 +56,25 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  const pathname = request.nextUrl.pathname;
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/connexion";
+      return NextResponse.redirect(url);
+    }
 
-  const isPublicRoute =
-    pathname === "/connexion" ||
-    pathname.startsWith("/auth/") ||
-    pathname.startsWith("/_next/") ||
-    pathname === "/favicon.ico" ||
-    pathname === "/manifest.json";
+    return response;
+  } catch (error) {
+    console.error("Échec Supabase Auth dans le proxy :", error);
 
-  if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/connexion";
+    url.searchParams.set("erreur", "Connexion au service momentanément impossible");
 
     return NextResponse.redirect(url);
   }
-
-  if (user && pathname === "/connexion") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/aujourd-hui";
-
-    return NextResponse.redirect(url);
-  }
-
-  return response;
 }

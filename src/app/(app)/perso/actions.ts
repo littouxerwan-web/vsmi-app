@@ -230,7 +230,7 @@ export async function excludeRecurrenceOccurrence(recurrenceId: string, occurren
 
 async function saveDefaultAccountSetting(
   fd: FormData,
-  formKey: "photo_default_account_id" | "movement_default_account_id" | "urssaf_default_account_id" | "savings_source_account_id" | "savings_destination_account_id",
+  formKey: "photo_default_account_id" | "movement_default_account_id" | "urssaf_default_account_id" | "savings_source_account_id" | "savings_destination_account_id" | "savings_source_account_2_id" | "savings_destination_account_2_id",
   successMessage: string,
 ) {
   const { supabase, user } = await auth();
@@ -291,12 +291,46 @@ export async function updateUrssafDefaultAccount(fd: FormData) {
 }
 
 
-export async function updateSavingsSourceAccount(fd: FormData) {
-  return saveDefaultAccountSetting(fd, "savings_source_account_id", "Compte source de l’analyse d’épargne enregistré.");
+async function saveSavingsProfile(fd: FormData, profile: 1 | 2) {
+  const { supabase, user } = await auth();
+  const sourceKey = profile === 1 ? "savings_source_account_id" : "savings_source_account_2_id";
+  const destinationKey = profile === 1 ? "savings_destination_account_id" : "savings_destination_account_2_id";
+  const thresholdKey = profile === 1 ? "savings_threshold" : "savings_threshold_2";
+  const sourceAccountId = optional(fd, sourceKey);
+  const destinationAccountId = optional(fd, destinationKey);
+  const thresholdRaw = Number(fd.get(thresholdKey) ?? 500);
+  const threshold = Number.isFinite(thresholdRaw) && thresholdRaw >= 0 ? thresholdRaw : 500;
+
+  if (sourceAccountId === destinationAccountId && sourceAccountId) fail("Le compte source et le compte d’épargne doivent être différents.");
+  if (sourceAccountId) {
+    const { data: source, error } = await supabase.from("personal_accounts").select("id,account_type").eq("id", sourceAccountId).eq("owner_id", user.id).eq("is_active", true).maybeSingle();
+    if (error) fail(error.message);
+    if (!source || source.account_type !== "checking") fail("Choisis un compte courant valide comme source.");
+  }
+  if (destinationAccountId) {
+    const { data: destination, error } = await supabase.from("personal_accounts").select("id,account_type").eq("id", destinationAccountId).eq("owner_id", user.id).eq("is_active", true).maybeSingle();
+    if (error) fail(error.message);
+    if (!destination || destination.account_type !== "savings") fail("Choisis un compte d’épargne valide comme destination.");
+  }
+
+  const { data: existing, error: readError } = await supabase.from("personal_settings").select("owner_id").eq("owner_id", user.id).maybeSingle();
+  if (readError) fail(readError.message);
+  const payload = { [sourceKey]: sourceAccountId, [destinationKey]: destinationAccountId, [thresholdKey]: threshold, updated_at: new Date().toISOString() };
+  const query = existing
+    ? supabase.from("personal_settings").update(payload).eq("owner_id", user.id)
+    : supabase.from("personal_settings").insert({ owner_id: user.id, ...payload });
+  const { error } = await query;
+  if (error) fail(error.message);
+  revalidatePath(PATH);
+  redirect(`${PATH}?vue=parametres&succes=${encodeURIComponent(`Profil d’épargne ${profile} enregistré.`)}`);
 }
 
-export async function updateSavingsDestinationAccount(fd: FormData) {
-  return saveDefaultAccountSetting(fd, "savings_destination_account_id", "Compte d’épargne destinataire enregistré.");
+export async function updateSavingsProfile1(fd: FormData) {
+  return saveSavingsProfile(fd, 1);
+}
+
+export async function updateSavingsProfile2(fd: FormData) {
+  return saveSavingsProfile(fd, 2);
 }
 
 export async function toggleUrssafContribution(month: string, completed: boolean, fallbackAccountId?: string | null) {
@@ -351,6 +385,9 @@ export async function toggleWeddingPayment(paymentId: string, completed: boolean
   refresh(completed ? "Encaissement photo intégré au disponible aujourd’hui." : "Encaissement photo maintenu en prévision.");
 }
 
+function savingsReturnView(fd: FormData) { return text(fd, "return_view") === "projection" ? "projection" : "finances"; }
+function savingsSuccess(fd: FormData, message: string): never { revalidatePath(PATH); redirect(`${PATH}?vue=${savingsReturnView(fd)}&succes=${encodeURIComponent(message)}`); }
+
 function savingsProposalKey(fd: FormData) {
   const sourceAccountId = text(fd, "source_account_id");
   const destinationAccountId = text(fd, "destination_account_id");
@@ -364,7 +401,9 @@ async function verifySavingsAccounts(supabase: any, ownerId: string, sourceAccou
   if (error) fail(error.message);
   const source = rows?.find((a: { id: string; account_type: string }) => a.id === sourceAccountId);
   const destination = rows?.find((a: { id: string; account_type: string }) => a.id === destinationAccountId);
-  if (!source || source.account_type !== "checking" || !destination || destination.account_type !== "savings") fail("Les comptes de la proposition d’épargne sont incorrects.");
+  const isSavingsDeposit = source?.account_type === "checking" && destination?.account_type === "savings";
+  const isSavingsUse = source?.account_type === "savings" && destination?.account_type === "checking";
+  if (!source || !destination || (!isSavingsDeposit && !isSavingsUse)) fail("Les comptes de la proposition d’épargne sont incorrects.");
 }
 
 export async function acceptSavingsProposal(fd: FormData) {
@@ -374,29 +413,39 @@ export async function acceptSavingsProposal(fd: FormData) {
   await verifySavingsAccounts(supabase, user.id, key.sourceAccountId, key.destinationAccountId);
   const { data: existing, error: existingError } = await supabase.from("personal_savings_proposals").select("id,status,transfer_group_id").eq("owner_id", user.id).eq("source_account_id", key.sourceAccountId).eq("destination_account_id", key.destinationAccountId).eq("source_month", key.sourceMonthDate).maybeSingle();
   if (existingError) fail(existingError.message);
-  if (existing?.status === "accepted" && existing.transfer_group_id) return refresh("Ce versement d’épargne est déjà accepté.");
-  let { data: category, error: categoryError } = await supabase.from("personal_categories").select("id").eq("owner_id", user.id).eq("name", "Épargne").eq("movement_type", "expense").is("parent_id", null).maybeSingle();
-  if (categoryError) fail(categoryError.message);
-  if (!category) {
-    const { data: created, error } = await supabase.from("personal_categories").insert({ owner_id: user.id, name: "Épargne", movement_type: "expense", parent_id: null, monthly_budget: 0, account_id: key.sourceAccountId, is_active: true }).select("id").single();
-    if (error) fail(error.message); category = created;
+  if (existing?.status === "accepted" && existing.transfer_group_id) savingsSuccess(fd, "Ce versement d’épargne est déjà accepté.");
+  const { data: accountRows, error: accountError } = await supabase.from("personal_accounts").select("id,account_type").eq("owner_id", user.id).in("id", [key.sourceAccountId, key.destinationAccountId]);
+  if (accountError) fail(accountError.message);
+  const sourceType = accountRows?.find((row: { id: string; account_type: string }) => row.id === key.sourceAccountId)?.account_type;
+  const isSavingsUse = sourceType === "savings";
+  let category: { id: string } | null = null;
+  if (!isSavingsUse) {
+    const { data, error: categoryError } = await supabase.from("personal_categories").select("id").eq("owner_id", user.id).eq("name", "Épargne").eq("movement_type", "expense").is("parent_id", null).maybeSingle();
+    if (categoryError) fail(categoryError.message);
+    category = data;
+    if (!category) {
+      const { data: created, error } = await supabase.from("personal_categories").insert({ owner_id: user.id, name: "Épargne", movement_type: "expense", parent_id: null, monthly_budget: 0, account_id: key.sourceAccountId, is_active: true }).select("id").single();
+      if (error) fail(error.message); category = created;
+    }
   }
-  const d = new Date(`${key.sourceMonth}-01T12:00:00`); d.setMonth(d.getMonth() + 1); const movementDate = d.toISOString().slice(0, 10); const group = crypto.randomUUID();
-  const label = `Versement épargne proposé · ${key.sourceMonth}`;
+  const d = new Date(`${key.sourceMonth}-01T12:00:00`);
+  if (isSavingsUse) { d.setMonth(d.getMonth() + 1); d.setDate(0); } else { d.setMonth(d.getMonth() + 1); }
+  const movementDate = d.toISOString().slice(0, 10); const group = crypto.randomUUID();
+  const label = isSavingsUse ? `Utilisation épargne proposée · ${key.sourceMonth}` : `Versement épargne proposé · ${key.sourceMonth}`;
   const { error: movementError } = await supabase.from("personal_movements").insert([
-    { owner_id: user.id, account_id: key.sourceAccountId, category_id: category.id, movement_type: "transfer_out", label, amount, movement_date: movementDate, status: "planned", transfer_group_id: group },
+    { owner_id: user.id, account_id: key.sourceAccountId, category_id: isSavingsUse ? null : category?.id ?? null, movement_type: "transfer_out", label, amount, movement_date: movementDate, status: "planned", transfer_group_id: group },
     { owner_id: user.id, account_id: key.destinationAccountId, category_id: null, movement_type: "transfer_in", label, amount, movement_date: movementDate, status: "planned", transfer_group_id: group },
   ]);
   if (movementError) fail(movementError.message);
   const payload = { owner_id: user.id, source_account_id: key.sourceAccountId, destination_account_id: key.destinationAccountId, source_month: key.sourceMonthDate, amount, status: "accepted", transfer_group_id: group, accepted_at: new Date().toISOString(), updated_at: new Date().toISOString() };
   const { error } = await supabase.from("personal_savings_proposals").upsert(payload, { onConflict: "owner_id,source_account_id,destination_account_id,source_month" });
   if (error) fail(error.message);
-  revalidatePath(PATH); redirect(`${PATH}?vue=finances&succes=${encodeURIComponent("Versement d’épargne accepté et ajouté aux prévisions du mois suivant.")}`);
+  savingsSuccess(fd, "Proposition d’épargne acceptée et ajoutée aux prévisions.");
 }
 
 export async function updateSavingsProposalAmount(fd: FormData) {
   const { supabase, user } = await auth();
-  const key = savingsProposalKey(fd); const amount = number(fd, "amount");
+  const key = savingsProposalKey(fd); const amount = number(fd, "amount"); const calculationBase = number(fd, "calculation_base");
   if (!Number.isFinite(amount) || amount <= 0) fail("Le montant doit être supérieur à zéro.");
   await verifySavingsAccounts(supabase, user.id, key.sourceAccountId, key.destinationAccountId);
   const { data: existing, error: readError } = await supabase.from("personal_savings_proposals").select("status,transfer_group_id").eq("owner_id", user.id).eq("source_account_id", key.sourceAccountId).eq("destination_account_id", key.destinationAccountId).eq("source_month", key.sourceMonthDate).maybeSingle();
@@ -405,9 +454,9 @@ export async function updateSavingsProposalAmount(fd: FormData) {
     const { error } = await supabase.from("personal_movements").update({ amount }).eq("owner_id", user.id).eq("transfer_group_id", existing.transfer_group_id);
     if (error) fail(error.message);
   }
-  const { error } = await supabase.from("personal_savings_proposals").upsert({ owner_id: user.id, source_account_id: key.sourceAccountId, destination_account_id: key.destinationAccountId, source_month: key.sourceMonthDate, amount, status: existing?.status === "accepted" ? "accepted" : "modified", transfer_group_id: existing?.transfer_group_id ?? null, updated_at: new Date().toISOString() }, { onConflict: "owner_id,source_account_id,destination_account_id,source_month" });
+  const { error } = await supabase.from("personal_savings_proposals").upsert({ owner_id: user.id, source_account_id: key.sourceAccountId, destination_account_id: key.destinationAccountId, source_month: key.sourceMonthDate, amount, calculation_base: Number.isFinite(calculationBase) ? calculationBase : null, status: existing?.status === "accepted" ? "accepted" : "pending", transfer_group_id: existing?.transfer_group_id ?? null, updated_at: new Date().toISOString() }, { onConflict: "owner_id,source_account_id,destination_account_id,source_month" });
   if (error) fail(error.message);
-  revalidatePath(PATH); redirect(`${PATH}?vue=finances&succes=${encodeURIComponent("Montant du versement d’épargne modifié.")}`);
+  savingsSuccess(fd, "Montant du versement d’épargne modifié.");
 }
 
 export async function deleteSavingsProposal(fd: FormData) {
@@ -421,5 +470,5 @@ export async function deleteSavingsProposal(fd: FormData) {
   }
   const { error } = await supabase.from("personal_savings_proposals").upsert({ owner_id: user.id, source_account_id: key.sourceAccountId, destination_account_id: key.destinationAccountId, source_month: key.sourceMonthDate, amount: 0, status: "deleted", transfer_group_id: null, accepted_at: null, updated_at: new Date().toISOString() }, { onConflict: "owner_id,source_account_id,destination_account_id,source_month" });
   if (error) fail(error.message);
-  revalidatePath(PATH); redirect(`${PATH}?vue=finances&succes=${encodeURIComponent("Proposition d’épargne supprimée.")}`);
+  savingsSuccess(fd, "Proposition d’épargne supprimée.");
 }
