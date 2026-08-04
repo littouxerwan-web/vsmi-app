@@ -336,14 +336,23 @@ async function saveSavingsProfile(fd: FormData, profile: 1 | 2) {
     if (!category || category.movement_type !== "income") fail("Choisis une catégorie de revenu valide pour démarrer le cycle.");
   }
 
-  const { data: existing, error: readError } = await supabase.from("personal_settings").select("owner_id").eq("owner_id", user.id).maybeSingle();
-  if (readError) fail(readError.message);
-  const payload = { [sourceKey]: sourceAccountId, [destinationKey]: destinationAccountId, [thresholdKey]: threshold, [incomeCategoryKey]: incomeCategoryId, [incomeSourceKey]: incomeSource, [proposalTimingKey]: proposalTiming, updated_at: new Date().toISOString() };
-  const query = existing
-    ? supabase.from("personal_settings").update(payload).eq("owner_id", user.id)
-    : supabase.from("personal_settings").insert({ owner_id: user.id, ...payload });
-  const { error } = await query;
+  const payload = {
+    owner_id: user.id,
+    [sourceKey]: sourceAccountId,
+    [destinationKey]: destinationAccountId,
+    [thresholdKey]: threshold,
+    [incomeCategoryKey]: incomeCategoryId,
+    [incomeSourceKey]: incomeSource,
+    [proposalTimingKey]: proposalTiming,
+    updated_at: new Date().toISOString(),
+  };
+  const { data: saved, error } = await supabase
+    .from("personal_settings")
+    .upsert(payload, { onConflict: "owner_id" })
+    .select(`${sourceKey},${destinationKey},${thresholdKey},${incomeCategoryKey},${incomeSourceKey},${proposalTimingKey}`)
+    .single();
   if (error) fail(error.message);
+  if (!saved) fail("Le profil d’épargne n’a pas pu être relu après son enregistrement.");
   revalidatePath(PATH);
   redirect(`${PATH}?vue=parametres&succes=${encodeURIComponent(`Profil d’épargne ${profile} enregistré.`)}`);
 }
