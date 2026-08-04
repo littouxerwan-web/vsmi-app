@@ -25,6 +25,7 @@ type Input = {
   overrides?: SavingsOverride[]; exclusions?: SavingsExclusion[]; photoPayments?: SavingsPhotoPayment[]; photoDefaultAccountId?: string | null;
   urssafStates?: SavingsUrssafState[]; urssafDefaultAccountId?: string | null; movementDefaultAccountId?: string | null;
   savingsProposals?: SavingsProposalDecision[]; months?: number; minReserve?: number;
+  primaryIncomeCategoryId?: string | null; primaryIncomeSource?: "category" | "weddings"; proposalTiming?: "same_day" | "next_day";
 };
 
 type DayFlow = { income: number; expense: number; primaryIncome: number };
@@ -40,7 +41,8 @@ export function calculateSavingsPlan(input: Input): SavingsPlanRow[] {
   const endDate = monthEnd(endMonth);
   const startDate = `${input.startMonth}-01`;
   const resolveRoot = createCategoryRootResolver(input.categories);
-  const primaryRoots = new Set(input.categories.filter(c => c.is_primary_income).map(c => resolveRoot(c.id) ?? c.id));
+  const selectedPrimaryRoot = input.primaryIncomeCategoryId ? (resolveRoot(input.primaryIncomeCategoryId) ?? input.primaryIncomeCategoryId) : null;
+  const primaryRoots = new Set(selectedPrimaryRoot ? [selectedPrimaryRoot] : input.categories.filter(c => c.is_primary_income).map(c => resolveRoot(c.id) ?? c.id));
   const accounts = input.accounts ?? [{ id: input.sourceAccountId, account_type: "checking" as const, is_default: true }, { id: input.destinationAccountId, account_type: "savings" as const }];
   const budgetRoots = input.categories.filter(c => !c.parent_id && c.movement_type !== "income" && Number(c.monthly_budget) > 0 && resolveBudgetAccountId(c, input.movementDefaultAccountId, accounts) === input.sourceAccountId);
   const overrideMap = new Map((input.overrides ?? []).map(o => [`${o.recurrence_id}:${String(o.occurrence_month).slice(0, 7)}`, Number(o.amount)]));
@@ -81,7 +83,7 @@ export function calculateSavingsPlan(input: Input): SavingsPlanRow[] {
   for (const p of input.photoPayments ?? []) {
     const date = p.status === "received" ? (p.received_date ?? p.expected_date) : p.expected_date;
     if (!date || date < startDate || date > endDate || p.status === "cancelled") continue;
-    if ((p.personal_account_id ?? input.photoDefaultAccountId) === input.sourceAccountId && p.status === "expected") addIncome(date, Number(p.amount));
+    if ((p.personal_account_id ?? input.photoDefaultAccountId) === input.sourceAccountId && p.status === "expected") addIncome(date, Number(p.amount), input.primaryIncomeSource === "weddings");
   }
 
   for (let i = 0; i < monthCount; i++) {
@@ -95,6 +97,12 @@ export function calculateSavingsPlan(input: Input): SavingsPlanRow[] {
 
   const dates: string[] = []; for (let d = new Date(`${startDate}T12:00:00`); iso(d) <= endDate; d.setDate(d.getDate() + 1)) dates.push(iso(d));
   const primaryDates = dates.filter(date => (flows.get(date)?.primaryIncome ?? 0) > 0);
+  const proposalDelayDays = input.proposalTiming === "next_day" ? 1 : 0;
+  const proposalTriggers = new Map<string, string>();
+  for (const primaryDate of primaryDates) {
+    const d = new Date(`${primaryDate}T12:00:00`); d.setDate(d.getDate() + proposalDelayDays);
+    const triggerDate = iso(d); if (triggerDate <= endDate) proposalTriggers.set(triggerDate, primaryDate);
+  }
   let checking = Number(input.initialChecking), savings = Number(input.initialSavings);
   const monthState = new Map<string, SavingsPlanRow>();
   const ensureRow = (month: string) => { let row = monthState.get(month); if (!row) { row = { month, openingChecking: checking, checking, savings, proposal: 0, savingsUsed: 0, balanceAfterSavingsUse: checking, income: 0, expense: 0, debitExcludingBudgetRemaining: 0, budgetRemaining: 0, balanceBeforeSavings: checking, requiredReserve: minimumReserve, proposalDate: null, savingsUseDate: null, cycleEndDate: null }; monthState.set(month, row); } return row; };
@@ -110,8 +118,9 @@ export function calculateSavingsPlan(input: Input): SavingsPlanRow[] {
     }
     row.balanceAfterSavingsUse = checking;
 
-    if (flow.primaryIncome > 0 && row.proposal === 0) {
-      const nextPrimary = primaryDates.find(d => d > date) ?? endDate;
+    const cycleStartDate = proposalTriggers.get(date);
+    if (cycleStartDate && row.proposal === 0) {
+      const nextPrimary = primaryDates.find(d => d > cycleStartDate) ?? endDate;
       let projected = checking, minimum = checking;
       for (const futureDate of dates) { if (futureDate <= date || futureDate >= nextPrimary) continue; const future = flows.get(futureDate); if (future) projected += future.income - future.expense; minimum = Math.min(minimum, projected); }
       const automatic = Math.max(0, minimum - minimumReserve); const decision = depositDecision.get(month);

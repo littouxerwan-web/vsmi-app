@@ -308,8 +308,14 @@ async function saveSavingsProfile(fd: FormData, profile: 1 | 2) {
   const sourceKey = profile === 1 ? "savings_source_account_id" : "savings_source_account_2_id";
   const destinationKey = profile === 1 ? "savings_destination_account_id" : "savings_destination_account_2_id";
   const thresholdKey = profile === 1 ? "savings_threshold" : "savings_threshold_2";
+  const incomeCategoryKey = profile === 1 ? "savings_income_category_id" : "savings_income_category_2_id";
+  const proposalTimingKey = profile === 1 ? "savings_proposal_timing" : "savings_proposal_timing_2";
+  const incomeSourceKey = profile === 1 ? "savings_income_source" : "savings_income_source_2";
   const sourceAccountId = optional(fd, sourceKey);
   const destinationAccountId = optional(fd, destinationKey);
+  const incomeSource = text(fd, incomeSourceKey) === "weddings" ? "weddings" : "category";
+  const incomeCategoryId = incomeSource === "category" ? optional(fd, incomeCategoryKey) : null;
+  const proposalTiming = text(fd, proposalTimingKey) === "next_day" ? "next_day" : "same_day";
   const thresholdRaw = Number(fd.get(thresholdKey) ?? 500);
   const threshold = Number.isFinite(thresholdRaw) && thresholdRaw >= 0 ? thresholdRaw : 500;
 
@@ -324,10 +330,15 @@ async function saveSavingsProfile(fd: FormData, profile: 1 | 2) {
     if (error) fail(error.message);
     if (!destination || destination.account_type !== "savings") fail("Choisis un compte d’épargne valide comme destination.");
   }
+  if (incomeCategoryId) {
+    const { data: category, error } = await supabase.from("personal_categories").select("id,movement_type").eq("id", incomeCategoryId).eq("owner_id", user.id).eq("is_active", true).maybeSingle();
+    if (error) fail(error.message);
+    if (!category || category.movement_type !== "income") fail("Choisis une catégorie de revenu valide pour démarrer le cycle.");
+  }
 
   const { data: existing, error: readError } = await supabase.from("personal_settings").select("owner_id").eq("owner_id", user.id).maybeSingle();
   if (readError) fail(readError.message);
-  const payload = { [sourceKey]: sourceAccountId, [destinationKey]: destinationAccountId, [thresholdKey]: threshold, updated_at: new Date().toISOString() };
+  const payload = { [sourceKey]: sourceAccountId, [destinationKey]: destinationAccountId, [thresholdKey]: threshold, [incomeCategoryKey]: incomeCategoryId, [incomeSourceKey]: incomeSource, [proposalTimingKey]: proposalTiming, updated_at: new Date().toISOString() };
   const query = existing
     ? supabase.from("personal_settings").update(payload).eq("owner_id", user.id)
     : supabase.from("personal_settings").insert({ owner_id: user.id, ...payload });
@@ -405,7 +416,9 @@ function savingsProposalKey(fd: FormData) {
   const destinationAccountId = text(fd, "destination_account_id");
   const sourceMonth = text(fd, "source_month");
   if (!sourceAccountId || !destinationAccountId || sourceAccountId === destinationAccountId || !/^\d{4}-\d{2}$/.test(sourceMonth)) fail("Proposition d’épargne incorrecte.");
-  return { sourceAccountId, destinationAccountId, sourceMonth, sourceMonthDate: `${sourceMonth}-01` };
+  const proposalDateRaw = optional(fd, "proposal_date");
+  const proposalDate = proposalDateRaw && /^\d{4}-\d{2}-\d{2}$/.test(proposalDateRaw) && proposalDateRaw.startsWith(sourceMonth) ? proposalDateRaw : `${sourceMonth}-28`;
+  return { sourceAccountId, destinationAccountId, sourceMonth, sourceMonthDate: `${sourceMonth}-01`, proposalDate };
 }
 
 async function verifySavingsAccounts(supabase: any, ownerId: string, sourceAccountId: string, destinationAccountId: string) {
@@ -440,7 +453,7 @@ export async function acceptSavingsProposal(fd: FormData) {
       if (error) fail(error.message); category = created;
     }
   }
-  const movementDate = `${key.sourceMonth}-28`; const group = crypto.randomUUID();
+  const movementDate = key.proposalDate; const group = crypto.randomUUID();
   const label = isSavingsUse ? `Utilisation épargne proposée · ${key.sourceMonth}` : `Versement épargne proposé · ${key.sourceMonth}`;
   const { error: movementError } = await supabase.from("personal_movements").insert([
     { owner_id: user.id, account_id: key.sourceAccountId, category_id: isSavingsUse ? null : category?.id ?? null, movement_type: "transfer_out", label, amount, movement_date: movementDate, status: "planned", transfer_group_id: group },
