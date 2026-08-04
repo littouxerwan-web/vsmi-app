@@ -21,6 +21,9 @@ type Profile = {
   sourceAccountId: string | null;
   destinationAccountId: string | null;
   threshold: number;
+  primaryIncomeCategoryId?: string | null;
+  primaryIncomeSource?: "category" | "weddings";
+  proposalTiming?: "same_day" | "next_day";
 };
 
 type CalculatedProfile = Profile & { initialChecking: number; initialSavings: number };
@@ -100,6 +103,9 @@ export function SavingsAnalysis(props: Props) {
           movementDefaultAccountId: props.movementDefaultAccountId,
           savingsProposals: props.savingsProposals,
           minReserve: profile.threshold,
+          primaryIncomeCategoryId: profile.primaryIncomeCategoryId ?? null,
+          primaryIncomeSource: profile.primaryIncomeSource ?? "category",
+          proposalTiming: profile.proposalTiming ?? "same_day",
           months: 60,
         });
         return {
