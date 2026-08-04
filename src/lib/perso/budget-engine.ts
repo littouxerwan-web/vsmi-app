@@ -4,6 +4,8 @@ export type BudgetCategory = {
   monthly_budget: number;
   account_id?: string | null;
   movement_type?: string;
+  budget_period?: "monthly" | "specific_month";
+  budget_month?: string | null;
 };
 
 export type BudgetAccount = {
@@ -40,6 +42,14 @@ export function resolveBudgetAccountId(
     accounts.find((account) => account.account_type === "checking")?.id ??
     null
   );
+}
+
+export function isBudgetActiveForMonth(
+  category: Pick<BudgetCategory, "budget_period" | "budget_month">,
+  month: string,
+): boolean {
+  if ((category.budget_period ?? "monthly") === "monthly") return true;
+  return Boolean(category.budget_month && String(category.budget_month).slice(0, 7) === month.slice(0, 7));
 }
 
 export function calculateBudgetRemaining(

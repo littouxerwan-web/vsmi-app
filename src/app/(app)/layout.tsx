@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogOut } from "lucide-react";
+import { LogOut, Plus } from "lucide-react";
 import { redirect } from "next/navigation";
 import { logout } from "@/app/connexion/actions";
 import { AppNavigation } from "@/components/app-navigation";
@@ -33,9 +33,18 @@ export default async function AppLayout({ children }: AppLayoutProps) {
 
         <div className="min-w-0 flex-1">
           <header className="sticky top-0 z-30 border-b border-black/10 bg-white/95 backdrop-blur">
-            <div className="flex h-18 items-center justify-between px-5 lg:px-8">
+            <div className="relative flex h-18 items-center justify-between px-5 lg:px-8">
               <Link href="/aujourd-hui" className="lg:hidden">
                 <p className="text-xl font-semibold tracking-tight">VSMI</p>
+              </Link>
+
+              <Link
+                href="/perso?vue=finances&quick=movement"
+                aria-label="Saisir rapidement un nouveau mouvement"
+                title="Nouveau mouvement"
+                className="absolute left-1/2 top-1/2 grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-black text-white shadow-md transition hover:bg-neutral-800"
+              >
+                <Plus size={22} strokeWidth={2.2} />
               </Link>
 
               <div className="flex items-center gap-4">

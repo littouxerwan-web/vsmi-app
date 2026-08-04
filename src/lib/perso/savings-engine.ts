@@ -1,6 +1,7 @@
 import {
   calculateBudgetRemaining,
   createCategoryRootResolver,
+  isBudgetActiveForMonth,
   resolveBudgetAccountId,
   type BudgetAccount,
 } from "./budget-engine";
@@ -12,6 +13,8 @@ export type SavingsCategory = {
   monthly_budget: number;
   account_id?: string | null;
   movement_type?: string;
+  budget_period?: "monthly" | "specific_month";
+  budget_month?: string | null;
 };
 export type SavingsMovement = {
   id?: string;
@@ -262,6 +265,7 @@ export function calculateSavingsPlan(input: Input): SavingsPlanRow[] {
     const debitExcludingBudgetRemaining = expense;
     let budgetRemaining = 0;
     for (const budget of budgetRoots) {
+      if (!isBudgetActiveForMonth(budget, month)) continue;
       budgetRemaining += calculateBudgetRemaining(
         Number(budget.monthly_budget),
         spentByBudget.get(budget.id) ?? 0,
@@ -290,8 +294,9 @@ export function calculateSavingsPlan(input: Input): SavingsPlanRow[] {
    * à la fin du mois précédent. Après application de tous les flux du mois
    * (mouvements, récurrences, photo, URSSAF et budgets restants), tout excédent
    * au-dessus du seuil est proposé au virement vers l'épargne. La simulation
-   * considère ce virement comme réalisé au 1er du mois suivant, de sorte que
-   * le mois suivant démarre bien avec le solde conservé sur le compte courant.
+   * considère ce virement comme réalisé le 28 du mois concerné. Les propositions
+   * automatiques restent intégrées aux mois suivants tant qu’elles ne sont pas
+   * validées, modifiées ou supprimées manuellement.
    */
   for (let index = 0; index < monthCount; index += 1) {
     const flow = flows[index];

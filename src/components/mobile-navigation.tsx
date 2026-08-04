@@ -8,13 +8,12 @@ import {
   HeartHandshake,
   LayoutDashboard,
   LockKeyhole,
-  Plus,
 } from "lucide-react";
 
 const items = [
   { href: "/aujourd-hui", label: "Aujourd’hui", icon: LayoutDashboard },
   { href: "/mariages", label: "Mariages", icon: HeartHandshake },
-  { href: "/mariages/nouveau", label: "Ajouter", icon: Plus, primary: true },
+  { href: "/comptabilite", label: "Compta", icon: CircleDollarSign },
   { href: "/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/perso", label: "Perso", icon: LockKeyhole },
 ];
@@ -30,9 +29,7 @@ export function MobileNavigation() {
       <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
         {items.map((item) => {
           const Icon = item.icon;
-          const active = item.href === "/mariages"
-            ? pathname === "/mariages" || pathname.startsWith("/mariages/")
-            : pathname === item.href;
+          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
           return (
             <Link
@@ -40,14 +37,12 @@ export function MobileNavigation() {
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-medium transition ${
-                item.primary
-                  ? "bg-black text-white"
-                  : active
-                    ? "bg-neutral-100 text-black"
-                    : "text-neutral-500 hover:bg-neutral-50 hover:text-black"
+                active
+                  ? "bg-neutral-100 text-black"
+                  : "text-neutral-500 hover:bg-neutral-50 hover:text-black"
               }`}
             >
-              <Icon size={item.primary ? 21 : 19} strokeWidth={1.9} />
+              <Icon size={19} strokeWidth={1.9} />
               <span>{item.label}</span>
             </Link>
           );

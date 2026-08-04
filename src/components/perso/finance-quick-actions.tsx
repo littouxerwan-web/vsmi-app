@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CalendarClock, PiggyBank, Plus, Tags, X } from "lucide-react";
 
 type MovementTab = "movement" | "recurrence" | "transfer";
@@ -20,6 +21,17 @@ export function FinanceQuickActions({
 }: Props) {
   const [modal, setModal] = useState<"movement" | "category" | null>(null);
   const [tab, setTab] = useState<MovementTab>("movement");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (searchParams.get("quick") !== "movement") return;
+    setTab("movement");
+    setModal("movement");
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("quick");
+    router.replace(params.size ? `/perso?${params.toString()}` : "/perso", { scroll: false });
+  }, [router, searchParams]);
 
   useEffect(() => {
     if (!modal) return;

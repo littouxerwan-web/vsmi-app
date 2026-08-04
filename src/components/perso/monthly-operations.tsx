@@ -11,9 +11,10 @@ import {
   toggleWeddingPayment,
   updateMovement,
 } from "@/app/(app)/perso/actions";
+import { isBudgetActiveForMonth } from "@/lib/perso/budget-engine";
 
 type Account={id:string;name:string};
-type Category={id:string;name:string;parent_id:string|null;monthly_budget:number;movement_type?:string;account_id?:string|null};
+type Category={id:string;name:string;parent_id:string|null;monthly_budget:number;movement_type?:string;account_id?:string|null;budget_period?:"monthly"|"specific_month";budget_month?:string|null};
 type Movement={id:string;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;recurrence_id?:string|null;transfer_group_id?:string|null};
 type Recurrence={id:string;account_id:string;destination_account_id:string|null;category_id:string|null;movement_type:"income"|"expense"|"transfer";label:string;amount:number;frequency:"weekly"|"monthly"|"quarterly"|"yearly";interval_count:number;start_date:string;end_date:string|null};
 type Override={recurrence_id:string;occurrence_month:string;amount:number};
@@ -53,7 +54,7 @@ export function MonthlyOperations({accounts,categories,movements,recurrences,ove
  const visibleOps=sortOps(baseVisibleOps.filter(o=>(!normalizedQuery||`${o.label} ${accounts.find(a=>a.id===o.account_id)?.name??""} ${categories.find(c=>c.id===o.category_id)?.name??""}`.toLocaleLowerCase("fr").includes(normalizedQuery))&&matchesType(o)&&matchesStatus(o.status)));
  const visiblePhotos=photos.filter(p=>(accountFilter==="all"||(p.personal_account_id??photoDefaultAccountId)===accountFilter)&&(!normalizedQuery||photoLabel(p).toLocaleLowerCase("fr").includes(normalizedQuery))&&(typeFilter==="all"||typeFilter==="credit")&&matchesStatus(p.status==="received"?"completed":"planned"));
  const showUrssaf=urssafAmount>0&&(accountFilter==="all"||urssafAccountId===accountFilter);
- const budgets=categories.filter(c=>!c.parent_id&&Number(c.monthly_budget||0)>0&&(accountFilter==="all"||c.account_id===accountFilter)).map(c=>{const spent=visibleOps.filter(o=>o.movement_type==="expense"&&rootFor(o.category_id)===c.id).reduce((s,o)=>s+Number(o.amount),0);return {...c,spent,remaining:Math.max(0,Number(c.monthly_budget)-spent)};});
+ const budgets=categories.filter(c=>!c.parent_id&&Number(c.monthly_budget||0)>0&&isBudgetActiveForMonth(c,month)&&(accountFilter==="all"||c.account_id===accountFilter)).map(c=>{const spent=visibleOps.filter(o=>o.movement_type==="expense"&&rootFor(o.category_id)===c.id).reduce((s,o)=>s+Number(o.amount),0);return {...c,spent,remaining:Math.max(0,Number(c.monthly_budget)-spent)};});
  const isCredit=(o:Operation)=>o.movement_type==="income"||o.movement_type==="transfer_in";
  const isDebit=(o:Operation)=>o.movement_type==="expense"||o.movement_type==="transfer"||o.movement_type==="transfer_out";
  const checkedCredits=visibleOps.filter(o=>o.status==="completed"&&isCredit(o)).reduce((s,o)=>s+Number(o.amount),0)+visiblePhotos.filter(p=>p.status==="received").reduce((s,p)=>s+Number(p.amount),0);

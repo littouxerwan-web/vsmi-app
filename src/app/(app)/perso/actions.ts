@@ -30,9 +30,13 @@ export async function createAccount(fd: FormData) {
 export async function createCategory(fd: FormData) {
   const { supabase, user } = await auth();
   const name = text(fd, "name"); const movementType = text(fd, "movement_type"); const parentId = optional(fd, "parent_id"); const accountId = optional(fd, "account_id"); const monthlyBudget = Math.max(0, number(fd, "monthly_budget") || 0);
+  const budgetPeriod = text(fd, "budget_period") === "specific_month" ? "specific_month" : "monthly";
+  const budgetMonthInput = optional(fd, "budget_month");
+  const budgetMonth = budgetPeriod === "specific_month" && budgetMonthInput ? `${budgetMonthInput.slice(0, 7)}-01` : null;
+  if (movementType === "expense" && monthlyBudget > 0 && budgetPeriod === "specific_month" && !budgetMonth) fail("Choisis le mois du budget ponctuel.");
   if (!name) fail("Indique le nom de la catégorie.");
   if (!["income", "expense"].includes(movementType)) fail("Type de catégorie incorrect.");
-  const { error } = await supabase.from("personal_categories").insert({ owner_id: user.id, name, movement_type: movementType, parent_id: parentId, monthly_budget: movementType === "expense" ? monthlyBudget : 0, account_id: movementType === "expense" ? accountId : null });
+  const { error } = await supabase.from("personal_categories").insert({ owner_id: user.id, name, movement_type: movementType, parent_id: parentId, monthly_budget: movementType === "expense" ? monthlyBudget : 0, account_id: movementType === "expense" ? accountId : null, budget_period: movementType === "expense" ? budgetPeriod : "monthly", budget_month: movementType === "expense" ? budgetMonth : null });
   if (error) fail(error.message); refresh(parentId ? "Sous-catégorie ajoutée." : "Catégorie ajoutée.");
 }
 
@@ -175,8 +179,12 @@ export async function updateAccount(fd: FormData) {
 export async function updateCategory(fd: FormData) {
   const { supabase, user } = await auth();
   const id = text(fd, "id"); const name = text(fd, "name"); const accountId = optional(fd, "account_id"); const monthlyBudget = Math.max(0, number(fd, "monthly_budget") || 0);
+  const budgetPeriod = text(fd, "budget_period") === "specific_month" ? "specific_month" : "monthly";
+  const budgetMonthInput = optional(fd, "budget_month");
+  const budgetMonth = budgetPeriod === "specific_month" && budgetMonthInput ? `${budgetMonthInput.slice(0, 7)}-01` : null;
   if (!id || !name) fail("Catégorie incomplète.");
-  const { error } = await supabase.from("personal_categories").update({ name, monthly_budget: monthlyBudget, account_id: accountId }).eq("id", id).eq("owner_id", user.id);
+  if (monthlyBudget > 0 && budgetPeriod === "specific_month" && !budgetMonth) fail("Choisis le mois du budget ponctuel.");
+  const { error } = await supabase.from("personal_categories").update({ name, monthly_budget: monthlyBudget, account_id: accountId, budget_period: budgetPeriod, budget_month: budgetMonth }).eq("id", id).eq("owner_id", user.id);
   if (error) fail(error.message); revalidatePath(PATH, "page"); redirect(`${PATH}?vue=finances&succes=${encodeURIComponent("Catégorie modifiée et soldes recalculés.")}`);
 }
 
@@ -428,9 +436,7 @@ export async function acceptSavingsProposal(fd: FormData) {
       if (error) fail(error.message); category = created;
     }
   }
-  const d = new Date(`${key.sourceMonth}-01T12:00:00`);
-  if (isSavingsUse) { d.setMonth(d.getMonth() + 1); d.setDate(0); } else { d.setMonth(d.getMonth() + 1); }
-  const movementDate = d.toISOString().slice(0, 10); const group = crypto.randomUUID();
+  const movementDate = `${key.sourceMonth}-28`; const group = crypto.randomUUID();
   const label = isSavingsUse ? `Utilisation épargne proposée · ${key.sourceMonth}` : `Versement épargne proposé · ${key.sourceMonth}`;
   const { error: movementError } = await supabase.from("personal_movements").insert([
     { owner_id: user.id, account_id: key.sourceAccountId, category_id: isSavingsUse ? null : category?.id ?? null, movement_type: "transfer_out", label, amount, movement_date: movementDate, status: "planned", transfer_group_id: group },
