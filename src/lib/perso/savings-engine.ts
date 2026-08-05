@@ -103,11 +103,28 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
  const primaryDates=dates.filter(d=>(flows.get(d)?.primaryIncome??0)>0);
  let checking=Number(input.initialChecking),savings=Number(input.initialSavings);
  const rows:SavingsPlanRow[]=[];
+ // Les propositions automatiques doivent être réinjectées dans les mois suivants.
+ // Sans cela, le même excédent est reproposé chaque mois, ce qui gonfle
+ // artificiellement l'épargne et génère ensuite des découverts énormes dans la projection.
+ const pendingDeposits:{date:string;amount:number}[]=[];
+ const pendingUses:{date:string;amount:number}[]=[];
 
  for(let i=0;i<count;i++){
   const month=shiftMonth(input.startMonth,i),first=`${month}-01`,last=monthEnd(month);
   if(last<simulationStart)continue;
   const rowStart=first<simulationStart?simulationStart:first;
+
+  // Applique les propositions calculées le mois précédent lorsqu'elles tombent
+  // au premier jour (ou avant le début) du mois courant.
+  for(const item of pendingDeposits.filter(item=>item.date<=rowStart)){
+   checking-=item.amount; savings+=item.amount;
+  }
+  for(const item of pendingUses.filter(item=>item.date<=rowStart)){
+   checking+=item.amount; savings-=item.amount;
+  }
+  for(let j=pendingDeposits.length-1;j>=0;j--)if(pendingDeposits[j].date<=rowStart)pendingDeposits.splice(j,1);
+  for(let j=pendingUses.length-1;j>=0;j--)if(pendingUses[j].date<=rowStart)pendingUses.splice(j,1);
+
   const opening=checking;
   let monthIncome=0,monthExpense=0,monthBudget=0;
 
@@ -151,18 +168,31 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
   const proposal=hasAcceptedDecision?0:automaticProposal;
   const usable=hasAcceptedDecision?0:Math.min(needed,savings);
 
-  // Projection de fin de mois : seules les décisions déjà acceptées modifient les soldes.
-  // Une simple proposition ne doit jamais créer artificiellement une baisse de liquidité.
+  // Projection de fin de mois. Les décisions acceptées ET les propositions
+  // automatiques sont intégrées dans la projection future afin qu'un même
+  // excédent ne puisse pas être épargné plusieurs fois.
   for(const date of dates.filter(d=>d>=rowStart&&d<=last)){
    const f=flows.get(date);if(f){checking+=f.income-f.expense;monthIncome+=f.income;monthExpense+=f.expense;monthBudget+=f.budget}
   }
-  checking-=acceptedDeposit; savings+=acceptedDeposit;
-  checking+=acceptedUse; savings-=acceptedUse;
 
-  const balanceBeforeSavings=checking+acceptedDeposit-acceptedUse;
+  const automaticUseDate=needed>0?(overdraftDate?addDays(overdraftDate,-1):lowestDate):null;
+  const projectedDeposit=acceptedDepositDecision?acceptedDeposit:proposal;
+  const projectedUse=acceptedUseDecision?acceptedUse:usable;
+  const projectedDepositDate=acceptedDepositDecision?proposalDate:proposalDate;
+  const projectedUseDate=acceptedUseDecision?automaticUseDate:automaticUseDate;
+
+  const balanceBeforeSavings=checking;
+  if(projectedDeposit>0){
+   if(projectedDepositDate<=last){checking-=projectedDeposit;savings+=projectedDeposit}
+   else pendingDeposits.push({date:projectedDepositDate,amount:projectedDeposit});
+  }
+  if(projectedUse>0&&projectedUseDate){
+   if(projectedUseDate<=last){checking+=projectedUse;savings-=projectedUse}
+   else pendingUses.push({date:projectedUseDate,amount:projectedUse});
+  }
   rows.push({
    month,openingChecking:opening,checking,savings,proposal,savingsUsed:usable,
-   balanceAfterSavingsUse:checking+usable,income:monthIncome,expense:monthExpense,
+   balanceAfterSavingsUse:checking,income:monthIncome,expense:monthExpense,
    debitExcludingBudgetRemaining:monthExpense-monthBudget,budgetRemaining:monthBudget,
    balanceBeforeSavings,requiredReserve:reserve,proposalDate,
    savingsUseDate:needed>0?(overdraftDate?addDays(overdraftDate,-1):lowestDate):null,

@@ -146,14 +146,28 @@ export function SavingsAnalysis(props: Props) {
     (sum, value) => sum + value,
     0,
   );
-  let cumulativeProposals = 0;
   const generalRows = results[0].rows.map((row, index) => {
     const proposal = results.reduce(
       (sum, result) => sum + (result.rows[index]?.proposal ?? 0),
       0,
     );
-    cumulativeProposals += proposal;
-    return { month: row.month, savings: generalInitialSavings + cumulativeProposals, proposal };
+    // Le moteur renvoie désormais une épargne projetée qui inclut déjà les
+    // versements et reprises des mois précédents. Ne jamais cumuler à nouveau
+    // les propositions ici.
+    const savingsByDestination = new Map<string, number>();
+    for (const result of results) {
+      if (!savingsByDestination.has(result.destination.id)) {
+        savingsByDestination.set(
+          result.destination.id,
+          Number(result.rows[index]?.savings ?? result.profile.initialSavings),
+        );
+      }
+    }
+    return {
+      month: row.month,
+      savings: [...savingsByDestination.values()].reduce((sum, value) => sum + value, 0),
+      proposal,
+    };
   });
   const displayedRows = selected?.rows ?? generalRows;
   const currentSavings = selected ? selected.profile.initialSavings : generalInitialSavings;
