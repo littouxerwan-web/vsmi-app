@@ -1,5 +1,6 @@
+import Image from "next/image";
 import Link from "next/link";
-import { LogOut, Plus } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
 import { redirect } from "next/navigation";
 import { logout } from "@/app/connexion/actions";
 import { AppNavigation } from "@/components/app-navigation";
@@ -34,20 +35,19 @@ export default async function AppLayout({ children }: AppLayoutProps) {
         <div className="min-w-0 flex-1">
           <header className="sticky top-0 z-30 border-b border-black/10 bg-white/95 backdrop-blur">
             <div className="relative flex h-18 items-center justify-between px-5 lg:px-8">
-              <Link href="/aujourd-hui" className="lg:hidden">
-                <p className="text-xl font-semibold tracking-tight">VSMI</p>
+              <Link href="/aujourd-hui" className="flex items-center lg:hidden" aria-label="Accueil VSMI">
+                <Image src="/vsmi-logo.gif" alt="Logo VSMI" width={54} height={54} className="h-11 w-auto object-contain" unoptimized priority />
               </Link>
 
-              <Link
-                href="/perso?vue=finances&quick=movement"
-                aria-label="Saisir rapidement un nouveau mouvement"
-                title="Nouveau mouvement"
-                className="absolute left-1/2 top-1/2 grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-black text-white shadow-md transition hover:bg-neutral-800"
-              >
-                <Plus size={22} strokeWidth={2.2} />
-              </Link>
-
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4">
+                <Link
+                  href="/perso?vue=parametres"
+                  aria-label="Ouvrir les paramètres personnels"
+                  title="Paramètres"
+                  className="grid size-10 place-items-center rounded-full border border-black/10 bg-white transition hover:bg-neutral-100"
+                >
+                  <Settings size={18} />
+                </Link>
                 <div className="hidden text-right sm:block">
                   <p className="text-sm font-medium">
                     {firstName ?? user.email ?? "Utilisateur"}

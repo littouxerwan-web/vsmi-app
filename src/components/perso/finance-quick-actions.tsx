@@ -73,12 +73,12 @@ export function FinanceQuickActions({
 
       {modal ? (
         <div
-          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/45 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+          className="fixed inset-0 z-[100] flex items-end justify-center overflow-hidden bg-black/45 p-0 backdrop-blur-sm sm:items-center sm:p-6"
           onMouseDown={(event) => {
             if (event.currentTarget === event.target) setModal(null);
           }}
         >
-          <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:max-w-3xl sm:rounded-3xl">
+          <div className="max-h-[calc(100dvh-5.25rem-env(safe-area-inset-bottom))] w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-white pb-[env(safe-area-inset-bottom)] shadow-2xl sm:max-h-[92vh] sm:max-w-3xl sm:rounded-3xl sm:pb-0">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-black/10 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-400">
@@ -100,7 +100,7 @@ export function FinanceQuickActions({
 
             {modal === "movement" ? (
               <div className="p-5 sm:p-6">
-                <div className="mb-6 grid grid-cols-3 gap-2 rounded-2xl bg-neutral-100 p-1.5">
+                <div className="mb-6 grid grid-cols-3 gap-1 rounded-2xl bg-neutral-100 p-1.5 sm:gap-2">
                   <TabButton
                     active={tab === "movement"}
                     onClick={() => setTab("movement")}
