@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { logout } from "@/app/connexion/actions";
 import { AppNavigation } from "@/components/app-navigation";
 import { MobileNavigation } from "@/components/mobile-navigation";
+import { PrivacyModeToggle } from "@/components/privacy-mode-toggle";
 import { createClient } from "@/lib/supabase/server";
 
 type AppLayoutProps = {
@@ -40,6 +41,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
               </Link>
 
               <div className="flex items-center gap-2 sm:gap-4">
+                <PrivacyModeToggle />
                 <Link
                   href="/perso?vue=parametres"
                   aria-label="Ouvrir les paramètres personnels"
@@ -69,7 +71,9 @@ export default async function AppLayout({ children }: AppLayoutProps) {
             </div>
           </header>
 
-          <div className="pb-24 lg:pb-0">{children}</div>
+          <div id="app-private-content" className="relative pb-24 lg:pb-0">
+            {children}
+          </div>
           <MobileNavigation />
         </div>
       </div>

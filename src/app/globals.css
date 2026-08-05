@@ -51,3 +51,23 @@ button:disabled,
 input:disabled {
   cursor: not-allowed;
 }
+
+/* Mode privé : les pages restent visibles, seuls les chiffres sont masqués. */
+.vsmi-private-mode #app-private-content input[type="number"],
+.vsmi-private-mode #app-private-content input[inputmode="numeric"],
+.vsmi-private-mode #app-private-content input[inputmode="decimal"] {
+  -webkit-text-security: disc;
+}
+
+/* Neutralise définitivement l'ancien mode privé qui floutait toute la page. */
+.private-mode-shield {
+  display: none !important;
+}
+
+.vsmi-private-mode #app-private-content,
+.vsmi-private-mode #app-private-content > * {
+  filter: none !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  user-select: auto !important;
+}
