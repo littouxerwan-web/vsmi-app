@@ -63,6 +63,12 @@ const monthLabel = (value: string) =>
   new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(
     new Date(`${value}-01T12:00:00`),
   );
+const dateLabel = (value: string | null) =>
+  value
+    ? new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", year: "numeric" }).format(
+        new Date(`${value}T12:00:00`),
+      )
+    : "—";
 const shift = (month: string, delta: number) => {
   const date = new Date(`${month}-01T12:00:00`);
   date.setMonth(date.getMonth() + delta);
@@ -234,6 +240,7 @@ function ProposalList({ result }: { result: SavingsResult }) {
   const diagnosticRow =
     result.rows.find((row) => row.month === diagnosticMonth) ?? result.rows[0];
   const proposedRows = result.rows.filter((row) => row.proposal > 0).slice(0, 24);
+  const recoveryRows = result.rows.filter((row) => row.savingsUsed > 0).slice(0, 24);
 
   return (
     <section className="rounded-3xl border bg-white p-6">
@@ -297,20 +304,71 @@ function ProposalList({ result }: { result: SavingsResult }) {
               value={diagnosticRow.balanceBeforeSavings}
             />
             <DiagnosticMetric label="Seuil conservé" value={diagnosticRow.requiredReserve} />
+            <DiagnosticMetric label="Point bas du cycle" value={diagnosticRow.lowestBalance} />
             <DiagnosticMetric
               label="Versement proposé"
               value={diagnosticRow.proposal}
               positive={diagnosticRow.proposal > 0}
             />
+            <DiagnosticMetric
+              label="Épargne à reprendre"
+              value={diagnosticRow.savingsUsed}
+              negative={diagnosticRow.savingsUsed > 0}
+            />
             <DiagnosticMetric label="Solde après proposition" value={diagnosticRow.checking} />
+            <DiagnosticMetric
+              label="Solde après reprise éventuelle"
+              value={diagnosticRow.balanceAfterSavingsUse}
+            />
           </div>
 
-          {diagnosticRow.proposal <= 0 ? (
-            <p className="mt-4 rounded-xl bg-white p-3 text-sm text-neutral-700">
-              Aucune proposition : le solde avant épargne ({money(diagnosticRow.balanceBeforeSavings)})
-              ne dépasse pas le seuil configuré ({money(diagnosticRow.requiredReserve)}).
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <InfoMetric label="Date du point bas" value={dateLabel(diagnosticRow.lowestBalanceDate)} />
+            <InfoMetric label="Prochain revenu principal" value={dateLabel(diagnosticRow.nextPrimaryIncomeDate)} />
+            <InfoMetric label="Fin du cycle analysé" value={dateLabel(diagnosticRow.cycleEndDate)} />
+            <InfoMetric
+              label="Découvert prévu"
+              value={diagnosticRow.overdraftDate ? dateLabel(diagnosticRow.overdraftDate) : "Non"}
+              danger={Boolean(diagnosticRow.overdraftDate)}
+            />
+          </div>
+
+          {diagnosticRow.savingsUsed > 0 ? (
+            <p className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+              Une reprise de {money(diagnosticRow.savingsUsed)} depuis {result.destination.name} est conseillée avant le {dateLabel(diagnosticRow.savingsUseDate)} afin de conserver le seuil de {money(diagnosticRow.requiredReserve)}.
             </p>
-          ) : null}
+          ) : diagnosticRow.proposal <= 0 ? (
+            <p className="mt-4 rounded-xl bg-white p-3 text-sm text-neutral-700">
+              Aucune proposition : le point bas du cycle ({money(diagnosticRow.lowestBalance)}) ne dépasse pas le seuil configuré ({money(diagnosticRow.requiredReserve)}).
+            </p>
+          ) : (
+            <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+              Le versement proposé conserve un point bas de {money(diagnosticRow.requiredReserve)} jusqu’au prochain revenu principal.
+            </p>
+          )}
+        </div>
+      ) : null}
+
+      {recoveryRows.length ? (
+        <div className="mt-5 space-y-3">
+          <p className="text-sm font-semibold text-red-900">Reprises d’épargne conseillées</p>
+          {recoveryRows.map((row) => (
+            <div key={`recovery-${row.month}`} className="rounded-2xl border border-red-200 bg-red-50 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-red-950">Utilisation de l’épargne conseillée</p>
+                  <p className="mt-1 text-xs text-red-800">
+                    Avant le {dateLabel(row.savingsUseDate)} · {result.destination.name}{" "}
+                    <ArrowRight className="inline" size={13} /> {result.source.name}
+                  </p>
+                  <p className="mt-1 text-xs text-red-700">
+                    Point bas : {money(row.lowestBalance)} le {dateLabel(row.lowestBalanceDate)} · Seuil : {money(row.requiredReserve)}
+                  </p>
+                </div>
+                <p className="text-lg font-semibold text-red-900">{money(row.savingsUsed)}</p>
+              </div>
+            </div>
+          ))}
         </div>
       ) : null}
 
@@ -344,6 +402,15 @@ function ProposalList({ result }: { result: SavingsResult }) {
         )}
       </div>
     </section>
+  );
+}
+
+function InfoMetric({ label, value, danger = false }: { label: string; value: string; danger?: boolean }) {
+  return (
+    <div className={`rounded-2xl border p-3 ${danger ? "border-red-200 bg-red-50" : "border-sky-100 bg-white"}`}>
+      <p className="text-xs text-neutral-500">{label}</p>
+      <p className={`mt-1 text-sm font-semibold ${danger ? "text-red-800" : "text-neutral-900"}`}>{value}</p>
+    </div>
   );
 }
 

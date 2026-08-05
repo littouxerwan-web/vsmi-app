@@ -53,7 +53,9 @@ export async function createSnapshot(fd: FormData) {
 export async function createMovement(fd: FormData) {
   const { supabase, user } = await auth();
   const movementType = text(fd, "movement_type"); const amount = number(fd, "amount");
-  const payload = { owner_id: user.id, account_id: text(fd, "account_id"), category_id: optional(fd, "category_id"), movement_type: movementType, label: text(fd, "label"), amount, movement_date: text(fd, "movement_date"), status: text(fd, "status") || "planned", notes: optional(fd, "notes") };
+  const status = text(fd, "status") || "planned";
+  const movementDate = text(fd, "movement_date");
+  const payload = { owner_id: user.id, account_id: text(fd, "account_id"), category_id: optional(fd, "category_id"), movement_type: movementType, label: text(fd, "label"), amount, movement_date: movementDate, status, completed_date: status === "completed" ? movementDate : null, notes: optional(fd, "notes") };
   if (!payload.account_id || !payload.label || !payload.movement_date || !Number.isFinite(amount) || amount <= 0) fail("Complète les informations du mouvement.");
   if (!["income", "expense"].includes(movementType)) fail("Type de mouvement incorrect.");
   const { error } = await supabase.from("personal_movements").insert(payload);
@@ -66,8 +68,8 @@ export async function createTransfer(fd: FormData) {
   if (!source || !destination || source === destination || !date || !Number.isFinite(amount) || amount <= 0) fail("Le transfert est incomplet ou incorrect.");
   const group = crypto.randomUUID();
   const { error } = await supabase.from("personal_movements").insert([
-    { owner_id: user.id, account_id: source, movement_type: "transfer_out", label, amount, movement_date: date, status: "completed", transfer_group_id: group },
-    { owner_id: user.id, account_id: destination, movement_type: "transfer_in", label, amount, movement_date: date, status: "completed", transfer_group_id: group },
+    { owner_id: user.id, account_id: source, movement_type: "transfer_out", label, amount, movement_date: date, status: "completed", completed_date: date, transfer_group_id: group },
+    { owner_id: user.id, account_id: destination, movement_type: "transfer_in", label, amount, movement_date: date, status: "completed", completed_date: date, transfer_group_id: group },
   ]);
   if (error) fail(error.message); refresh("Transfert d’épargne enregistré.");
 }
@@ -100,7 +102,8 @@ export async function createSavingsGoal(fd: FormData) {
 
 export async function toggleMovement(id: string, completed: boolean, transferGroupId?: string | null) {
   const { supabase, user } = await auth();
-  let query = supabase.from("personal_movements").update({ status: completed ? "completed" : "planned" }).eq("owner_id", user.id);
+  const completedDate = completed ? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()) : null;
+  let query = supabase.from("personal_movements").update({ status: completed ? "completed" : "planned", completed_date: completedDate }).eq("owner_id", user.id);
   query = transferGroupId ? query.eq("transfer_group_id", transferGroupId) : query.eq("id", id);
   const { error } = await query;
   if (error) fail(error.message); refresh(completed ? "Mouvement pointé et intégré au solde à date." : "Mouvement replacé en prévision.");
@@ -127,7 +130,8 @@ export async function completeRecurrenceOccurrence(recurrenceId: string, occurre
     .limit(1)
     .maybeSingle();
   if (existing) {
-    let query = supabase.from("personal_movements").update({ status: "completed" }).eq("owner_id", user.id);
+    const completedDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    let query = supabase.from("personal_movements").update({ status: "completed", completed_date: completedDate }).eq("owner_id", user.id);
     query = existing.transfer_group_id ? query.eq("transfer_group_id", existing.transfer_group_id) : query.eq("id", existing.id);
     const { error } = await query;
     if (error) fail(error.message);
@@ -148,8 +152,8 @@ export async function completeRecurrenceOccurrence(recurrenceId: string, occurre
     if (!recurrence.destination_account_id) fail("Le compte destinataire du virement interne est manquant.");
     const group = crypto.randomUUID();
     const { error } = await supabase.from("personal_movements").insert([
-      { owner_id: user.id, account_id: recurrence.account_id, category_id: recurrence.category_id, movement_type: "transfer_out", label: recurrence.label, amount, movement_date: occurrenceDate, status: "completed", notes: recurrence.notes, transfer_group_id: group, recurrence_id: recurrenceId },
-      { owner_id: user.id, account_id: recurrence.destination_account_id, category_id: recurrence.category_id, movement_type: "transfer_in", label: recurrence.label, amount, movement_date: occurrenceDate, status: "completed", notes: recurrence.notes, transfer_group_id: group, recurrence_id: recurrenceId },
+      { owner_id: user.id, account_id: recurrence.account_id, category_id: recurrence.category_id, movement_type: "transfer_out", label: recurrence.label, amount, movement_date: occurrenceDate, status: "completed", completed_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()), notes: recurrence.notes, transfer_group_id: group, recurrence_id: recurrenceId },
+      { owner_id: user.id, account_id: recurrence.destination_account_id, category_id: recurrence.category_id, movement_type: "transfer_in", label: recurrence.label, amount, movement_date: occurrenceDate, status: "completed", completed_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()), notes: recurrence.notes, transfer_group_id: group, recurrence_id: recurrenceId },
     ]);
     if (error) fail(error.message);
   } else {
@@ -162,6 +166,7 @@ export async function completeRecurrenceOccurrence(recurrenceId: string, occurre
       amount,
       movement_date: occurrenceDate,
       status: "completed",
+      completed_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
       notes: recurrence.notes,
       recurrence_id: recurrenceId,
     });
@@ -182,14 +187,51 @@ export async function updateCategory(fd: FormData) {
   const { supabase, user } = await auth();
   const id = text(fd, "id"); const name = text(fd, "name"); const accountId = optional(fd, "account_id"); const monthlyBudget = Math.max(0, number(fd, "monthly_budget") || 0);
   const isPrimaryIncome = text(fd, "movement_type") === "income" && text(fd, "is_primary_income") === "on";
+  const isEssential = text(fd, "movement_type") !== "income" && text(fd, "is_essential") === "on";
   const budgetPeriod = text(fd, "budget_period") === "specific_month" ? "specific_month" : "monthly";
   const budgetMonthInput = optional(fd, "budget_month");
   const budgetMonth = budgetPeriod === "specific_month" && budgetMonthInput ? `${budgetMonthInput.slice(0, 7)}-01` : null;
   if (!id || !name) fail("Catégorie incomplète.");
   if (monthlyBudget > 0 && budgetPeriod === "specific_month" && !budgetMonth) fail("Choisis le mois du budget ponctuel.");
   if (isPrimaryIncome) { const { error: resetError } = await supabase.from("personal_categories").update({ is_primary_income: false }).eq("owner_id", user.id).eq("is_primary_income", true).neq("id", id); if (resetError) fail(resetError.message); }
-  const { error } = await supabase.from("personal_categories").update({ name, monthly_budget: monthlyBudget, account_id: accountId, budget_period: budgetPeriod, budget_month: budgetMonth, is_primary_income: isPrimaryIncome }).eq("id", id).eq("owner_id", user.id);
+  const { error } = await supabase.from("personal_categories").update({ name, monthly_budget: monthlyBudget, account_id: accountId, budget_period: budgetPeriod, budget_month: budgetMonth, is_primary_income: isPrimaryIncome, is_essential: isEssential }).eq("id", id).eq("owner_id", user.id);
   if (error) fail(error.message); revalidatePath(PATH, "page"); redirect(`${PATH}?vue=finances&succes=${encodeURIComponent("Catégorie modifiée et soldes recalculés.")}`);
+}
+
+export async function applyCategoryBudgetSimulation(fd: FormData) {
+  const { supabase, user } = await auth();
+  const raw = text(fd, "changes");
+  let changes: Array<{ id: string; monthly_budget: number }> = [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) changes = parsed;
+  } catch {
+    fail("Simulation de budgets invalide.");
+  }
+
+  const normalized = changes
+    .map((item) => ({
+      id: String(item?.id ?? ""),
+      monthly_budget: Math.round(Math.max(0, Number(item?.monthly_budget ?? 0)) * 100) / 100,
+    }))
+    .filter((item) => item.id && Number.isFinite(item.monthly_budget));
+
+  if (!normalized.length) fail("Aucune modification de budget à appliquer.");
+
+  for (const change of normalized) {
+    const { error } = await supabase
+      .from("personal_categories")
+      .update({ monthly_budget: change.monthly_budget })
+      .eq("id", change.id)
+      .eq("owner_id", user.id)
+      .eq("movement_type", "expense")
+      .eq("is_essential", false)
+      .eq("is_active", true);
+    if (error) fail(error.message);
+  }
+
+  revalidatePath(PATH, "page");
+  redirect(`${PATH}?vue=finances&succes=${encodeURIComponent(`${normalized.length} budget(s) mis à jour.`)}`);
 }
 
 export async function updateRecurrence(fd: FormData) {
@@ -426,7 +468,7 @@ function savingsProposalKey(fd: FormData) {
   const sourceMonth = text(fd, "source_month");
   if (!sourceAccountId || !destinationAccountId || sourceAccountId === destinationAccountId || !/^\d{4}-\d{2}$/.test(sourceMonth)) fail("Proposition d’épargne incorrecte.");
   const proposalDateRaw = optional(fd, "proposal_date");
-  const proposalDate = proposalDateRaw && /^\d{4}-\d{2}-\d{2}$/.test(proposalDateRaw) && proposalDateRaw.startsWith(sourceMonth) ? proposalDateRaw : `${sourceMonth}-28`;
+  const proposalDate = proposalDateRaw && /^\d{4}-\d{2}-\d{2}$/.test(proposalDateRaw) ? proposalDateRaw : `${sourceMonth}-28`;
   return { sourceAccountId, destinationAccountId, sourceMonth, sourceMonthDate: `${sourceMonth}-01`, proposalDate };
 }
 
