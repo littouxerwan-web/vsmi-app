@@ -40,6 +40,7 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
  const excluded=new Set((input.exclusions??[]).map(e=>`${e.recurrence_id}:${e.occurrence_date}`));
  const materialized=new Set(input.movements.filter(m=>m.recurrence_id).map(m=>`${m.recurrence_id}:${m.movement_date}`));
  const acceptedGroups=new Set((input.savingsProposals??[]).filter(p=>p.status==="accepted"&&p.transfer_group_id).map(p=>p.transfer_group_id as string));
+ const materializedTransferGroups=new Set(input.movements.filter(m=>m.status!=="cancelled"&&m.transfer_group_id).map(m=>m.transfer_group_id as string));
  const depositDecisions=new Map((input.savingsProposals??[]).filter(p=>p.source_account_id===input.sourceAccountId&&p.destination_account_id===input.destinationAccountId).map(p=>[String(p.source_month).slice(0,7),p]));
  const useDecisions=new Map((input.savingsProposals??[]).filter(p=>p.source_account_id===input.destinationAccountId&&p.destination_account_id===input.sourceAccountId).map(p=>[String(p.source_month).slice(0,7),p]));
  const flows=new Map<string,DayFlow>(),spent=new Map<string,number>();
@@ -123,8 +124,12 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
   const nextPrimary=primaryDates.find(d=>d>proposalDate)??null;
   const cycleEnd=nextPrimary?addDays(nextPrimary,-1):monthEnd(shiftMonth(month,1));
   const depositDecision=depositDecisions.get(month),useDecision=useDecisions.get(month);
-  const acceptedDeposit=depositDecision?.status==="accepted"?Number(depositDecision.amount):0;
-  const acceptedUse=useDecision?.status==="accepted"?Number(useDecision.amount):0;
+  const acceptedDepositDecision=depositDecision?.status==="accepted"?depositDecision:null;
+  const acceptedUseDecision=useDecision?.status==="accepted"?useDecision:null;
+  // Si le transfert accepté existe déjà dans personal_movements, il est déjà inclus
+  // dans initialChecking/initialSavings. Ne jamais l'appliquer une seconde fois.
+  const acceptedDeposit=acceptedDepositDecision&&(!acceptedDepositDecision.transfer_group_id||!materializedTransferGroups.has(acceptedDepositDecision.transfer_group_id))?Number(acceptedDepositDecision.amount):0;
+  const acceptedUse=acceptedUseDecision&&(!acceptedUseDecision.transfer_group_id||!materializedTransferGroups.has(acceptedUseDecision.transfer_group_id))?Number(acceptedUseDecision.amount):0;
 
   let simulated=balanceAtProposal-acceptedDeposit+acceptedUse;
   let lowest=simulated,lowestDate=proposalDate,overdraftDate:string|null=simulated<0?proposalDate:null;
@@ -135,9 +140,16 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
   }
 
   const needed=Math.max(0,roundMoney(reserve-lowest));
-  const automaticProposal=needed>0?0:Math.max(0,roundMoney(lowest-reserve));
-  const proposal=acceptedDeposit>0||acceptedUse>0?0:automaticProposal;
-  const usable=acceptedDeposit>0||acceptedUse>0?0:Math.min(needed,savings);
+  // Une proposition n'est autorisée que si le cycle est borné par un prochain
+  // revenu principal connu. Sans cette borne, les données futures peuvent être
+  // incomplètes et le surplus serait artificiellement élevé.
+  const cycleIsReliable=Boolean(trigger&&nextPrimary);
+  const safeAtProposal=Math.max(0,roundMoney(balanceAtProposal-reserve));
+  const safeOverCycle=Math.max(0,roundMoney(lowest-reserve));
+  const automaticProposal=cycleIsReliable&&needed===0?Math.min(safeAtProposal,safeOverCycle):0;
+  const hasAcceptedDecision=Boolean(acceptedDepositDecision||acceptedUseDecision);
+  const proposal=hasAcceptedDecision?0:automaticProposal;
+  const usable=hasAcceptedDecision?0:Math.min(needed,savings);
 
   // Projection de fin de mois : seules les décisions déjà acceptées modifient les soldes.
   // Une simple proposition ne doit jamais créer artificiellement une baisse de liquidité.
