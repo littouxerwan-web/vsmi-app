@@ -73,11 +73,7 @@ export function ProjectionView({accounts,categories,snapshots,movements,recurren
    for(const row of rows){
     if(row.proposal>0){
      const stored=proposalRows.find(p=>p.source_account_id===profile.sourceAccountId&&p.destination_account_id===profile.destinationAccountId&&String(p.source_month).slice(0,7)===row.month);
-     // row.proposal est la proposition actuellement recalculée par le moteur.
-     // Une ancienne ligne marquée « deleted » ne doit pas empêcher cette nouvelle
-     // proposition d'être intégrée à la courbe, sinon l'épargne projetée augmente
-     // tandis que le compte source conserve artificiellement le même excédent.
-     if(stored?.status!=="accepted"){
+     if(stored?.status!=="accepted"&&stored?.status!=="deleted"){
       const movementDate=row.proposalDate??`${row.month}-28`;
       const meta:SavingsProposalMeta={sourceAccountId:profile.sourceAccountId!,destinationAccountId:profile.destinationAccountId!,sourceMonth:row.month,automaticAmount:Number(row.proposal),status:stored?.status==="pending"?"pending":"automatic",kind:"deposit"};
       const label=`Versement épargne proposé · ${profile.label}`;
@@ -86,7 +82,7 @@ export function ProjectionView({accounts,categories,snapshots,movements,recurren
     }
     if(row.savingsUsed>0){
      const stored=proposalRows.find(p=>p.source_account_id===profile.destinationAccountId&&p.destination_account_id===profile.sourceAccountId&&String(p.source_month).slice(0,7)===row.month);
-     if(stored?.status!=="accepted"){
+     if(stored?.status!=="accepted"&&stored?.status!=="deleted"){
       const movementDate=row.savingsUseDate??firstDeficitDate(profile,row);
       const meta:SavingsProposalMeta={sourceAccountId:profile.destinationAccountId!,destinationAccountId:profile.sourceAccountId!,sourceMonth:row.month,automaticAmount:Number(row.savingsUsed),status:stored?.status==="pending"?"pending":"automatic",kind:"use"};
       const label=`Utilisation épargne proposée · ${profile.label}`;
@@ -99,15 +95,8 @@ export function ProjectionView({accounts,categories,snapshots,movements,recurren
  },[savingsPlans,savingsProposals]);
  const points=useMemo<Point[]>(()=>{
   const horizon=new Date(today);horizon.setFullYear(horizon.getFullYear()+years);
-  // Le graphique et le moteur d’épargne doivent impérativement partir du même solde.
-  // currentBalances est déjà recalculé côté serveur à partir du dernier pointage et
-  // des opérations réalisées. Une seconde reconstruction locale pouvait produire
-  // une base différente selon le compte et fausser les virements projetés.
-  const balances=new Map<string,number>();
-  for(const a of accounts){
-   const current=Number(currentBalances[a.id]??0);
-   balances.set(a.id,a.account_type==="savings"?Math.max(SAVINGS_FLOOR,current):current);
-  }
+  const balances=new Map<string,number>();const refs=new Map<string,string>();
+  for(const a of accounts){const ref=snapshots.filter(s=>s.account_id===a.id&&s.snapshot_date<=todayIso).sort((x,y)=>y.snapshot_date.localeCompare(x.snapshot_date))[0];balances.set(a.id,a.account_type==="savings"?Math.max(SAVINGS_FLOOR,Number(ref?.balance??0)):Number(ref?.balance??0));refs.set(a.id,ref?.snapshot_date??todayIso);movements.filter(m=>{const effectiveDate=m.completed_date??m.movement_date;return m.account_id===a.id&&m.status==="completed"&&effectiveDate>(ref?.snapshot_date??"0000-00-00")&&effectiveDate<=todayIso;}).forEach(m=>balances.set(a.id,(balances.get(a.id)??0)+(["income","transfer_in"].includes(m.movement_type)?Number(m.amount):-Number(m.amount))));photoPayments.filter(p=>p.status==="received"&&(p.personal_account_id??photoDefaultAccountId)===a.id&&(p.received_date??"")>(ref?.snapshot_date??"0000-00-00")).forEach(p=>balances.set(a.id,(balances.get(a.id)??0)+Number(p.amount)));urssafStates.filter(s=>s.is_completed&&s.account_id===a.id&&(s.completed_date??"")>(ref?.snapshot_date??"0000-00-00")).forEach(s=>balances.set(a.id,(balances.get(a.id)??0)-urssafForMonth(String(s.contribution_month).slice(0,7))));}
   const monthExpenseByRoot=new Map<string,number>();
   for(const m of movements.filter(m=>m.status==="completed"&&m.movement_type==="expense")){const root=rootFor(m.category_id);if(root){const key=`${m.movement_date.slice(0,7)}:${root}`;monthExpenseByRoot.set(key,(monthExpenseByRoot.get(key)??0)+Number(m.amount));}}
   const result:Point[]=[];let current=new Date(today);
@@ -122,7 +111,7 @@ export function ProjectionView({accounts,categories,snapshots,movements,recurren
    const copy=Object.fromEntries(balances);const checking=accounts.filter(a=>a.account_type==="checking").reduce((s,a)=>s+(balances.get(a.id)??0),0);const savings=accounts.filter(a=>a.account_type==="savings").reduce((s,a)=>s+(balances.get(a.id)??0),0);result.push({date,balances:copy,checking,savings,total:checking+savings});current=tomorrow;
   }
   return result;
- },[accounts,currentBalances,movements,recurrences,overrides,exclusions,photoPayments,photoDefaultAccountId,urssafDefaultAccountId,urssafStates,years,todayIso,budgetRoots,categoryById,movementDefaultAccountId,virtualSavingsOps]);
+ },[accounts,snapshots,movements,recurrences,overrides,exclusions,photoPayments,photoDefaultAccountId,urssafDefaultAccountId,urssafStates,years,todayIso,budgetRoots,categoryById,movementDefaultAccountId,virtualSavingsOps]);
  const accountSummaries=useMemo(()=>accounts.map(account=>{
   const values=points.map(point=>({date:point.date,balance:Number(point.balances[account.id]??0)}));
   const firstRisk=account.account_type==="checking"?values.find(item=>item.balance<0):values.find(item=>item.balance<=SAVINGS_FLOOR);
@@ -145,33 +134,14 @@ export function ProjectionView({accounts,categories,snapshots,movements,recurren
 }
 function ProjectionChart({values,cursor,color}:{values:number[];cursor:number;color?:string|null}){
  if(values.length<2)return null;
-
- // Une projection de trois ou cinq ans contient plusieurs milliers de points.
- // L'ancien échantillonnage ne conservait qu'un jour tous les 6 à 11 jours :
- // un point bas atteint pendant une seule journée après un virement d'épargne
- // pouvait donc disparaître entièrement du graphique. Chaque tranche conserve
- // maintenant ses extrema, afin que les vrais minima et maxima restent visibles.
- const maxBuckets=180;
- const bucketSize=Math.max(1,Math.ceil(values.length/maxBuckets));
- const selectedIndexes=new Set<number>([0,values.length-1]);
- for(let start=0;start<values.length;start+=bucketSize){
-  const end=Math.min(values.length,start+bucketSize);
-  let minIndex=start,maxIndex=start;
-  for(let index=start+1;index<end;index++){
-   if(values[index]<values[minIndex])minIndex=index;
-   if(values[index]>values[maxIndex])maxIndex=index;
-  }
-  selectedIndexes.add(minIndex);
-  selectedIndexes.add(maxIndex);
- }
- const sample=[...selectedIndexes].sort((a,b)=>a-b).map(index=>({index,value:values[index]}));
- const rawMin=Math.min(...values,0),rawMax=Math.max(...values,0);
+ const sample=values.filter((_,i)=>i%Math.max(1,Math.ceil(values.length/180))===0||i===values.length-1);
+ const rawMin=Math.min(...sample,0),rawMax=Math.max(...sample,0);
  let axisMin=Math.floor(rawMin/1000)*1000;
  let axisMax=Math.ceil(rawMax/1000)*1000;
  if(axisMin===axisMax){axisMin-=1000;axisMax+=1000;}
  const range=Math.max(1000,axisMax-axisMin);
  const yFor=(value:number)=>90-((value-axisMin)/range)*80;
- const pts=sample.map(point=>`${(point.index/Math.max(1,values.length-1))*100},${yFor(point.value)}`).join(" ");
+ const pts=sample.map((v,i)=>`${(i/(sample.length-1))*100},${yFor(v)}`).join(" ");
  const cursorX=(cursor/Math.max(1,values.length-1))*100;
  const gridValues:number[]=[];
  for(let value=axisMin;value<=axisMax;value+=1000)gridValues.push(value);

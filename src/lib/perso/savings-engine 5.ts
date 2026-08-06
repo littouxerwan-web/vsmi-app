@@ -171,11 +171,9 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
   const safeAtProposal=Math.max(0,roundMoney(balanceAtProposal-reserve));
   const safeOverCycle=Math.max(0,roundMoney(lowest-reserve));
   const automaticProposal=cycleIsReliable&&needed===0?Math.min(safeAtProposal,safeOverCycle):0;
-  // Un versement vers l’épargne déjà accepté ne doit pas bloquer une reprise
-  // d’épargne devenue nécessaire plus tard dans le même mois. Les deux décisions
-  // sont indépendantes : chacune ne neutralise que sa propre proposition automatique.
-  const proposal=acceptedDepositDecision?0:automaticProposal;
-  const usable=acceptedUseDecision?0:Math.min(needed,Math.max(0,savings-SAVINGS_FLOOR));
+  const hasAcceptedDecision=Boolean(acceptedDepositDecision||acceptedUseDecision);
+  const proposal=hasAcceptedDecision?0:automaticProposal;
+  const usable=hasAcceptedDecision?0:Math.min(needed,Math.max(0,savings-SAVINGS_FLOOR));
 
   // Projection de fin de mois. Les décisions acceptées ET les propositions
   // automatiques sont intégrées dans la projection future afin qu'un même

@@ -73,11 +73,7 @@ export function ProjectionView({accounts,categories,snapshots,movements,recurren
    for(const row of rows){
     if(row.proposal>0){
      const stored=proposalRows.find(p=>p.source_account_id===profile.sourceAccountId&&p.destination_account_id===profile.destinationAccountId&&String(p.source_month).slice(0,7)===row.month);
-     // row.proposal est la proposition actuellement recalculée par le moteur.
-     // Une ancienne ligne marquée « deleted » ne doit pas empêcher cette nouvelle
-     // proposition d'être intégrée à la courbe, sinon l'épargne projetée augmente
-     // tandis que le compte source conserve artificiellement le même excédent.
-     if(stored?.status!=="accepted"){
+     if(stored?.status!=="accepted"&&stored?.status!=="deleted"){
       const movementDate=row.proposalDate??`${row.month}-28`;
       const meta:SavingsProposalMeta={sourceAccountId:profile.sourceAccountId!,destinationAccountId:profile.destinationAccountId!,sourceMonth:row.month,automaticAmount:Number(row.proposal),status:stored?.status==="pending"?"pending":"automatic",kind:"deposit"};
       const label=`Versement épargne proposé · ${profile.label}`;
@@ -86,7 +82,7 @@ export function ProjectionView({accounts,categories,snapshots,movements,recurren
     }
     if(row.savingsUsed>0){
      const stored=proposalRows.find(p=>p.source_account_id===profile.destinationAccountId&&p.destination_account_id===profile.sourceAccountId&&String(p.source_month).slice(0,7)===row.month);
-     if(stored?.status!=="accepted"){
+     if(stored?.status!=="accepted"&&stored?.status!=="deleted"){
       const movementDate=row.savingsUseDate??firstDeficitDate(profile,row);
       const meta:SavingsProposalMeta={sourceAccountId:profile.destinationAccountId!,destinationAccountId:profile.sourceAccountId!,sourceMonth:row.month,automaticAmount:Number(row.savingsUsed),status:stored?.status==="pending"?"pending":"automatic",kind:"use"};
       const label=`Utilisation épargne proposée · ${profile.label}`;
@@ -145,33 +141,14 @@ export function ProjectionView({accounts,categories,snapshots,movements,recurren
 }
 function ProjectionChart({values,cursor,color}:{values:number[];cursor:number;color?:string|null}){
  if(values.length<2)return null;
-
- // Une projection de trois ou cinq ans contient plusieurs milliers de points.
- // L'ancien échantillonnage ne conservait qu'un jour tous les 6 à 11 jours :
- // un point bas atteint pendant une seule journée après un virement d'épargne
- // pouvait donc disparaître entièrement du graphique. Chaque tranche conserve
- // maintenant ses extrema, afin que les vrais minima et maxima restent visibles.
- const maxBuckets=180;
- const bucketSize=Math.max(1,Math.ceil(values.length/maxBuckets));
- const selectedIndexes=new Set<number>([0,values.length-1]);
- for(let start=0;start<values.length;start+=bucketSize){
-  const end=Math.min(values.length,start+bucketSize);
-  let minIndex=start,maxIndex=start;
-  for(let index=start+1;index<end;index++){
-   if(values[index]<values[minIndex])minIndex=index;
-   if(values[index]>values[maxIndex])maxIndex=index;
-  }
-  selectedIndexes.add(minIndex);
-  selectedIndexes.add(maxIndex);
- }
- const sample=[...selectedIndexes].sort((a,b)=>a-b).map(index=>({index,value:values[index]}));
- const rawMin=Math.min(...values,0),rawMax=Math.max(...values,0);
+ const sample=values.filter((_,i)=>i%Math.max(1,Math.ceil(values.length/180))===0||i===values.length-1);
+ const rawMin=Math.min(...sample,0),rawMax=Math.max(...sample,0);
  let axisMin=Math.floor(rawMin/1000)*1000;
  let axisMax=Math.ceil(rawMax/1000)*1000;
  if(axisMin===axisMax){axisMin-=1000;axisMax+=1000;}
  const range=Math.max(1000,axisMax-axisMin);
  const yFor=(value:number)=>90-((value-axisMin)/range)*80;
- const pts=sample.map(point=>`${(point.index/Math.max(1,values.length-1))*100},${yFor(point.value)}`).join(" ");
+ const pts=sample.map((v,i)=>`${(i/(sample.length-1))*100},${yFor(v)}`).join(" ");
  const cursorX=(cursor/Math.max(1,values.length-1))*100;
  const gridValues:number[]=[];
  for(let value=axisMin;value<=axisMax;value+=1000)gridValues.push(value);

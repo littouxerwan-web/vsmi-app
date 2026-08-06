@@ -163,19 +163,16 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
   // Le seuil de réserve pilote les versements vers l’épargne, mais ne doit jamais
   // provoquer un retrait massif lorsque le compte ne passe que légèrement sous 0 €.
   const needed=Math.max(0,roundMoney(-lowest));
-  // Après la dernière échéance de revenu principal connue, la projection ne doit
-  // pas figer le compte au niveau de sa réserve. Le cycle de secours est alors
-  // borné à la fin du mois suivant : l'excédent n'est proposé que s'il reste
-  // réellement disponible après tous les flux connus de cette fenêtre.
-  const cycleIsReliable=cycleEnd<=endDate;
+  // Une proposition n'est autorisée que si le cycle est borné par un prochain
+  // revenu principal connu. Sans cette borne, les données futures peuvent être
+  // incomplètes et le surplus serait artificiellement élevé.
+  const cycleIsReliable=Boolean(trigger&&nextPrimary);
   const safeAtProposal=Math.max(0,roundMoney(balanceAtProposal-reserve));
   const safeOverCycle=Math.max(0,roundMoney(lowest-reserve));
   const automaticProposal=cycleIsReliable&&needed===0?Math.min(safeAtProposal,safeOverCycle):0;
-  // Un versement vers l’épargne déjà accepté ne doit pas bloquer une reprise
-  // d’épargne devenue nécessaire plus tard dans le même mois. Les deux décisions
-  // sont indépendantes : chacune ne neutralise que sa propre proposition automatique.
-  const proposal=acceptedDepositDecision?0:automaticProposal;
-  const usable=acceptedUseDecision?0:Math.min(needed,Math.max(0,savings-SAVINGS_FLOOR));
+  const hasAcceptedDecision=Boolean(acceptedDepositDecision||acceptedUseDecision);
+  const proposal=hasAcceptedDecision?0:automaticProposal;
+  const usable=hasAcceptedDecision?0:Math.min(needed,Math.max(0,savings-SAVINGS_FLOOR));
 
   // Projection de fin de mois. Les décisions acceptées ET les propositions
   // automatiques sont intégrées dans la projection future afin qu'un même

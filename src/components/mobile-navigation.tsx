@@ -95,7 +95,7 @@ export function MobileNavigation() {
         <div className="mx-auto grid max-w-lg grid-cols-5 items-end gap-1">
           {persoItem("/perso?vue=finances", "En cours", CircleDollarSign, pathname === "/perso" && view === "finances")}
           {persoItem("/perso?vue=projection", "Projection", TrendingUp, pathname === "/perso" && view === "projection")}
-          <Link href="/perso?vue=finances&quick=movement" aria-label="Créer rapidement un mouvement" className="relative -top-3 mx-auto grid size-14 place-items-center rounded-full border-4 border-white bg-black text-white shadow-lg">
+          <Link href="/perso?vue=finances&quick=movement" aria-label="Ajouter un débit ou un crédit" className="relative -top-3 mx-auto grid size-14 place-items-center rounded-full border-4 border-white bg-black text-white shadow-lg">
             <Plus size={25} strokeWidth={2.2} />
           </Link>
           {persoItem("/perso?vue=epargne", "Épargne", Sparkles, pathname === "/perso" && view === "epargne")}

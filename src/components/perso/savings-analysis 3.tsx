@@ -80,7 +80,6 @@ export function SavingsAnalysis(props: Props) {
     (profile) => profile.sourceAccountId && profile.destinationAccountId,
   );
   const [view, setView] = useState<string>("general");
-  const [cursorIndex, setCursorIndex] = useState(0);
 
   const results = useMemo(
     () =>
@@ -172,19 +171,17 @@ export function SavingsAnalysis(props: Props) {
   });
   const displayedRows = selected?.rows ?? generalRows;
   const currentSavings = selected ? selected.profile.initialSavings : generalInitialSavings;
-  const minSavings = Math.min(...displayedRows.map((row) => row.savings), currentSavings);
-  const maxSavings = Math.max(...displayedRows.map((row) => row.savings), currentSavings + 1);
-  const amplitude = Math.max(1, maxSavings - minSavings);
+  const max = Math.max(1, ...displayedRows.map((row) => row.savings));
   const points = displayedRows
-    .map((row, index) => `${(index / Math.max(1, displayedRows.length - 1)) * 100},${92 - ((row.savings - minSavings) / amplitude) * 82}`)
+    .map(
+      (row, index) =>
+        `${(index / Math.max(1, displayedRows.length - 1)) * 100},${92 - (row.savings / max) * 82}`,
+    )
     .join(" ");
-  const safeCursorIndex = Math.min(cursorIndex, Math.max(0, displayedRows.length - 1));
-  const cursorRow = displayedRows[safeCursorIndex];
-  const cursorX = (safeCursorIndex / Math.max(1, displayedRows.length - 1)) * 100;
 
   return (
     <div className="space-y-7">
-      <section className="border-y border-emerald-200 bg-emerald-50 px-3 py-5 sm:px-5 lg:px-6">
+      <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <span className="grid size-11 place-items-center rounded-2xl bg-emerald-100 text-emerald-800">
@@ -212,19 +209,20 @@ export function SavingsAnalysis(props: Props) {
         </div>
       </section>
 
-      <section className="border-y border-black/10 bg-white py-5">
-        <div className="flex flex-wrap items-end justify-between gap-3 px-3 sm:px-5 lg:px-6">
-          <div><h3 className="text-lg font-semibold">Évolution projetée sur 5 ans</h3><p className="mt-1 text-sm text-neutral-500">{cursorRow ? `${monthLabel(cursorRow.month)} · ${money(cursorRow.savings)}` : "—"}</p></div>
-        </div>
-        <div className="mt-4 bg-neutral-50 px-3 py-4 sm:px-5 lg:px-6">
-          <svg viewBox="0 0 100 100" className="h-64 w-full" preserveAspectRatio="none">
-            <line x1={cursorX} x2={cursorX} y1="4" y2="96" stroke="currentColor" strokeWidth="0.7" strokeDasharray="2 2" opacity="0.55" vectorEffect="non-scaling-stroke" />
-            <polyline points={points} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-            {cursorRow ? <circle cx={cursorX} cy={92 - ((cursorRow.savings - minSavings) / amplitude) * 82} r="1.2" fill="currentColor" vectorEffect="non-scaling-stroke" /> : null}
+      <section className="rounded-3xl border bg-white p-6">
+        <h3 className="text-lg font-semibold">Évolution projetée sur 5 ans</h3>
+        <div className="mt-4 overflow-hidden rounded-2xl bg-neutral-50 p-3">
+          <svg viewBox="0 0 100 100" className="h-56 w-full" preserveAspectRatio="none">
+            <polyline
+              points={points}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              vectorEffect="non-scaling-stroke"
+            />
           </svg>
         </div>
-        <div className="px-3 sm:px-5 lg:px-6"><input aria-label="Date consultée" type="range" min={0} max={Math.max(0, displayedRows.length - 1)} value={safeCursorIndex} onChange={(event) => setCursorIndex(Number(event.target.value))} className="mt-3 w-full" /></div>
-        <div className="mt-4 grid gap-px bg-black/10 sm:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <Metric label="Épargne actuelle" value={money(Number(currentSavings ?? 0))} />
           <Metric
             label="Épargne dans 12 mois"
@@ -259,7 +257,7 @@ function ProposalList({ result }: { result: SavingsResult }) {
   const recoveryRows = result.rows.filter((row) => row.savingsUsed > 0).slice(0, 24);
 
   return (
-    <section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6">
+    <section className="rounded-3xl border bg-white p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold">{result.profile.label} · Virements proposés</h3>

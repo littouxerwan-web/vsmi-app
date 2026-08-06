@@ -71,21 +71,3 @@ input:disabled {
   pointer-events: auto !important;
   user-select: auto !important;
 }
-
-/* Refonte 2026-08 : mise en page plus dense, large et structurée comme Navylo. */
-#app-private-content main > div[class*="max-w-"] {
-  max-width: none !important;
-  width: 100% !important;
-}
-
-#app-private-content .rounded-3xl,
-#app-private-content .rounded-2xl {
-  border-radius: 0.5rem !important;
-}
-
-@media (min-width: 1024px) {
-  #app-private-content main {
-    padding-left: 1.5rem !important;
-    padding-right: 1.5rem !important;
-  }
-}
