@@ -173,7 +173,16 @@ export function ProjectionView({accounts,categories,snapshots,movements,recurren
   for(const baseline of points){
    cumulativePurchase+=operationByDate.get(baseline.date)??0;
    if(baseline.date<firstOperationDate)continue;
-   if(sourceId){const sourceWithoutSupport=Number(baseline.balances[sourceId]??0)-cumulativePurchase;requiredTransfer=Math.max(requiredTransfer,Math.max(0,threshold-sourceWithoutSupport));}
+   if(sourceId){
+    const baselineBalance=Number(baseline.balances[sourceId]??0);
+    const baselineGap=Math.max(0,threshold-baselineBalance);
+    const sourceWithoutSupport=baselineBalance-cumulativePurchase;
+    const simulatedGap=Math.max(0,threshold-sourceWithoutSupport);
+    // La simulation ne doit financer que le besoin SUPPLÉMENTAIRE créé par
+    // l'achat. Un déficit déjà présent dans la projection de référence n'est
+    // jamais imputé à l'acquisition simulée.
+    requiredTransfer=Math.max(requiredTransfer,Math.max(0,simulatedGap-baselineGap));
+   }
    if(destinationId&&!savingsAvailabilityCaptured){availableSavings=Math.max(0,Number(baseline.balances[destinationId]??0)-SAVINGS_FLOOR);savingsAvailabilityCaptured=true;}
   }
   const savingsTransferAmount=destinationId?Math.min(requiredTransfer,availableSavings):0;
@@ -185,7 +194,10 @@ export function ProjectionView({accounts,categories,snapshots,movements,recurren
    if(index>0){for(const account of accounts){const baselineDelta=Number(baseline.balances[account.id]??0)-Number(previousBaseline.balances[account.id]??0);balances[account.id]=Number(balances[account.id]??0)+baselineDelta;}}
    if(!transferApplied&&sourceId&&destinationId&&baseline.date>=firstOperationDate&&savingsTransferAmount>0){balances[sourceId]=Number(balances[sourceId]??0)+savingsTransferAmount;balances[destinationId]=Number(balances[destinationId]??0)-savingsTransferAmount;transferApplied=true;}
    const purchaseDebit=operationByDate.get(baseline.date)??0;if(purchaseDebit>0)balances[simulationAccountId]=Number(balances[simulationAccountId]??0)-purchaseDebit;
-   const thresholdGap=sourceId?Math.max(0,threshold-Number(balances[sourceId]??0)):0;
+   const thresholdGap=sourceId?Math.max(0,
+    Math.max(0,threshold-Number(balances[sourceId]??0))
+    -Math.max(0,threshold-Number(baseline.balances[sourceId]??0))
+   ):0;
    const checking=accounts.filter(account=>account.account_type==="checking").reduce((sum,account)=>sum+Number(balances[account.id]??0),0);const savings=accounts.filter(account=>account.account_type==="savings").reduce((sum,account)=>sum+Number(balances[account.id]??0),0);
    simulated.push({...baseline,balances:{...balances},checking,savings,total:checking+savings});details.push({savingsBalance:destinationId?Number(balances[destinationId]??0):0,thresholdGap});previousBaseline=baseline;
   }
