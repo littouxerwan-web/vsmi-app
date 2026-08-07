@@ -6,14 +6,16 @@ import { applySavingsBudgetReallocation, createSavingsBudget, deleteSavingsBudge
 import { mobilizableSavingsForAccount, savingsBudgetAmount, type SavingsBudgetAllocation } from "@/lib/perso/savings-engine";
 
 type Account={id:string;name:string;account_type:"checking"|"savings";color?:string|null};
-type ForecastRow={month:string;accountId:string;savings:number;savingsUsed:number};
+type ForecastRow={month:string;accountId:string;savings:number;savingsUsed:number;proposal?:number;proposalDate?:string|null;savingsUseDate?:string|null};
 type Props={accounts:Account[];budgets:SavingsBudgetAllocation[];currentBalances:Record<string,number>;forecastRows:ForecastRow[]};
-type BudgetPoint={month:string;total:number;mobile:number;budgetValues:Record<string,number>};
+type BudgetPoint={date:string;total:number;mobile:number;budgetValues:Record<string,number>};
 
 const GLOBAL="__global__";
 const FLOOR=30;
 const money=(v:number)=>new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"}).format(v);
 const monthLabel=(v:string)=>new Intl.DateTimeFormat("fr-FR",{month:"short",year:"2-digit"}).format(new Date(`${v}-01T12:00:00`));
+const dateLabel=(v:string)=>new Intl.DateTimeFormat("fr-FR",{day:"numeric",month:"short",year:"numeric"}).format(new Date(`${v}T12:00:00`));
+const iso=(d:Date)=>d.toISOString().slice(0,10);
 const protectionLabel=(v:string)=>v==="free"?"Libre":v==="untouchable"?"Intouchable":"À préserver";
 const PALETTE=["#2563eb","#7c3aed","#db2777","#ea580c","#0891b2","#65a30d","#b91c1c","#4f46e5","#0f766e","#a16207","#9333ea","#0369a1"];
 const addMonths=(month:string,n:number)=>{const d=new Date(`${month}-01T12:00:00`);d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,7);};
@@ -31,28 +33,47 @@ export function SavingsBudgetView({accounts,budgets,currentBalances,forecastRows
  const allocated=scopedBudgets.reduce((s,b)=>s+savingsBudgetAmount(b,balanceFor(b.account_id)),0);
  const mobilizable=scopedAccounts.reduce((s,a)=>s+mobilizableSavingsForAccount(balanceFor(a.id),a.id,budgets,FLOOR),0);
  const protectedAmount=Math.max(0,currentSavings-(FLOOR*scopedAccounts.length)-mobilizable);
- const physical=Math.max(0,currentSavings-(FLOOR*scopedAccounts.length));
- const overAllocated=Math.max(0,allocated-physical);
+ // Les enveloppes ventilent le solde total. Le plancher de 30 € limite ce qui est
+ // mobilisable, mais ne doit pas déclencher une fausse sur-affectation à 100 %.
+ const overAllocated=Math.max(0,Math.round((allocated-currentSavings)*100)/100);
+ const hasOverAllocation=overAllocated>0.02;
 
  const series=useMemo<BudgetPoint[]>(()=>{
   if(!scopedAccounts.length)return [];
-  const firstForecastMonth=forecastRows.map(r=>r.month).sort()[0]??new Date().toISOString().slice(0,7);
-  const months=Array.from({length:60},(_,i)=>addMonths(firstForecastMonth,i));
-  return months.map(month=>{
-   const monthBalances=new Map<string,number>();
-   for(const account of scopedAccounts){
-    const row=forecastRows.find(r=>r.accountId===account.id&&r.month===month);
-    const latestPrevious=forecastRows.filter(r=>r.accountId===account.id&&r.month<=month).sort((a,b)=>b.month.localeCompare(a.month))[0];
-    monthBalances.set(account.id,Math.max(0,Number(row?.savings??latestPrevious?.savings??currentBalances[account.id]??0)));
+  const startDate=new Date();startDate.setHours(12,0,0,0);
+  const endDate=new Date(startDate);endDate.setFullYear(endDate.getFullYear()+5);
+  const balances=new Map(scopedAccounts.map(a=>[a.id,balanceFor(a.id)]));
+  const events=new Map<string,Map<string,number>>();
+  const addEvent=(date:string|undefined|null,account:string,delta:number)=>{if(!date||!account||!Number.isFinite(delta)||Math.abs(delta)<0.005)return;const byAccount=events.get(date)??new Map<string,number>();byAccount.set(account,(byAccount.get(account)??0)+delta);events.set(date,byAccount);};
+  for(const row of forecastRows){
+   if(!scopedIds.has(row.accountId))continue;
+   addEvent(row.proposalDate,row.accountId,Number(row.proposal??0));
+   addEvent(row.savingsUseDate,row.accountId,-Number(row.savingsUsed??0));
+  }
+  const monthlyTargets=new Map(forecastRows.filter(r=>scopedIds.has(r.accountId)).map(r=>[`${r.accountId}:${r.month}`,Number(r.savings)]));
+  const out:BudgetPoint[]=[];
+  let day=new Date(startDate);
+  while(day<=endDate){
+   const date=iso(day),month=date.slice(0,7);
+   const dayEvents=events.get(date);
+   if(dayEvents)for(const [account,delta] of dayEvents)balances.set(account,Math.max(FLOOR,Math.round(((balances.get(account)??0)+delta)*100)/100));
+   const tomorrow=new Date(day);tomorrow.setDate(tomorrow.getDate()+1);
+   if(tomorrow.getMonth()!==day.getMonth()){
+    // Le moteur calculateSavingsPlan reste l'autorité sur le solde de fin de mois.
+    // Ce recalage garantit que la trajectoire journalière rejoint exactement la
+    // Projection à chaque clôture mensuelle, tout en positionnant les variations
+    // aux vraies dates de versement/utilisation dans le mois.
+    for(const account of scopedAccounts){const target=monthlyTargets.get(`${account.id}:${month}`);if(Number.isFinite(target))balances.set(account.id,Math.max(FLOOR,Number(target)));}
    }
-   const total=scopedAccounts.reduce((s,a)=>s+(monthBalances.get(a.id)??0),0);
-   const mobile=scopedAccounts.reduce((s,a)=>s+mobilizableSavingsForAccount(monthBalances.get(a.id)??0,a.id,budgets,FLOOR),0);
+   const total=scopedAccounts.reduce((sum,a)=>sum+(balances.get(a.id)??0),0);
+   const mobile=scopedAccounts.reduce((sum,a)=>sum+mobilizableSavingsForAccount(balances.get(a.id)??0,a.id,budgets,FLOOR),0);
    const budgetValues:Record<string,number>={};
-   for(const budget of scopedBudgets)budgetValues[budget.id]=savingsBudgetAmount(budget,monthBalances.get(budget.account_id)??0);
-   return {month,total,mobile,budgetValues};
-  });
+   for(const budget of scopedBudgets)budgetValues[budget.id]=savingsBudgetAmount(budget,balances.get(budget.account_id)??0);
+   out.push({date,total,mobile,budgetValues});
+   day=tomorrow;
+  }
+  return out;
  },[accountId,forecastRows,budgets,currentBalances,accounts]);
-
  const allowed=scopedBudgets.filter(b=>b.allow_recovery&&b.protection!=="untouchable");
  const criticalThreshold=global?allowed.reduce((s,b)=>s+Number(b.critical_threshold??0),0):Math.max(0,...allowed.map(b=>Number(b.critical_threshold??0)));
  const firstCritical=criticalThreshold>0?series.find(r=>r.mobile<=criticalThreshold)??null:null;
@@ -68,14 +89,14 @@ export function SavingsBudgetView({accounts,budgets,currentBalances,forecastRows
    </div>
    {!savingsAccounts.length?<p className="mt-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-800">Crée d’abord un compte d’épargne.</p>:<>
     <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label={global?"Épargne totale globale":"Épargne totale"} value={money(currentSavings)}/><Metric label="Épargne affectée" value={money(allocated)}/><Metric label="Épargne protégée" value={money(protectedAmount)}/><Metric label="Mobilisable trésorerie" value={money(mobilizable)} dark/></div>
-    {overAllocated>0?<div className="mt-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"><AlertTriangle size={17}/><p>Les enveloppes dépassent l’épargne disponible de {money(overAllocated)}.</p></div>:null}
+    {hasOverAllocation?<div className="mt-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"><AlertTriangle size={17}/><p>Les enveloppes dépassent l’épargne disponible de {money(overAllocated)}.</p></div>:null}
     {global?<div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{savingsAccounts.map(a=>{const b=balanceFor(a.id),mob=mobilizableSavingsForAccount(b,a.id,budgets,FLOOR),aff=budgets.filter(x=>x.account_id===a.id).reduce((s,x)=>s+savingsBudgetAmount(x,b),0);return <button key={a.id} type="button" onClick={()=>setAccountId(a.id)} className="rounded-2xl border border-black/10 p-4 text-left hover:bg-neutral-50"><div className="flex justify-between gap-3"><span className="font-medium">{a.name}</span><span className="font-semibold">{money(b)}</span></div><p className="mt-1 text-xs text-neutral-500">Affecté {money(aff)} · mobilisable {money(mob)}</p></button>})}</div>:null}
    </>}
   </section>
 
   {!global&&selected?<section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6"><details><summary className="flex cursor-pointer items-center gap-2 font-semibold"><Plus size={17}/>Créer une enveloppe</summary><SavingsBudgetForm accountId={selected.id} savings={balanceFor(selected.id)}/></details><div className="mt-5 grid gap-3 lg:grid-cols-2">{scopedBudgets.length?scopedBudgets.map(b=><BudgetCard key={b.id} budget={b} accountId={selected.id} savings={balanceFor(selected.id)}/>):<div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">Aucun budget d’épargne : toute l’épargne de ce compte peut être utilisée si la trésorerie l’exige.</div>}</div></section>:global?<section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6"><div className="flex items-start gap-3 rounded-2xl bg-neutral-50 p-4"><PiggyBank size={18}/><div><p className="font-medium">Vue globale</p><p className="mt-1 text-sm text-neutral-500">Sélectionne un compte pour créer ou modifier ses enveloppes. Un pourcentage reste toujours calculé sur le solde de son propre compte.</p></div></div></section>:null}
 
-  {scopedAccounts.length?<section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6"><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-neutral-500">Projection 5 ans</p><h2 className="mt-2 text-xl font-semibold">Évolution des Budgets Épargne</h2><p className="mt-1 text-sm text-neutral-500">Chaque enveloppe possède sa propre courbe. En vue globale, le nom du compte est indiqué dans la légende.</p></div><SavingsBudgetChart rows={series} budgets={scopedBudgets} accounts={accounts} global={global}/>{firstCritical?<div className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4"><div className="flex items-start gap-2"><AlertTriangle size={18} className="mt-0.5 text-amber-700"/><div><p className="font-semibold text-amber-950">Seuil critique projeté en {monthLabel(firstCritical.month)}</p><p className="mt-1 text-sm text-amber-900">La capacité mobilisable descendrait à {money(firstCritical.mobile)} pour un seuil configuré de {money(criticalThreshold)}.</p></div></div>{suggestedAmount>0&&fixedSource&&fixedDestination?<form action={applySavingsBudgetReallocation} className="mt-4 flex flex-wrap items-end gap-2"><input type="hidden" name="source_budget_id" value={fixedSource.id}/><input type="hidden" name="destination_budget_id" value={fixedDestination.id}/><label className="text-xs font-medium text-neutral-600">Réaffectation proposée<input name="amount" type="number" min="1" step="0.01" defaultValue={suggestedAmount.toFixed(2)} className="mt-1 block w-36 rounded-xl border bg-white px-3 py-2 text-sm"/></label><div className="pb-2 text-sm"><strong>{fixedSource.name}</strong> <ArrowRight size={14} className="inline"/> <strong>{fixedDestination.name}</strong></div><button className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white">Appliquer</button></form>:null}</div>:criticalThreshold>0?<div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Aucun seuil critique détecté sur les 5 prochaines années.</div>:null}</section>:null}
+  {scopedAccounts.length?<section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6"><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-neutral-500">Projection 5 ans</p><h2 className="mt-2 text-xl font-semibold">Évolution des Budgets Épargne</h2><p className="mt-1 text-sm text-neutral-500">Chaque enveloppe possède sa propre courbe. En vue globale, le nom du compte est indiqué dans la légende.</p></div><SavingsBudgetChart rows={series} budgets={scopedBudgets} accounts={accounts} global={global}/>{firstCritical?<div className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4"><div className="flex items-start gap-2"><AlertTriangle size={18} className="mt-0.5 text-amber-700"/><div><p className="font-semibold text-amber-950">Seuil critique projeté en {dateLabel(firstCritical.date)}</p><p className="mt-1 text-sm text-amber-900">La capacité mobilisable descendrait à {money(firstCritical.mobile)} pour un seuil configuré de {money(criticalThreshold)}.</p></div></div>{suggestedAmount>0&&fixedSource&&fixedDestination?<form action={applySavingsBudgetReallocation} className="mt-4 flex flex-wrap items-end gap-2"><input type="hidden" name="source_budget_id" value={fixedSource.id}/><input type="hidden" name="destination_budget_id" value={fixedDestination.id}/><label className="text-xs font-medium text-neutral-600">Réaffectation proposée<input name="amount" type="number" min="1" step="0.01" defaultValue={suggestedAmount.toFixed(2)} className="mt-1 block w-36 rounded-xl border bg-white px-3 py-2 text-sm"/></label><div className="pb-2 text-sm"><strong>{fixedSource.name}</strong> <ArrowRight size={14} className="inline"/> <strong>{fixedDestination.name}</strong></div><button className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white">Appliquer</button></form>:null}</div>:criticalThreshold>0?<div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Aucun seuil critique détecté sur les 5 prochaines années.</div>:null}</section>:null}
  </div>;
 }
 
@@ -122,12 +143,12 @@ function SavingsBudgetChart({rows,budgets,accounts,global}:{rows:BudgetPoint[];b
    <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
     <div>
      <p className="text-xs font-medium text-neutral-500">Position du curseur</p>
-     <p className="text-base font-semibold">{monthLabel(selectedRow.month)}</p>
+     <p className="text-base font-semibold">{dateLabel(selectedRow.date)}</p>
     </div>
-    <p className="text-xs text-neutral-500">{monthLabel(rows[0].month)} → {monthLabel(rows.at(-1)!.month)}</p>
+    <p className="text-xs text-neutral-500">{dateLabel(rows[0].date)} → {dateLabel(rows.at(-1)!.date)}</p>
    </div>
 
-   <svg viewBox="0 0 100 100" className="h-64 w-full" preserveAspectRatio="none" role="img" aria-label={`Projection des budgets épargne en ${monthLabel(selectedRow.month)}`}>
+   <svg viewBox="0 0 100 100" className="h-64 w-full" preserveAspectRatio="none" role="img" aria-label={`Projection des budgets épargne en ${dateLabel(selectedRow.date)}`}>
     {grids.map(v=><line key={v} x1="0" y1={y(v)} x2="100" y2={y(v)} stroke="currentColor" opacity=".11" strokeDasharray="2 2" vectorEffect="non-scaling-stroke"/>)}
     <polyline points={pts(rows.map(r=>r.total))} fill="none" stroke="#111827" strokeWidth="2" opacity=".7" vectorEffect="non-scaling-stroke"/>
     <polyline points={pts(rows.map(r=>r.mobile))} fill="none" stroke="#16a34a" strokeWidth="2" strokeDasharray="4 2" vectorEffect="non-scaling-stroke"/>
