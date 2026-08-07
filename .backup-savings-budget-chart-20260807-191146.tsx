@@ -91,97 +91,12 @@ function BudgetCard({budget,accountId,savings}:{budget:SavingsBudgetAllocation;a
 function Metric({label,value,dark}:{label:string;value:string;dark?:boolean}){return <div className={`rounded-2xl p-4 ${dark?"bg-black text-white":"bg-neutral-100"}`}><p className="text-xs opacity-70">{label}</p><p className="mt-2 text-xl font-semibold">{value}</p></div>}
 
 function SavingsBudgetChart({rows,budgets,accounts,global}:{rows:BudgetPoint[];budgets:SavingsBudgetAllocation[];accounts:Account[];global:boolean}){
- const [cursor,setCursor]=useState(0);
  if(rows.length<2)return null;
- const safe=Math.min(cursor,rows.length-1);
- const selectedRow=rows[safe];
  const values=[...rows.map(r=>r.total),...rows.map(r=>r.mobile),...budgets.flatMap(b=>rows.map(r=>Number(r.budgetValues[b.id]??0))),0];
  const rawMax=Math.max(...values),rawMin=Math.min(...values);
- let top=Math.ceil(rawMax/1000)*1000,bottom=Math.floor(rawMin/1000)*1000;
- if(top===bottom)top=bottom+1000;
- const range=Math.max(1000,top-bottom);
- const y=(v:number)=>90-((v-bottom)/range)*80;
- const x=(i:number)=>(i/Math.max(1,rows.length-1))*100;
- const pts=(values:number[])=>values.map((v,i)=>`${x(i)},${y(v)}`).join(" ");
- const grids:number[]=[];
- for(let v=bottom;v<=top;v+=1000)grids.push(v);
- const cursorX=x(safe);
-
- return <div className="mt-5">
-  <div className="flex flex-wrap gap-2 rounded-2xl border border-black/10 bg-white p-3">
-   <LegendItem color="#111827" label="Épargne totale" value={money(selectedRow.total)} thick/>
-   <LegendItem color="#16a34a" label="Mobilisable pour la trésorerie" value={money(selectedRow.mobile)} dashed/>
-   {budgets.map((b,i)=>{
-    const account=accounts.find(a=>a.id===b.account_id);
-    const label=`${b.name}${global&&account?` · ${account.name}`:""}`;
-    return <LegendItem key={b.id} color={PALETTE[i%PALETTE.length]} label={label} value={money(Number(selectedRow.budgetValues[b.id]??0))}/>;
-   })}
-  </div>
-
-  <div className="mt-3 overflow-hidden rounded-2xl bg-neutral-50 p-3">
-   <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-    <div>
-     <p className="text-xs font-medium text-neutral-500">Position du curseur</p>
-     <p className="text-base font-semibold">{monthLabel(selectedRow.month)}</p>
-    </div>
-    <p className="text-xs text-neutral-500">{monthLabel(rows[0].month)} → {monthLabel(rows.at(-1)!.month)}</p>
-   </div>
-
-   <svg viewBox="0 0 100 100" className="h-64 w-full" preserveAspectRatio="none" role="img" aria-label={`Projection des budgets épargne en ${monthLabel(selectedRow.month)}`}>
-    {grids.map(v=><line key={v} x1="0" y1={y(v)} x2="100" y2={y(v)} stroke="currentColor" opacity=".11" strokeDasharray="2 2" vectorEffect="non-scaling-stroke"/>)}
-    <polyline points={pts(rows.map(r=>r.total))} fill="none" stroke="#111827" strokeWidth="2" opacity=".7" vectorEffect="non-scaling-stroke"/>
-    <polyline points={pts(rows.map(r=>r.mobile))} fill="none" stroke="#16a34a" strokeWidth="2" strokeDasharray="4 2" vectorEffect="non-scaling-stroke"/>
-    {budgets.map((b,i)=><polyline key={b.id} points={pts(rows.map(r=>Number(r.budgetValues[b.id]??0)))} fill="none" stroke={PALETTE[i%PALETTE.length]} strokeWidth="1.8" vectorEffect="non-scaling-stroke"/>)}
-    <line x1={cursorX} y1="4" x2={cursorX} y2="94" stroke="#111827" strokeWidth="1.2" opacity=".6" strokeDasharray="2 2" vectorEffect="non-scaling-stroke"/>
-    <circle cx={cursorX} cy={y(selectedRow.total)} r="1.5" fill="#111827" vectorEffect="non-scaling-stroke"/>
-    <circle cx={cursorX} cy={y(selectedRow.mobile)} r="1.5" fill="#16a34a" vectorEffect="non-scaling-stroke"/>
-    {budgets.map((b,i)=><circle key={`cursor-${b.id}`} cx={cursorX} cy={y(Number(selectedRow.budgetValues[b.id]??0))} r="1.35" fill={PALETTE[i%PALETTE.length]} vectorEffect="non-scaling-stroke"/>)}
-   </svg>
-
-   <input
-    type="range"
-    min="0"
-    max={rows.length-1}
-    value={safe}
-    onChange={e=>setCursor(Number(e.target.value))}
-    className="mt-3 w-full accent-black"
-    aria-label="Déplacer le curseur dans la projection des budgets épargne"
-   />
-
-   <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-    <div className="rounded-xl border border-black/10 bg-white p-3">
-     <p className="text-xs text-neutral-500">Épargne totale</p>
-     <p className="mt-1 font-semibold">{money(selectedRow.total)}</p>
-    </div>
-    <div className="rounded-xl border border-emerald-200 bg-white p-3">
-     <p className="text-xs text-emerald-700">Mobilisable pour la trésorerie</p>
-     <p className="mt-1 font-semibold text-emerald-700">{money(selectedRow.mobile)}</p>
-    </div>
-    {budgets.map((b,i)=>{
-     const account=accounts.find(a=>a.id===b.account_id);
-     return <div key={`value-${b.id}`} className="rounded-xl border border-black/10 bg-white p-3">
-      <div className="flex items-center gap-2">
-       <span className="block h-1 w-8 rounded-full" style={{backgroundColor:PALETTE[i%PALETTE.length]}}/>
-       <p className="text-xs font-medium">{b.name}</p>
-      </div>
-      {global&&account?<p className="mt-1 text-[11px] text-neutral-500">{account.name}</p>:null}
-      <p className="mt-1 font-semibold">{money(Number(selectedRow.budgetValues[b.id]??0))}</p>
-     </div>;
-    })}
-   </div>
-  </div>
- </div>;
+ let top=Math.ceil(rawMax/1000)*1000,bottom=Math.floor(rawMin/1000)*1000;if(top===bottom)top=bottom+1000;
+ const range=Math.max(1000,top-bottom),y=(v:number)=>90-((v-bottom)/range)*80;
+ const pts=(values:number[])=>values.map((v,i)=>`${(i/Math.max(1,values.length-1))*100},${y(v)}`).join(" ");
+ const grids:number[]=[];for(let v=bottom;v<=top;v+=1000)grids.push(v);
+ return <div className="mt-5 overflow-hidden rounded-2xl bg-neutral-50 p-3"><svg viewBox="0 0 100 100" className="h-64 w-full" preserveAspectRatio="none">{grids.map(v=><line key={v} x1="0" y1={y(v)} x2="100" y2={y(v)} stroke="currentColor" opacity=".11" strokeDasharray="2 2" vectorEffect="non-scaling-stroke"/>)}<polyline points={pts(rows.map(r=>r.total))} fill="none" stroke="#111827" strokeWidth="2" opacity=".7" vectorEffect="non-scaling-stroke"/><polyline points={pts(rows.map(r=>r.mobile))} fill="none" stroke="#16a34a" strokeWidth="2" strokeDasharray="4 2" vectorEffect="non-scaling-stroke"/>{budgets.map((b,i)=><polyline key={b.id} points={pts(rows.map(r=>Number(r.budgetValues[b.id]??0)))} fill="none" stroke={PALETTE[i%PALETTE.length]} strokeWidth="1.8" vectorEffect="non-scaling-stroke"/>)}</svg><div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs"><span className="flex items-center gap-2"><i className="block h-0.5 w-5 bg-neutral-900"/>Épargne totale</span><span className="flex items-center gap-2 text-emerald-700"><i className="block h-0.5 w-5 bg-emerald-600"/>Mobilisable</span>{budgets.map((b,i)=>{const account=accounts.find(a=>a.id===b.account_id);return <span key={b.id} className="flex items-center gap-2"><i className="block h-0.5 w-5" style={{backgroundColor:PALETTE[i%PALETTE.length]}}/><span>{b.name}{global&&account?` · ${account.name}`:""}</span></span>})}<span className="ml-auto text-neutral-500">{monthLabel(rows[0].month)} → {monthLabel(rows.at(-1)!.month)}</span></div></div>;
 }
-
-function LegendItem({color,label,value,dashed=false,thick=false}:{color:string;label:string;value:string;dashed?:boolean;thick?:boolean}){
- return <div className="flex min-w-[210px] flex-1 items-center gap-3 rounded-xl bg-neutral-50 px-3 py-2">
-  <svg width="42" height="12" viewBox="0 0 42 12" className="shrink-0" aria-hidden="true">
-   <line x1="1" y1="6" x2="41" y2="6" stroke={color} strokeWidth={thick?3:2.4} strokeDasharray={dashed?"7 4":undefined} strokeLinecap="round"/>
-  </svg>
-  <div className="min-w-0">
-   <p className="truncate text-xs font-medium">{label}</p>
-   <p className="text-sm font-semibold" style={{color}}>{value}</p>
-  </div>
- </div>;
-}
-
