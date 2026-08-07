@@ -2,13 +2,13 @@ import { calculateBudgetRemaining, createCategoryRootResolver, isBudgetActiveFor
 
 export type SavingsAccount = BudgetAccount;
 export type SavingsCategory = { id:string; parent_id:string|null; monthly_budget:number; account_id?:string|null; movement_type?:string; budget_period?:"monthly"|"specific_month"; budget_month?:string|null; is_primary_income?:boolean; is_essential?:boolean };
-export type SavingsMovement = { id?:string; account_id:string; category_id:string|null; movement_type:string; amount:number; movement_date:string; status:string; recurrence_id?:string|null; transfer_group_id?:string|null };
+export type SavingsMovement = { id?:string; account_id:string; category_id:string|null; movement_type:string; label?:string; amount:number; movement_date:string; status:string; recurrence_id?:string|null; transfer_group_id?:string|null };
 export type SavingsRecurrence = { id:string; account_id:string; destination_account_id:string|null; category_id:string|null; movement_type:"income"|"expense"|"transfer"; amount:number; frequency:string; interval_count:number; start_date:string; end_date:string|null; is_active?:boolean };
 export type SavingsOverride={recurrence_id:string;occurrence_month:string;amount:number};
 export type SavingsExclusion={recurrence_id:string;occurrence_date:string};
 export type SavingsPhotoPayment={amount:number;expected_date:string|null;received_date:string|null;status:string;personal_account_id:string|null;accounting_status?:string};
 export type SavingsUrssafState={contribution_month:string;account_id:string|null;is_completed:boolean};
-export type SavingsProposalDecision={source_account_id:string;destination_account_id:string;source_month:string;amount:number;status:"pending"|"accepted"|"deleted";transfer_group_id?:string|null;calculation_base?:number|null};
+export type SavingsProposalDecision={source_account_id:string;destination_account_id:string;source_month:string;amount:number;status:"pending"|"accepted"|"deleted";transfer_group_id?:string|null};
 export type SavingsPlanRow={
  month:string; openingChecking:number; checking:number; savings:number; proposal:number; savingsUsed:number;
  balanceAfterSavingsUse:number; income:number; expense:number; debitExcludingBudgetRemaining:number; budgetRemaining:number;
@@ -17,6 +17,7 @@ export type SavingsPlanRow={
 };
 type Input={sourceAccountId:string;destinationAccountId:string;initialChecking:number;initialSavings:number;startMonth:string;accounts?:SavingsAccount[];categories:SavingsCategory[];movements:SavingsMovement[];recurrences:SavingsRecurrence[];overrides?:SavingsOverride[];exclusions?:SavingsExclusion[];photoPayments?:SavingsPhotoPayment[];photoDefaultAccountId?:string|null;urssafStates?:SavingsUrssafState[];urssafDefaultAccountId?:string|null;movementDefaultAccountId?:string|null;savingsProposals?:SavingsProposalDecision[];months?:number;minReserve?:number;primaryIncomeCategoryId?:string|null;primaryIncomeSource?:"category"|"weddings";proposalTiming?:"same_day"|"next_day"};
 type DayFlow={income:number;expense:number;primaryIncome:number;budget:number};
+type PairedTransfer={group:string;date:string;amount:number;status:string;automatic:boolean};
 const iso=(d:Date)=>d.toISOString().slice(0,10);
 const todayParis=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Paris",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 const shiftMonth=(m:string,n:number)=>{const d=new Date(`${m}-01T12:00:00`);d.setMonth(d.getMonth()+n);return iso(d).slice(0,7)};
@@ -25,6 +26,7 @@ const addOccurrence=(date:Date,f:string,n:number)=>{const d=new Date(date);if(f=
 const addDays=(date:string,n:number)=>{const d=new Date(`${date}T12:00:00`);d.setDate(d.getDate()+n);return iso(d)};
 const roundMoney=(value:number)=>Math.round(value*100)/100;
 const SAVINGS_FLOOR=30;
+const MAX_DEPOSITS_PER_MONTH=2;
 
 export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
  const count=input.months??60,reserve=Math.max(0,Number(input.minReserve??500));
@@ -40,28 +42,43 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
  const overrides=new Map((input.overrides??[]).map(o=>[`${o.recurrence_id}:${String(o.occurrence_month).slice(0,7)}`,Number(o.amount)]));
  const excluded=new Set((input.exclusions??[]).map(e=>`${e.recurrence_id}:${e.occurrence_date}`));
  const materialized=new Set(input.movements.filter(m=>m.recurrence_id).map(m=>`${m.recurrence_id}:${m.movement_date}`));
- const acceptedGroups=new Set((input.savingsProposals??[]).filter(p=>p.status==="accepted"&&p.transfer_group_id).map(p=>p.transfer_group_id as string));
- const materializedTransferGroups=new Set(input.movements.filter(m=>m.status!=="cancelled"&&m.transfer_group_id).map(m=>m.transfer_group_id as string));
  const depositDecisions=new Map((input.savingsProposals??[]).filter(p=>p.source_account_id===input.sourceAccountId&&p.destination_account_id===input.destinationAccountId).map(p=>[String(p.source_month).slice(0,7),p]));
  const useDecisions=new Map((input.savingsProposals??[]).filter(p=>p.source_account_id===input.destinationAccountId&&p.destination_account_id===input.sourceAccountId).map(p=>[String(p.source_month).slice(0,7),p]));
+
+ // Reconstruit les vrais virements entre le compte courant analysé et son compte
+ // d'épargne. Les virements planifiés doivent faire baisser le courant ET monter
+ // l'épargne dans la projection ; les traiter comme un simple débit faussait le couple.
+ const grouped=new Map<string,SavingsMovement[]>();
+ for(const m of input.movements){if(m.status!=="cancelled"&&m.transfer_group_id){const rows=grouped.get(m.transfer_group_id)??[];rows.push(m);grouped.set(m.transfer_group_id,rows)}}
+ const deposits:PairedTransfer[]=[],uses:PairedTransfer[]=[];
+ for(const [group,rows] of grouped){
+  const depositOut=rows.find(m=>m.account_id===input.sourceAccountId&&m.movement_type==="transfer_out");
+  const depositIn=rows.find(m=>m.account_id===input.destinationAccountId&&m.movement_type==="transfer_in");
+  if(depositOut&&depositIn){deposits.push({group,date:depositOut.movement_date,amount:Number(depositOut.amount),status:depositOut.status,automatic:String(depositOut.label??"").startsWith("Versement épargne proposé")});continue}
+  const useOut=rows.find(m=>m.account_id===input.destinationAccountId&&m.movement_type==="transfer_out");
+  const useIn=rows.find(m=>m.account_id===input.sourceAccountId&&m.movement_type==="transfer_in");
+  if(useOut&&useIn)uses.push({group,date:useOut.movement_date,amount:Number(useOut.amount),status:useOut.status,automatic:String(useOut.label??"").startsWith("Utilisation épargne proposée")});
+ }
+ const pairedGroups=new Set([...deposits,...uses].map(t=>t.group));
+
  const flows=new Map<string,DayFlow>(),spent=new Map<string,number>();
  const flow=(date:string)=>{const f=flows.get(date)??{income:0,expense:0,primaryIncome:0,budget:0};flows.set(date,f);return f};
  const income=(date:string,amount:number,primary=false)=>{const f=flow(date);f.income+=amount;if(primary)f.primaryIncome+=amount};
  const registerSpent=(date:string,amount:number,categoryId?:string|null)=>{const r=root(categoryId??null);if(r){const k=`${date.slice(0,7)}:${r}`;spent.set(k,(spent.get(k)??0)+amount)}};
  const expense=(date:string,amount:number,categoryId?:string|null,budget=false)=>{const f=flow(date);f.expense+=amount;if(budget)f.budget+=amount;else registerSpent(date,amount,categoryId)};
 
- // Les opérations pointées sont déjà incluses dans initialChecking. Elles ne sont donc
- // pas rejouées dans les flux, mais elles doivent réduire le reliquat du budget du mois.
+ // Les opérations pointées sont déjà incluses dans initialChecking. Les non pointées
+ // restent dues même si leur date est passée. Les virements du couple courant/épargne
+ // sont traités séparément pour faire évoluer les deux soldes simultanément.
  for(const m of input.movements){
-  if(m.movement_date<requestedStart||m.movement_date>endDate||m.account_id!==input.sourceAccountId||m.status==="cancelled")continue;
-  if(m.movement_type==="expense"&&["planned","completed"].includes(m.status))registerSpent(m.movement_date,Number(m.amount),m.category_id);
-  if(m.status!=="planned"||m.movement_date<simulationStart)continue;
-  if(m.transfer_group_id&&acceptedGroups.has(m.transfer_group_id))continue;
+  if(m.movement_date>endDate||m.account_id!==input.sourceAccountId||m.status==="cancelled")continue;
+  if(m.movement_date>=requestedStart&&m.movement_type==="expense"&&["planned","completed"].includes(m.status))registerSpent(m.movement_date,Number(m.amount),m.category_id);
+  if(m.status!=="planned"|| (m.transfer_group_id&&pairedGroups.has(m.transfer_group_id)))continue;
+  const effectiveDate=m.movement_date<simulationStart?simulationStart:m.movement_date;
+  if(effectiveDate>endDate)continue;
   const a=Number(m.amount);
-  if(["income","transfer_in"].includes(m.movement_type))income(m.movement_date,a,primaryRoots.has(root(m.category_id)??""));
-  else if(m.movement_type==="expense"||m.movement_type==="transfer_out"){
-   const f=flow(m.movement_date);f.expense+=a;
-  }
+  if(["income","transfer_in"].includes(m.movement_type))income(effectiveDate,a,primaryRoots.has(root(m.category_id)??""));
+  else if(m.movement_type==="expense"||m.movement_type==="transfer_out"){const f=flow(effectiveDate);f.expense+=a}
  }
 
  for(const r of input.recurrences.filter(r=>r.is_active!==false)){
@@ -104,17 +121,16 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
  const primaryDates=dates.filter(d=>(flows.get(d)?.primaryIncome??0)>0);
  let checking=Number(input.initialChecking),savings=Math.max(SAVINGS_FLOOR,Number(input.initialSavings));
  const rows:SavingsPlanRow[]=[];
-
- // Les transferts calculés sont exécutés à leur date réelle dans la simulation.
- // Cela évite qu'un versement ou une reprise d'épargne soit appliqué seulement
- // en fin de mois alors qu'un découvert peut apparaître quelques jours avant.
- const scheduledDeposits=new Map<string,number>();
- const scheduledUses=new Map<string,number>();
+ const scheduledDeposits=new Map<string,number>(),scheduledUses=new Map<string,number>();
  const addScheduled=(map:Map<string,number>,date:string,amount:number)=>map.set(date,roundMoney((map.get(date)??0)+amount));
 
+ // Un virement accepté mais encore non pointé reste une opération future. S'il est
+ // en retard, il est reporté à aujourd'hui, exactement comme les autres débits non cochés.
+ for(const t of deposits.filter(t=>t.status==="planned")){const date=t.date<simulationStart?simulationStart:t.date;if(date<=endDate)addScheduled(scheduledDeposits,date,t.amount)}
+ for(const t of uses.filter(t=>t.status==="planned")){const date=t.date<simulationStart?simulationStart:t.date;if(date<=endDate)addScheduled(scheduledUses,date,t.amount)}
+
  const balanceSeries=(from:string,to:string,opening:number)=>{
-  const out:{date:string;balance:number}[]=[];
-  let balance=opening;
+  const out:{date:string;balance:number}[]=[];let balance=opening;
   for(const date of dates.filter(d=>d>=from&&d<=to)){
    balance+=scheduledUses.get(date)??0;
    const f=flows.get(date);if(f)balance+=f.income-f.expense;
@@ -130,113 +146,86 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
   const rowStart=first<simulationStart?simulationStart:first;
   const opening=checking;
   let monthIncome=0,monthExpense=0,monthBudget=0;
-
   const depositDecision=depositDecisions.get(month),useDecision=useDecisions.get(month);
-  const acceptedDepositDecision=depositDecision?.status==="accepted"?depositDecision:null;
-  const acceptedUseDecision=useDecision?.status==="accepted"?useDecision:null;
-  const acceptedDeposit=acceptedDepositDecision&&(!acceptedDepositDecision.transfer_group_id||!materializedTransferGroups.has(acceptedDepositDecision.transfer_group_id))?Number(acceptedDepositDecision.amount):0;
-  const acceptedUseRequested=acceptedUseDecision&&(!acceptedUseDecision.transfer_group_id||!materializedTransferGroups.has(acceptedUseDecision.transfer_group_id))?Number(acceptedUseDecision.amount):0;
 
-  // Un seul versement automatique est proposé par mois. Cela respecte l'objectif
-  // de limiter les manipulations à un ou deux virements maximum, tout en restant
-  // compatible avec la structure actuelle des propositions (une décision par mois).
-  //
-  // Le montant est calculé sur une fenêtre glissante de 45 jours : on prend le
-  // premier jour du mois où le solde dépasse le seuil, puis on ne transfère que
-  // l'excédent qui peut rester sur l'épargne sans faire passer le compte sous son
-  // seuil pendant les 45 jours suivants. Aucune marge arbitraire n'est ajoutée.
+  // Compte uniquement les virements automatiques réellement matérialisés. Le moteur
+  // peut ainsi proposer un deuxième passage dans le mois, mais jamais un troisième.
+  const monthAutomaticDeposits=deposits.filter(t=>t.automatic&&((t.date<simulationStart&&t.status==="planned"?simulationStart:t.date).slice(0,7)===month));
+  const existingDepositCount=new Set(monthAutomaticDeposits.map(t=>t.group)).size;
+  const lastExistingDepositDate=monthAutomaticDeposits.map(t=>t.date<simulationStart&&t.status==="planned"?simulationStart:t.date).sort().at(-1)??null;
+
+  // Cas de secours : une décision acceptée sans mouvements associés ne doit jamais
+  // être appliquée deux fois ni permettre une nouvelle proposition avant réparation.
+  const acceptedDepositMissing=depositDecision?.status==="accepted"&&depositDecision.transfer_group_id&&!deposits.some(t=>t.group===depositDecision.transfer_group_id);
+  if(acceptedDepositMissing){const fallback=lastExistingDepositDate??rowStart;addScheduled(scheduledDeposits,fallback,Number(depositDecision.amount))}
+
   const baseline=balanceSeries(rowStart,endDate,checking);
+  const baselineEndOfMonth=baseline.find(item=>item.date===last)?.balance??checking;
   let proposalDate:string|null=null;
   let automaticProposal=0;
-  let reliableCycleEnd=rowStart;
+  let cycleEndDate:string|null=rowStart;
 
-  if(!acceptedDepositDecision){
-   const firstExcess=baseline.find(item=>item.date<=last&&item.balance>reserve+0.009)??null;
+  const canProposeDeposit=existingDepositCount<MAX_DEPOSITS_PER_MONTH&&!acceptedDepositMissing&&depositDecision?.status!=="deleted";
+  if(canProposeDeposit){
+   // Après un premier virement, réserve le deuxième créneau au prochain revenu
+   // principal du mois lorsqu'il existe. On évite ainsi de faire deux petits virements
+   // consécutifs puis de laisser un gros salaire dormir sur le compte jusqu'au mois suivant.
+   const nextPrimaryAfterExisting=lastExistingDepositDate?primaryDates.find(d=>d>lastExistingDepositDate&&d<=last)??null:null;
+   const candidateStart=nextPrimaryAfterExisting??(lastExistingDepositDate?addDays(lastExistingDepositDate,1):rowStart);
+   const firstExcess=baseline.find(item=>item.date>=candidateStart&&item.date<=last&&item.balance>reserve+0.009)??null;
    if(firstExcess){
-    proposalDate=firstExcess.date;
-    const fortyFiveDayEnd=addDays(proposalDate,44);
-    reliableCycleEnd=fortyFiveDayEnd<=endDate?fortyFiveDayEnd:endDate;
-    const window=baseline.filter(item=>item.date>=proposalDate!&&item.date<=reliableCycleEnd);
-    const minimumOverWindow=window.reduce((minimum,item)=>Math.min(minimum,item.balance),firstExcess.balance);
-    automaticProposal=Math.max(0,roundMoney(minimumOverWindow-reserve));
+    proposalDate=addDays(firstExcess.date,input.proposalTiming==="next_day"?1:0);
+    if(proposalDate<=last){
+     const fortyFiveDayEnd=addDays(proposalDate,44);
+     cycleEndDate=fortyFiveDayEnd<=endDate?fortyFiveDayEnd:endDate;
+     const window=baseline.filter(item=>item.date>=proposalDate!&&item.date<=cycleEndDate!);
+     const minimumOverWindow=window.reduce((minimum,item)=>Math.min(minimum,item.balance),firstExcess.balance);
+     automaticProposal=Math.max(0,roundMoney(minimumOverWindow-reserve));
+    } else proposalDate=null;
    }
   }
 
-  if(acceptedDepositDecision){
-   const trigger=primaryDates.find(d=>d>=rowStart&&d<=last)??rowStart;
-   proposalDate=addDays(trigger,input.proposalTiming==="next_day"?1:0);
-   if(proposalDate>last)proposalDate=last;
-   const fortyFiveDayEnd=addDays(proposalDate,44);
-   reliableCycleEnd=fortyFiveDayEnd<=endDate?fortyFiveDayEnd:endDate;
-  }
+  // Une modification manuelle en attente remplace le montant automatique. Une ligne
+  // acceptée déjà matérialisée représente le virement précédent et n'empêche donc pas
+  // le second calcul ; c'est le nombre réel de virements du mois qui fait foi.
+  let proposal=automaticProposal;
+  if(depositDecision?.status==="pending")proposal=Math.max(0,Number(depositDecision.amount));
+  if(existingDepositCount>=MAX_DEPOSITS_PER_MONTH||depositDecision?.status==="deleted"||acceptedDepositMissing)proposal=0;
+  if(proposal>0&&proposalDate)addScheduled(scheduledDeposits,proposalDate,proposal);
 
-  const nextPrimaryAfterProposal=primaryDates.find(d=>d>(proposalDate??rowStart))??null;
-  let prudentProposal=acceptedDepositDecision?acceptedDeposit:automaticProposal;
-  if(prudentProposal>0&&proposalDate)addScheduled(scheduledDeposits,proposalDate,prudentProposal);
-
-  let afterDeposit=balanceSeries(rowStart,reliableCycleEnd,checking);
-  let lowestPoint=afterDeposit.reduce((best,item)=>item.balance<best.balance?item:best,afterDeposit[0]??{date:rowStart,balance:checking});
-  let firstBelowReserve=afterDeposit.find(item=>item.balance<reserve-0.009)??null;
-  let needed=Math.max(0,roundMoney(reserve-lowestPoint.balance));
-
-  if(!acceptedDepositDecision&&prudentProposal>0&&needed>0&&proposalDate){
-   const reduction=Math.min(prudentProposal,needed);
-   prudentProposal=roundMoney(prudentProposal-reduction);
-   const revised=roundMoney((scheduledDeposits.get(proposalDate)??0)-reduction);
-   if(revised>0)scheduledDeposits.set(proposalDate,revised);else scheduledDeposits.delete(proposalDate);
-   afterDeposit=balanceSeries(rowStart,reliableCycleEnd,checking);
-   lowestPoint=afterDeposit.reduce((best,item)=>item.balance<best.balance?item:best,afterDeposit[0]??{date:rowStart,balance:checking});
-   firstBelowReserve=afterDeposit.find(item=>item.balance<reserve-0.009)??null;
-   needed=Math.max(0,roundMoney(reserve-lowestPoint.balance));
-  }
-
-  // Une reprise reste possible si un événement imprévu ou un versement déjà
-  // accepté fait malgré tout passer le compte sous son seuil. Le calcul automatique
-  // sur 45 jours cherche précisément à éviter cet aller-retour dans le cas normal.
-  const automaticUseAmount=Math.min(needed,Math.max(0,savings-SAVINGS_FLOOR));
-  const projectedUse=acceptedUseDecision?Math.min(acceptedUseRequested,Math.max(0,savings-SAVINGS_FLOOR)):automaticUseAmount;
+  // Après intégration du versement proposé, vérifie le risque réel de découvert.
+  const riskEnd=proposalDate?Math.min(Date.parse(`${addDays(proposalDate,44)}T12:00:00`),Date.parse(`${endDate}T12:00:00`)):Date.parse(`${monthEnd(shiftMonth(month,1))}T12:00:00`);
+  const riskEndDate=iso(new Date(riskEnd));
+  const afterDeposit=balanceSeries(rowStart,riskEndDate,checking);
+  const lowestPoint=afterDeposit.reduce((best,item)=>item.balance<best.balance?item:best,afterDeposit[0]??{date:rowStart,balance:checking});
+  const firstOverdraft=afterDeposit.find(item=>item.balance<0)??null;
+  const needed=Math.max(0,roundMoney(-lowestPoint.balance));
   let savingsUseDate:string|null=null;
-  if(projectedUse>0){
-   const riskDate=firstBelowReserve?.date??lowestPoint.date;
-   const previousDay=addDays(riskDate,-1);
-   savingsUseDate=previousDay<rowStart?rowStart:previousDay;
-   addScheduled(scheduledUses,savingsUseDate,projectedUse);
-  }
+  let usable=0;
+  const acceptedUseMissing=useDecision?.status==="accepted"&&useDecision.transfer_group_id&&!uses.some(t=>t.group===useDecision.transfer_group_id);
+  if(acceptedUseMissing){savingsUseDate=firstOverdraft?addDays(firstOverdraft.date,-1):rowStart;if(savingsUseDate<rowStart)savingsUseDate=rowStart;usable=Math.min(Number(useDecision.amount),Math.max(0,savings-SAVINGS_FLOOR));addScheduled(scheduledUses,savingsUseDate,usable)}
+  else if(useDecision?.status==="pending"&&needed>0){savingsUseDate=firstOverdraft?addDays(firstOverdraft.date,-1):lowestPoint.date;if(savingsUseDate<rowStart)savingsUseDate=rowStart;usable=Math.min(Number(useDecision.amount),Math.max(0,savings-SAVINGS_FLOOR));addScheduled(scheduledUses,savingsUseDate,usable)}
+  else if(useDecision?.status!=="deleted"&&needed>0){savingsUseDate=firstOverdraft?addDays(firstOverdraft.date,-1):lowestPoint.date;if(savingsUseDate<rowStart)savingsUseDate=rowStart;usable=Math.min(needed,Math.max(0,savings-SAVINGS_FLOOR));addScheduled(scheduledUses,savingsUseDate,usable)}
 
-  let lowest=checking,lowestDate=rowStart,overdraftDate:string|null=null;
-  const balanceBeforeSavings=baseline.find(item=>item.date===last)?.balance??checking;
-
+  // Exécute chronologiquement les flux et tous les virements planifiés/proposés du mois.
   for(const date of dates.filter(d=>d>=rowStart&&d<=last)){
    const use=scheduledUses.get(date)??0;
-   if(use>0){const actualUse=Math.min(use,Math.max(0,savings-SAVINGS_FLOOR));checking+=actualUse;savings-=actualUse;}
-
-   const f=flows.get(date);
-   if(f){checking+=f.income-f.expense;monthIncome+=f.income;monthExpense+=f.expense;monthBudget+=f.budget;}
-
+   if(use>0){const actualUse=Math.min(use,Math.max(0,savings-SAVINGS_FLOOR));checking+=actualUse;savings-=actualUse}
+   const f=flows.get(date);if(f){checking+=f.income-f.expense;monthIncome+=f.income;monthExpense+=f.expense;monthBudget+=f.budget}
    const deposit=scheduledDeposits.get(date)??0;
-   if(deposit>0){
-    const actualDeposit=Math.min(deposit,Math.max(0,checking-reserve));
-    checking-=actualDeposit;
-    savings+=actualDeposit;
-   }
-
+   if(deposit>0){const actualDeposit=Math.min(deposit,Math.max(0,checking-reserve));checking-=actualDeposit;savings+=actualDeposit}
    checking=roundMoney(checking);savings=roundMoney(Math.max(SAVINGS_FLOOR,savings));
-   if(checking<lowest){lowest=checking;lowestDate=date;}
-   if(overdraftDate===null&&checking<0)overdraftDate=date;
   }
 
+  const nextPrimary=primaryDates.find(d=>d>(proposalDate??rowStart))??null;
   rows.push({
-   month,openingChecking:opening,checking,savings,
-   proposal:acceptedDepositDecision?0:prudentProposal,
-   savingsUsed:acceptedUseDecision?0:automaticUseAmount,
+   month,openingChecking:opening,checking,savings,proposal,savingsUsed:usable,
    balanceAfterSavingsUse:checking,income:monthIncome,expense:monthExpense,
    debitExcludingBudgetRemaining:monthExpense-monthBudget,budgetRemaining:monthBudget,
-   balanceBeforeSavings,requiredReserve:reserve,proposalDate,
-   savingsUseDate,cycleEndDate:reliableCycleEnd,
-   lowestBalance:roundMoney(lowest),lowestBalanceDate:lowestDate,
-   nextPrimaryIncomeDate:nextPrimaryAfterProposal,overdraftDate
+   balanceBeforeSavings:roundMoney(baselineEndOfMonth),requiredReserve:reserve,proposalDate,
+   savingsUseDate,cycleEndDate,lowestBalance:roundMoney(lowestPoint.balance),lowestBalanceDate:lowestPoint.date,
+   nextPrimaryIncomeDate:nextPrimary,overdraftDate:firstOverdraft?.date??null
   });
  }
-
  return rows;
 }

@@ -26,15 +26,15 @@ export default async function PersoPage({searchParams}:{searchParams:Promise<SP>
  const [{data:accounts=[]},{data:categories=[]},{data:snapshots=[]},{data:movements=[]},{data:recurrences=[]},{data:overrides=[]},{data:exclusions=[]},{data:photoPaymentsRaw=[]},{data:photoStates=[]},{data:urssafStates=[]},{data:savingsProposals=[]},{data:personalSettings,error:personalSettingsError}]=await Promise.all([
   supabase.from("personal_accounts").select("id,name,account_type,is_default,color").eq("is_active",true).order("account_type").order("name"),
   supabase.from("personal_categories").select("id,name,movement_type,parent_id,monthly_budget,account_id,budget_period,budget_month,is_primary_income,is_essential").eq("is_active",true).order("name"),
-  supabase.from("personal_balance_snapshots").select("id,account_id,balance,snapshot_date,notes").order("snapshot_date",{ascending:false}),
-  supabase.from("personal_movements").select("id,account_id,category_id,movement_type,label,amount,movement_date,status,completed_date,recurrence_id,transfer_group_id").neq("status","cancelled").order("movement_date",{ascending:false}),
+  supabase.from("personal_balance_snapshots").select("id,account_id,balance,snapshot_date,notes,created_at").order("snapshot_date",{ascending:false}),
+  supabase.from("personal_movements").select("id,account_id,category_id,movement_type,label,amount,movement_date,status,completed_date,completed_at,recurrence_id,transfer_group_id").neq("status","cancelled").order("movement_date",{ascending:false}),
   supabase.from("personal_recurrences").select("id,account_id,destination_account_id,category_id,movement_type,label,amount,frequency,interval_count,start_date,end_date,annual_change_percent,is_active").order("start_date"),
   supabase.from("personal_recurrence_overrides").select("recurrence_id,occurrence_month,amount"),
   supabase.from("personal_recurrence_exclusions").select("recurrence_id,occurrence_date"),
   supabase.from("wedding_payments").select("id,display_name,wedding_date,payment_type,amount,expected_date,received_date,status").neq("status","cancelled").order("expected_date"),
   supabase.from("personal_photo_payment_states").select("payment_id,account_id,is_completed,completed_date"),
   supabase.from("personal_urssaf_states").select("contribution_month,account_id,is_completed,completed_date"),
-  supabase.from("personal_savings_proposals").select("source_account_id,destination_account_id,source_month,amount,status,transfer_group_id,calculation_base"),
+  supabase.from("personal_savings_proposals").select("source_account_id,destination_account_id,source_month,amount,status,transfer_group_id"),
   supabase.from("personal_settings").select("photo_default_account_id,movement_default_account_id,urssaf_default_account_id,savings_source_account_id,savings_destination_account_id,savings_threshold,savings_source_account_2_id,savings_destination_account_2_id,savings_threshold_2,savings_income_category_id,savings_income_category_2_id,savings_income_source,savings_income_source_2,savings_proposal_timing,savings_proposal_timing_2").eq("owner_id",user.id).maybeSingle()]);
  if(personalSettingsError) console.error("Chargement personal_settings:",personalSettingsError.message);
  const photoStateByPayment=new Map((photoStates as any[]).map(s=>[s.payment_id,s]));
@@ -61,7 +61,23 @@ export default async function PersoPage({searchParams}:{searchParams:Promise<SP>
  const photoCaForMonth=(month:string)=>(photoPayments as any[]).filter(p=>p.accounting_status!=="cancelled"&&photoAccountingMonth(p)===month).reduce((s,p)=>s+Number(p.amount),0);
  const urssafForMonth=(month:string)=>Math.round(photoCaForMonth(shiftMonth(month,-1))*0.216*100)/100;
  const urssafStateByMonth=new Map((urssafStates as any[]).map(s=>[String(s.contribution_month).slice(0,7),s]));
- const completed=(movements as any[]).filter(m=>{const effectiveDate=m.completed_date??m.movement_date;return m.status==="completed"&&effectiveDate>(latest.get(m.account_id)?.snapshot_date??"0000-00-00")&&effectiveDate<=today;});
+ const completed=(movements as any[]).filter(m=>{
+   if(m.status!=="completed") return false;
+   const snapshot=latest.get(m.account_id);
+   const effectiveDate=m.completed_date??m.movement_date;
+   if(effectiveDate>today) return false;
+   if(!snapshot) return true;
+   // Règle historique sûre : un mouvement ancien sans horodatage n'est rejoué
+   // que s'il est strictement postérieur au solde de référence. Cela évite
+   // de modifier rétroactivement un solde saisi le même jour.
+   if(!m.completed_at) return effectiveDate>snapshot.snapshot_date;
+   // Pour les mouvements pointés après ce correctif, l'heure permet de savoir
+   // s'ils ont réellement été validés après la saisie du solde, même le même jour.
+   const snapshotCreatedAt=snapshot.created_at?new Date(snapshot.created_at).getTime():NaN;
+   const completedAt=new Date(m.completed_at).getTime();
+   if(Number.isFinite(snapshotCreatedAt)&&Number.isFinite(completedAt)) return completedAt>snapshotCreatedAt;
+   return effectiveDate>snapshot.snapshot_date;
+  });
  const receivedPhoto=(photoPayments as any[]).filter(p=>p.status==="received"&&p.received_date&&p.received_date<=today);
  const live=(id:string)=>Number(latest.get(id)?.balance??0)
    +completed.filter(m=>m.account_id===id).reduce((s,m)=>s+(["income","transfer_in"].includes(m.movement_type)?Number(m.amount):-Number(m.amount)),0)
@@ -71,7 +87,7 @@ export default async function PersoPage({searchParams}:{searchParams:Promise<SP>
  const monthEnd=`${currentMonth}-${String(new Date(Number(currentMonth.slice(0,4)),Number(currentMonth.slice(5,7)),0).getDate()).padStart(2,"0")}`;
  const futureBalances=new Map<string,number>((accounts as any[]).map(a=>[a.id,live(a.id)]));
  const apply=(id:string,amount:number)=>futureBalances.set(id,(futureBalances.get(id)??0)+amount);
- (movements as any[]).filter(m=>m.status==="planned"&&m.movement_date.startsWith(currentMonth)).forEach(m=>apply(m.account_id,["income","transfer_in"].includes(m.movement_type)?Number(m.amount):-Number(m.amount)));
+ (movements as any[]).filter(m=>m.status==="planned"&&m.movement_date<=monthEnd).forEach(m=>apply(m.account_id,["income","transfer_in"].includes(m.movement_type)?Number(m.amount):-Number(m.amount)));
  const existingRec=new Set((movements as any[]).filter(m=>m.recurrence_id).map(m=>`${m.recurrence_id}:${m.movement_date}`));
  const addDate=(date:Date,f:string,n:number)=>{const d=new Date(date);if(f==="weekly")d.setDate(d.getDate()+7*n);else if(f==="monthly")d.setMonth(d.getMonth()+n);else if(f==="quarterly")d.setMonth(d.getMonth()+3*n);else d.setFullYear(d.getFullYear()+n);return d;};
  for(const r of (recurrences as any[]).filter(r=>r.is_active)){let d=new Date(`${r.start_date}T12:00:00`),guard=0;while(d<=new Date(`${monthEnd}T12:00:00`)&&guard++<2000){const date=d.toISOString().slice(0,10);if(date.startsWith(currentMonth)&&!existingRec.has(`${r.id}:${date}`)&&!(exclusions as any[]).some(e=>e.recurrence_id===r.id&&e.occurrence_date===date)&&(!r.end_date||date<=r.end_date)){const ov=(overrides as any[]).find(o=>o.recurrence_id===r.id&&String(o.occurrence_month).slice(0,7)===date.slice(0,7));const amount=Number(ov?.amount??r.amount);if(r.movement_type==="income")apply(r.account_id,amount);else if(r.movement_type==="expense")apply(r.account_id,-amount);else if(r.destination_account_id){apply(r.account_id,-amount);apply(r.destination_account_id,amount);}}d=addDate(d,r.frequency,Number(r.interval_count||1));}}

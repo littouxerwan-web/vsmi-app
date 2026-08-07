@@ -29,7 +29,7 @@ function occurrences(r:Recurrence,month:string){const start=new Date(`${r.start_
 function photoLabel(p:PhotoPayment){const kind=p.payment_type==="deposit"?"Acompte":"Solde";const date=p.wedding_date?formatDate(p.wedding_date):"date à définir";return `Mariage ${p.display_name} ${date} · ${kind}`;}
 
 export function MonthlyOperations({accounts,categories,movements,recurrences,overrides,photoPayments=[],photoDefaultAccountId=null,urssafDefaultAccountId=null,urssafStates=[]}:{accounts:Account[];categories:Category[];movements:Movement[];recurrences:Recurrence[];overrides:Override[];photoPayments?:PhotoPayment[];photoDefaultAccountId?:string|null;urssafDefaultAccountId?:string|null;urssafStates?:UrssafState[];budgetRows?:unknown[]}){
- const now=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Paris",year:"numeric",month:"2-digit"}).format(new Date());const [month,setMonth]=useState(now);const [accountFilter,setAccountFilter]=useState("all");const [query,setQuery]=useState("");const [typeFilter,setTypeFilter]=useState("all");const [statusFilter,setStatusFilter]=useState("all");const [sortBy,setSortBy]=useState("date-asc");
+ const now=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Paris",year:"numeric",month:"2-digit"}).format(new Date());const [month,setMonth]=useState(now);const [accountFilter,setAccountFilter]=useState("all");const [query,setQuery]=useState("");const [typeFilter,setTypeFilter]=useState("all");const [statusFilter,setStatusFilter]=useState("planned");const [sortBy,setSortBy]=useState("date-asc");
  const selectedAccount=accounts.find(a=>a.id===accountFilter);
  const accountTint=selectedAccount?.color??null;
  const shiftMonth=(value:string,delta:number)=>{const d=new Date(`${value}-01T12:00:00`);d.setMonth(d.getMonth()+delta);return d.toISOString().slice(0,7);};
@@ -37,7 +37,9 @@ export function MonthlyOperations({accounts,categories,movements,recurrences,ove
  const previousPhotoCa=photoPayments.filter(p=>p.status!=="cancelled"&&photoAccountingMonth(p)===shiftMonth(month,-1)).reduce((s,p)=>s+Number(p.amount),0);
  const urssafAmount=Math.round(previousPhotoCa*0.216*100)/100; const urssafState=urssafStates.find(s=>String(s.contribution_month).slice(0,7)===month); const urssafAccountId=urssafState?.account_id??urssafDefaultAccountId; const urssafChecked=Boolean(urssafState?.is_completed); const monthEnd=(()=>{const d=new Date(`${month}-01T12:00:00`);d.setMonth(d.getMonth()+1);d.setDate(0);return d.toISOString().slice(0,10);})();
  const ops=useMemo<Operation[]>(()=>{
-  const real=movements.filter(m=>m.movement_date.startsWith(month)&&m.movement_type!=="transfer_in").map(m=>({...m,projected:false}));
+  const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Paris",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+  const currentMonth=today.slice(0,7);
+  const real=movements.filter(m=>m.movement_type!=="transfer_in"&&(m.movement_date.startsWith(month)||(month===currentMonth&&m.status!=="completed"&&m.movement_date<`${currentMonth}-01`))).map(m=>({...m,projected:false,movement_date:month===currentMonth&&m.status!=="completed"&&m.movement_date<`${currentMonth}-01`?today:m.movement_date}));
   const existing=new Set(movements.filter(m=>m.recurrence_id&&m.movement_date.startsWith(month)).map(m=>`${m.recurrence_id}:${m.movement_date}`));
   const projected:Operation[]=[];
   for(const r of recurrences)for(const date of occurrences(r,month)){if(existing.has(`${r.id}:${date}`))continue;const ov=overrides.find(o=>o.recurrence_id===r.id&&o.occurrence_month.slice(0,7)===month);projected.push({id:`rec-${r.id}-${date}`,recurrence_id:r.id,account_id:r.account_id,destination_account_id:r.destination_account_id,category_id:r.category_id,movement_type:r.movement_type,label:r.label,amount:Number(ov?.amount??r.amount),movement_date:date,status:"planned",projected:true});}
@@ -56,7 +58,10 @@ export function MonthlyOperations({accounts,categories,movements,recurrences,ove
  const visibleOps=sortOps(baseVisibleOps.filter(o=>(!normalizedQuery||`${o.label} ${accounts.find(a=>a.id===o.account_id)?.name??""} ${categories.find(c=>c.id===o.category_id)?.name??""}`.toLocaleLowerCase("fr").includes(normalizedQuery))&&matchesType(o)&&matchesStatus(o.status)));
  const visiblePhotos=photos.filter(p=>(accountFilter==="all"||(p.personal_account_id??photoDefaultAccountId)===accountFilter)&&(!normalizedQuery||photoLabel(p).toLocaleLowerCase("fr").includes(normalizedQuery))&&(typeFilter==="all"||typeFilter==="credit")&&matchesStatus(p.status==="received"?"completed":"planned"));
  const showUrssaf=urssafAmount>0&&(accountFilter==="all"||urssafAccountId===accountFilter);
- const budgets=categories.filter(c=>!c.parent_id&&Number(c.monthly_budget||0)>0&&isBudgetActiveForMonth(c,month)&&(accountFilter==="all"||c.account_id===accountFilter)).map(c=>{const spent=visibleOps.filter(o=>o.movement_type==="expense"&&rootFor(o.category_id)===c.id).reduce((s,o)=>s+Number(o.amount),0);return {...c,spent,remaining:Math.max(0,Number(c.monthly_budget)-spent)};});
+ // Les filtres de recherche/type/statut sont strictement visuels : ils ne doivent jamais
+ // modifier le budget consommé ni, indirectement, la prévision de solde.
+ const budgetOps=accountFilter==="all"?ops:ops.filter(o=>o.account_id===accountFilter);
+ const budgets=categories.filter(c=>!c.parent_id&&Number(c.monthly_budget||0)>0&&isBudgetActiveForMonth(c,month)&&(accountFilter==="all"||c.account_id===accountFilter)).map(c=>{const spent=budgetOps.filter(o=>o.movement_type==="expense"&&rootFor(o.category_id)===c.id).reduce((s,o)=>s+Number(o.amount),0);return {...c,spent,remaining:Math.max(0,Number(c.monthly_budget)-spent)};});
  const isCredit=(o:Operation)=>o.movement_type==="income"||o.movement_type==="transfer_in";
  const isDebit=(o:Operation)=>o.movement_type==="expense"||o.movement_type==="transfer"||o.movement_type==="transfer_out";
  const checkedCredits=visibleOps.filter(o=>o.status==="completed"&&isCredit(o)).reduce((s,o)=>s+Number(o.amount),0)+visiblePhotos.filter(p=>p.status==="received").reduce((s,p)=>s+Number(p.amount),0);
