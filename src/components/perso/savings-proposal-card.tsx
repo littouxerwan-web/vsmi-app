@@ -16,7 +16,7 @@ export async function SavingsProposalCard({sourceAccountId,destinationAccountId,
  const recovery=mode==="recovery";
  const monthStart=`${sourceMonth}-01`;
  const nextMonth=(()=>{const d=new Date(`${monthStart}T12:00:00`);d.setMonth(d.getMonth()+1);return d.toISOString().slice(0,10)})();
- const prefix=recovery?"Utilisation épargne proposée":"Versement épargne proposé";
+ const prefix=recovery?"Utilisation d'épargne conseillée":"Versement épargne proposé";
  const {data:materializedTransfers=[]}=await supabase.from("personal_movements").select("transfer_group_id,status,movement_date").eq("owner_id",user.id).eq("account_id",sourceAccountId).eq("movement_type","transfer_out").gte("movement_date",monthStart).lt("movement_date",nextMonth).like("label",`${prefix}%`).not("transfer_group_id","is",null);
  const materializedGroups=new Set((materializedTransfers??[]).map((m:any)=>m.transfer_group_id).filter(Boolean));
  const previousAcceptedMaterialized=proposal?.status==="accepted"&&proposal.transfer_group_id&&materializedGroups.has(proposal.transfer_group_id);

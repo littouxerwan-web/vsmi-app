@@ -519,7 +519,7 @@ async function verifySavingsAccounts(supabase: any, ownerId: string, sourceAccou
 async function savingsTransferGroupsForMonth(supabase:any, ownerId:string, sourceAccountId:string, destinationAccountId:string, sourceMonth:string, isSavingsUse:boolean){
   const start=`${sourceMonth}-01`;
   const next=(()=>{const d=new Date(`${start}T12:00:00`);d.setMonth(d.getMonth()+1);return d.toISOString().slice(0,10)})();
-  const prefix=isSavingsUse?"Utilisation épargne proposée":"Versement épargne proposé";
+  const prefix=isSavingsUse?"Utilisation d'épargne conseillée":"Versement épargne proposé";
   const {data:outs,error:outError}=await supabase.from("personal_movements").select("transfer_group_id").eq("owner_id",ownerId).eq("account_id",sourceAccountId).eq("movement_type","transfer_out").gte("movement_date",start).lt("movement_date",next).like("label",`${prefix}%`).not("transfer_group_id","is",null).neq("status","cancelled");
   if(outError) fail(outError.message);
   const groups=[...new Set((outs??[]).map((row:{transfer_group_id:string|null})=>row.transfer_group_id).filter(Boolean))] as string[];
@@ -561,7 +561,7 @@ export async function acceptSavingsProposal(fd: FormData) {
     }
   }
   const movementDate = key.proposalDate; const group = crypto.randomUUID();
-  const label = isSavingsUse ? `Utilisation épargne proposée · ${key.sourceMonth}` : `Versement épargne proposé · ${key.sourceMonth}`;
+  const label = isSavingsUse ? `Utilisation d'épargne conseillée · ${key.sourceMonth}` : `Versement épargne proposé · ${key.sourceMonth}`;
   const { error: movementError } = await supabase.from("personal_movements").insert([
     { owner_id: user.id, account_id: key.sourceAccountId, category_id: isSavingsUse ? null : category?.id ?? null, movement_type: "transfer_out", label, amount, movement_date: movementDate, status: "planned", transfer_group_id: group },
     { owner_id: user.id, account_id: key.destinationAccountId, category_id: null, movement_type: "transfer_in", label, amount, movement_date: movementDate, status: "planned", transfer_group_id: group },

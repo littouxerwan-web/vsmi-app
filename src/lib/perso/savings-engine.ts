@@ -57,7 +57,7 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
   if(depositOut&&depositIn){deposits.push({group,date:depositOut.movement_date,amount:Number(depositOut.amount),status:depositOut.status,automatic:String(depositOut.label??"").startsWith("Versement épargne proposé")});continue}
   const useOut=rows.find(m=>m.account_id===input.destinationAccountId&&m.movement_type==="transfer_out");
   const useIn=rows.find(m=>m.account_id===input.sourceAccountId&&m.movement_type==="transfer_in");
-  if(useOut&&useIn)uses.push({group,date:useOut.movement_date,amount:Number(useOut.amount),status:useOut.status,automatic:String(useOut.label??"").startsWith("Utilisation épargne proposée")});
+  if(useOut&&useIn)uses.push({group,date:useOut.movement_date,amount:Number(useOut.amount),status:useOut.status,automatic:(()=>{const label=String(useOut.label??"");const legacy="Utilisation épargne "+"proposée";return label.startsWith("Utilisation d'épargne conseillée")||label.startsWith(legacy)})()});
  }
  const pairedGroups=new Set([...deposits,...uses].map(t=>t.group));
 
