@@ -23,6 +23,9 @@ export default async function AppLayout({ children }: AppLayoutProps) {
     redirect("/connexion");
   }
 
+  const personalOnly = user.app_metadata?.role === "personal";
+  const photoAccess = user.app_metadata?.photo_access === true;
+
   const firstName =
     typeof user.user_metadata?.first_name === "string"
       ? user.user_metadata.first_name
@@ -31,12 +34,12 @@ export default async function AppLayout({ children }: AppLayoutProps) {
   return (
     <div className="min-h-screen bg-[#f5f3ef] text-neutral-950">
       <div className="flex min-h-screen">
-        <AppNavigation />
+        <AppNavigation photoAccess={photoAccess} />
 
         <div className="min-w-0 flex-1">
           <header className="sticky top-0 z-30 border-b border-black/10 bg-white/95 backdrop-blur">
             <div className="relative flex h-18 items-center justify-between px-5 lg:px-8">
-              <Link href="/aujourd-hui" className="flex items-center lg:hidden" aria-label="Accueil VSMI">
+              <Link href={personalOnly || !photoAccess ? "/perso?vue=finances" : "/aujourd-hui"} className="flex items-center lg:hidden" aria-label="Accueil VSMI">
                 <Image src="/vsmi-logo.gif" alt="Logo VSMI" width={54} height={54} className="h-11 w-auto object-contain" unoptimized priority />
               </Link>
 
@@ -54,8 +57,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
                   <p className="text-sm font-medium">
                     {firstName ?? user.email ?? "Utilisateur"}
                   </p>
-
-                  <p className="text-xs text-neutral-500">Photographe</p>
+                  {personalOnly ? <p className="text-xs text-neutral-500">Personnel</p> : null}
                 </div>
 
                 <form action={logout}>
@@ -74,7 +76,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
           <div id="app-private-content" className="relative pb-24 lg:pb-0">
             {children}
           </div>
-          <MobileNavigation />
+          <MobileNavigation photoAccess={photoAccess} />
         </div>
       </div>
     </div>

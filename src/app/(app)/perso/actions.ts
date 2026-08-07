@@ -389,7 +389,10 @@ async function saveSavingsProfile(fd: FormData, profile: 1 | 2) {
   const incomeSourceKey = profile === 1 ? "savings_income_source" : "savings_income_source_2";
   const sourceAccountId = optional(fd, sourceKey);
   const destinationAccountId = optional(fd, destinationKey);
-  const incomeSource = text(fd, incomeSourceKey) === "weddings" ? "weddings" : "category";
+  const requestedIncomeSource = text(fd, incomeSourceKey) === "weddings" ? "weddings" : "category";
+  // Les revenus mariage sont réservés aux comptes VSMI complets. Le rôle est
+  // stocké dans app_metadata (non modifiable par l'utilisateur depuis le client).
+  const incomeSource = user.app_metadata?.role === "personal" ? "category" : requestedIncomeSource;
   const incomeCategoryId = incomeSource === "category" ? optional(fd, incomeCategoryKey) : null;
   const proposalTiming = text(fd, proposalTimingKey) === "next_day" ? "next_day" : "same_day";
   const thresholdRaw = Number(fd.get(thresholdKey) ?? 500);

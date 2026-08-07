@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "VSMI",
-  description: "Gestion clients pour photographe de mariage",
+  description: "Gestion clients et finances personnelles",
 };
 
 export default function RootLayout({

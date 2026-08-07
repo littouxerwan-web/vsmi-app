@@ -67,6 +67,15 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
+    // Un compte marqué app_metadata.role = "personal" est strictement limité
+    // au module PERSONNEL. Ce contrôle serveur complète le masquage de navigation.
+    if (user.app_metadata?.role === "personal" && !pathname.startsWith("/perso")) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/perso";
+      url.search = "?vue=finances";
+      return NextResponse.redirect(url);
+    }
+
     return response;
   } catch (error) {
     console.error("Échec Supabase Auth dans le proxy :", error);

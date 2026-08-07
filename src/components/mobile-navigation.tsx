@@ -22,7 +22,7 @@ const photoItems = [
   { href: "/comptabilite", label: "Comptabilité photo", icon: CircleDollarSign },
 ];
 
-export function MobileNavigation() {
+export function MobileNavigation({ photoAccess = false }: { photoAccess?: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [photoOpen, setPhotoOpen] = useState(false);
@@ -55,7 +55,7 @@ export function MobileNavigation() {
 
   return (
     <>
-      {photoOpen ? (
+      {photoAccess && photoOpen ? (
         <div
           className="fixed inset-0 z-[80] bg-black/35 lg:hidden"
           onPointerDown={(event) => {
@@ -92,17 +92,17 @@ export function MobileNavigation() {
       ) : null}
 
       <nav aria-label="Navigation mobile" className="fixed inset-x-0 bottom-0 z-[90] border-t border-black/10 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] backdrop-blur lg:hidden">
-        <div className="mx-auto grid max-w-lg grid-cols-5 items-end gap-1">
+        <div className={`mx-auto grid max-w-lg ${photoAccess ? "grid-cols-5" : "grid-cols-4"} items-end gap-1`}>
           {persoItem("/perso?vue=finances", "En cours", CircleDollarSign, pathname === "/perso" && view === "finances")}
           {persoItem("/perso?vue=projection", "Projection", TrendingUp, pathname === "/perso" && view === "projection")}
           <Link href="/perso?vue=finances&quick=movement" aria-label="Ajouter un débit ou un crédit" className="relative -top-3 mx-auto grid size-14 place-items-center rounded-full border-4 border-white bg-black text-white shadow-lg">
             <Plus size={25} strokeWidth={2.2} />
           </Link>
           {persoItem("/perso?vue=epargne", "Épargne", Sparkles, pathname === "/perso" && view === "epargne")}
-          <button type="button" onClick={() => setPhotoOpen((open) => !open)} aria-expanded={photoOpen} className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-semibold transition ${pathname !== "/perso" ? "bg-neutral-100 text-black" : "text-neutral-500"}`}>
+          {photoAccess ? <button type="button" onClick={() => setPhotoOpen((open) => !open)} aria-expanded={photoOpen} className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-semibold transition ${pathname !== "/perso" ? "bg-neutral-100 text-black" : "text-neutral-500"}`}>
             <Camera size={19} strokeWidth={1.9} />
             <span>PHOTO</span>
-          </button>
+          </button> : null}
         </div>
       </nav>
     </>
