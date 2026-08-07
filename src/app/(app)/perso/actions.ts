@@ -823,3 +823,64 @@ export async function deleteSavingsProposal(fd: FormData) {
   }
   savingsSuccess(fd, "Proposition d’épargne supprimée.");
 }
+
+
+function savingsBudgetRedirect(message:string){
+  revalidatePath(PATH, "page");
+  redirect(`${PATH}?vue=budgets-epargne&succes=${encodeURIComponent(message)}`);
+}
+
+export async function createSavingsBudget(fd: FormData) {
+  const { supabase, user } = await auth();
+  const accountId=text(fd,"account_id"), name=text(fd,"name");
+  const kind=text(fd,"kind")==="reserve"?"reserve":"project";
+  const allocationMode=text(fd,"allocation_mode")==="percent"?"percent":"amount";
+  const allocationValue=Math.max(0,number(fd,"allocation_value")||0);
+  const protection=["free","preserve","untouchable"].includes(text(fd,"protection"))?text(fd,"protection"):"preserve";
+  const allowRecovery=protection!=="untouchable"&&text(fd,"allow_recovery")==="on";
+  const criticalThreshold=Math.max(0,number(fd,"critical_threshold")||0);
+  const targetAmount=number(fd,"target_amount");
+  if(!accountId||!name||allocationValue<=0) fail("Complète le budget d’épargne.");
+  if(allocationMode==="percent"&&allocationValue>100) fail("Un pourcentage ne peut pas dépasser 100 %.");
+  const {error}=await supabase.from("personal_savings_budgets").insert({owner_id:user.id,account_id:accountId,name,kind,allocation_mode:allocationMode,allocation_value:allocationValue,protection,allow_recovery:allowRecovery,critical_threshold:criticalThreshold,target_amount:Number.isFinite(targetAmount)&&targetAmount>0?targetAmount:null,target_date:optional(fd,"target_date"),priority:Math.max(0,Math.trunc(number(fd,"priority")||0))});
+  if(error) fail(error.message); savingsBudgetRedirect("Budget d’épargne ajouté.");
+}
+
+export async function updateSavingsBudget(fd: FormData) {
+  const { supabase, user } = await auth();
+  const id=text(fd,"id"),accountId=text(fd,"account_id"),name=text(fd,"name");
+  const kind=text(fd,"kind")==="reserve"?"reserve":"project";
+  const allocationMode=text(fd,"allocation_mode")==="percent"?"percent":"amount";
+  const allocationValue=Math.max(0,number(fd,"allocation_value")||0);
+  const protection=["free","preserve","untouchable"].includes(text(fd,"protection"))?text(fd,"protection"):"preserve";
+  const allowRecovery=protection!=="untouchable"&&text(fd,"allow_recovery")==="on";
+  const criticalThreshold=Math.max(0,number(fd,"critical_threshold")||0);
+  const targetAmount=number(fd,"target_amount");
+  if(!id||!accountId||!name||allocationValue<=0) fail("Budget d’épargne incomplet.");
+  if(allocationMode==="percent"&&allocationValue>100) fail("Un pourcentage ne peut pas dépasser 100 %.");
+  const {error}=await supabase.from("personal_savings_budgets").update({account_id:accountId,name,kind,allocation_mode:allocationMode,allocation_value:allocationValue,protection,allow_recovery:allowRecovery,critical_threshold:criticalThreshold,target_amount:Number.isFinite(targetAmount)&&targetAmount>0?targetAmount:null,target_date:optional(fd,"target_date"),priority:Math.max(0,Math.trunc(number(fd,"priority")||0))}).eq("id",id).eq("owner_id",user.id);
+  if(error) fail(error.message); savingsBudgetRedirect("Budget d’épargne modifié.");
+}
+
+export async function deleteSavingsBudget(id:string){
+  const {supabase,user}=await auth();
+  const {error}=await supabase.from("personal_savings_budgets").delete().eq("id",id).eq("owner_id",user.id);
+  if(error) fail(error.message); savingsBudgetRedirect("Budget d’épargne supprimé.");
+}
+
+export async function applySavingsBudgetReallocation(fd:FormData){
+  const {supabase,user}=await auth();
+  const sourceId=text(fd,"source_budget_id"),destinationId=text(fd,"destination_budget_id"),amount=Math.max(0,number(fd,"amount")||0);
+  if(!sourceId||!destinationId||sourceId===destinationId||amount<=0) fail("Réaffectation incorrecte.");
+  const {data:rows,error:readError}=await supabase.from("personal_savings_budgets").select("id,allocation_mode,allocation_value,protection,allow_recovery").eq("owner_id",user.id).in("id",[sourceId,destinationId]);
+  if(readError) fail(readError.message);
+  const source=(rows??[]).find(r=>r.id===sourceId),destination=(rows??[]).find(r=>r.id===destinationId);
+  if(!source||!destination) fail("Enveloppe introuvable.");
+  if(source.protection==="untouchable") fail("Une enveloppe intouchable ne peut pas être réaffectée.");
+  if(source.allocation_mode!=="amount"||destination.allocation_mode!=="amount") fail("La réaffectation automatique V1 est disponible entre enveloppes en montant fixe.");
+  const actual=Math.min(amount,Math.max(0,Number(source.allocation_value)));
+  if(actual<=0) fail("Aucun montant disponible à réaffecter.");
+  const {error:e1}=await supabase.from("personal_savings_budgets").update({allocation_value:Math.max(0,Number(source.allocation_value)-actual)}).eq("id",sourceId).eq("owner_id",user.id); if(e1) fail(e1.message);
+  const {error:e2}=await supabase.from("personal_savings_budgets").update({allocation_value:Number(destination.allocation_value)+actual,allow_recovery:true}).eq("id",destinationId).eq("owner_id",user.id); if(e2) fail(e2.message);
+  savingsBudgetRedirect("Réaffectation appliquée.");
+}

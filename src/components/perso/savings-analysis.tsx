@@ -12,6 +12,7 @@ import {
   type SavingsRecurrence,
   type SavingsUrssafState,
   type SavingsProposalDecision,
+  type SavingsBudgetAllocation,
 } from "@/lib/perso/savings-engine";
 
 type Account = { id: string; name: string; account_type: "checking" | "savings" };
@@ -50,6 +51,7 @@ type Props = {
   profiles: Profile[];
   currentBalances: Record<string, number>;
   savingsProposals?: SavingsProposalDecision[];
+  savingsBudgets?: SavingsBudgetAllocation[];
   startMonth: string;
 };
 
@@ -109,6 +111,7 @@ export function SavingsAnalysis(props: Props) {
           urssafDefaultAccountId: props.urssafDefaultAccountId,
           movementDefaultAccountId: props.movementDefaultAccountId,
           savingsProposals: props.savingsProposals,
+          savingsBudgets: props.savingsBudgets,
           minReserve: profile.threshold,
           primaryIncomeCategoryId: profile.primaryIncomeCategoryId ?? null,
           primaryIncomeSource: profile.primaryIncomeSource ?? "category",

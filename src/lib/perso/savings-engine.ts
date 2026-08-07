@@ -8,6 +8,23 @@ export type SavingsOverride={recurrence_id:string;occurrence_month:string;amount
 export type SavingsExclusion={recurrence_id:string;occurrence_date:string};
 export type SavingsPhotoPayment={amount:number;expected_date:string|null;received_date:string|null;status:string;personal_account_id:string|null;accounting_status?:string};
 export type SavingsUrssafState={contribution_month:string;account_id:string|null;is_completed:boolean};
+
+export type SavingsBudgetAllocation={
+ id:string; account_id:string; name:string; kind:"project"|"reserve"; allocation_mode:"amount"|"percent"; allocation_value:number; protection:"free"|"preserve"|"untouchable"; allow_recovery:boolean; critical_threshold?:number|null; target_amount?:number|null; target_date?:string|null; priority?:number|null;
+};
+
+export function savingsBudgetAmount(budget:SavingsBudgetAllocation,savingsBalance:number){
+ const raw=budget.allocation_mode==="percent"?Math.max(0,savingsBalance)*Math.max(0,Number(budget.allocation_value))/100:Math.max(0,Number(budget.allocation_value));
+ return Math.max(0,Math.round(raw*100)/100);
+}
+
+export function mobilizableSavingsForAccount(savingsBalance:number,accountId:string,budgets:SavingsBudgetAllocation[]|undefined,floor=30){
+ const rows=(budgets??[]).filter(b=>b.account_id===accountId);
+ const physical=Math.max(0,Number(savingsBalance)-floor);
+ if(!rows.length)return physical;
+ const protectedAmount=rows.filter(b=>b.protection==="untouchable"||!b.allow_recovery).reduce((sum,b)=>sum+savingsBudgetAmount(b,Number(savingsBalance)),0);
+ return Math.max(0,Math.min(physical,Math.round((Number(savingsBalance)-floor-protectedAmount)*100)/100));
+}
 export type SavingsProposalDecision={source_account_id:string;destination_account_id:string;source_month:string;amount:number;status:"pending"|"accepted"|"deleted";transfer_group_id?:string|null};
 export type SavingsPlanRow={
  month:string; openingChecking:number; checking:number; savings:number; proposal:number; savingsUsed:number;
@@ -15,7 +32,7 @@ export type SavingsPlanRow={
  balanceBeforeSavings:number; requiredReserve:number; proposalDate:string|null; savingsUseDate:string|null; cycleEndDate:string|null;
  lowestBalance:number; lowestBalanceDate:string|null; nextPrimaryIncomeDate:string|null; overdraftDate:string|null;
 };
-type Input={sourceAccountId:string;destinationAccountId:string;initialChecking:number;initialSavings:number;startMonth:string;accounts?:SavingsAccount[];categories:SavingsCategory[];movements:SavingsMovement[];recurrences:SavingsRecurrence[];overrides?:SavingsOverride[];exclusions?:SavingsExclusion[];photoPayments?:SavingsPhotoPayment[];photoDefaultAccountId?:string|null;urssafStates?:SavingsUrssafState[];urssafDefaultAccountId?:string|null;movementDefaultAccountId?:string|null;savingsProposals?:SavingsProposalDecision[];months?:number;minReserve?:number;primaryIncomeCategoryId?:string|null;primaryIncomeSource?:"category"|"weddings";proposalTiming?:"same_day"|"next_day"};
+type Input={sourceAccountId:string;destinationAccountId:string;initialChecking:number;initialSavings:number;startMonth:string;accounts?:SavingsAccount[];categories:SavingsCategory[];movements:SavingsMovement[];recurrences:SavingsRecurrence[];overrides?:SavingsOverride[];exclusions?:SavingsExclusion[];photoPayments?:SavingsPhotoPayment[];photoDefaultAccountId?:string|null;urssafStates?:SavingsUrssafState[];urssafDefaultAccountId?:string|null;movementDefaultAccountId?:string|null;savingsProposals?:SavingsProposalDecision[];months?:number;minReserve?:number;primaryIncomeCategoryId?:string|null;primaryIncomeSource?:"category"|"weddings";proposalTiming?:"same_day"|"next_day";savingsBudgets?:SavingsBudgetAllocation[]};
 type DayFlow={income:number;expense:number;primaryIncome:number;budget:number};
 type PairedTransfer={group:string;date:string;amount:number;status:string;automatic:boolean};
 const iso=(d:Date)=>d.toISOString().slice(0,10);
@@ -203,14 +220,14 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
   let savingsUseDate:string|null=null;
   let usable=0;
   const acceptedUseMissing=useDecision?.status==="accepted"&&useDecision.transfer_group_id&&!uses.some(t=>t.group===useDecision.transfer_group_id);
-  if(acceptedUseMissing){savingsUseDate=firstOverdraft?addDays(firstOverdraft.date,-1):rowStart;if(savingsUseDate<rowStart)savingsUseDate=rowStart;usable=Math.min(Number(useDecision.amount),Math.max(0,savings-SAVINGS_FLOOR));addScheduled(scheduledUses,savingsUseDate,usable)}
-  else if(useDecision?.status==="pending"&&needed>0){savingsUseDate=firstOverdraft?addDays(firstOverdraft.date,-1):lowestPoint.date;if(savingsUseDate<rowStart)savingsUseDate=rowStart;usable=Math.min(Number(useDecision.amount),Math.max(0,savings-SAVINGS_FLOOR));addScheduled(scheduledUses,savingsUseDate,usable)}
-  else if(useDecision?.status!=="deleted"&&needed>0){savingsUseDate=firstOverdraft?addDays(firstOverdraft.date,-1):lowestPoint.date;if(savingsUseDate<rowStart)savingsUseDate=rowStart;usable=Math.min(needed,Math.max(0,savings-SAVINGS_FLOOR));addScheduled(scheduledUses,savingsUseDate,usable)}
+  if(acceptedUseMissing){savingsUseDate=firstOverdraft?addDays(firstOverdraft.date,-1):rowStart;if(savingsUseDate<rowStart)savingsUseDate=rowStart;usable=Math.min(Number(useDecision.amount),mobilizableSavingsForAccount(savings,input.destinationAccountId,input.savingsBudgets,SAVINGS_FLOOR));addScheduled(scheduledUses,savingsUseDate,usable)}
+  else if(useDecision?.status==="pending"&&needed>0){savingsUseDate=firstOverdraft?addDays(firstOverdraft.date,-1):lowestPoint.date;if(savingsUseDate<rowStart)savingsUseDate=rowStart;usable=Math.min(Number(useDecision.amount),mobilizableSavingsForAccount(savings,input.destinationAccountId,input.savingsBudgets,SAVINGS_FLOOR));addScheduled(scheduledUses,savingsUseDate,usable)}
+  else if(useDecision?.status!=="deleted"&&needed>0){savingsUseDate=firstOverdraft?addDays(firstOverdraft.date,-1):lowestPoint.date;if(savingsUseDate<rowStart)savingsUseDate=rowStart;usable=Math.min(needed,mobilizableSavingsForAccount(savings,input.destinationAccountId,input.savingsBudgets,SAVINGS_FLOOR));addScheduled(scheduledUses,savingsUseDate,usable)}
 
   // Exécute chronologiquement les flux et tous les virements planifiés/proposés du mois.
   for(const date of dates.filter(d=>d>=rowStart&&d<=last)){
    const use=scheduledUses.get(date)??0;
-   if(use>0){const actualUse=Math.min(use,Math.max(0,savings-SAVINGS_FLOOR));checking+=actualUse;savings-=actualUse}
+   if(use>0){const actualUse=Math.min(use,mobilizableSavingsForAccount(savings,input.destinationAccountId,input.savingsBudgets,SAVINGS_FLOOR));checking+=actualUse;savings-=actualUse}
    const f=flows.get(date);if(f){checking+=f.income-f.expense;monthIncome+=f.income;monthExpense+=f.expense;monthBudget+=f.budget}
    const deposit=scheduledDeposits.get(date)??0;
    if(deposit>0){const actualDeposit=Math.min(deposit,Math.max(0,checking-reserve));checking-=actualDeposit;savings+=actualDeposit}
