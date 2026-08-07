@@ -29,17 +29,35 @@ export async function createAccount(fd: FormData) {
 
 export async function createCategory(fd: FormData) {
   const { supabase, user } = await auth();
-  const name = text(fd, "name"); const movementType = text(fd, "movement_type"); const parentId = optional(fd, "parent_id"); const accountId = optional(fd, "account_id"); const monthlyBudget = Math.max(0, number(fd, "monthly_budget") || 0);
-  const isPrimaryIncome = movementType === "income" && text(fd, "is_primary_income") === "on";
-  const budgetPeriod = text(fd, "budget_period") === "specific_month" ? "specific_month" : "monthly";
-  const budgetMonthInput = optional(fd, "budget_month");
-  const budgetMonth = budgetPeriod === "specific_month" && budgetMonthInput ? `${budgetMonthInput.slice(0, 7)}-01` : null;
-  if (movementType === "expense" && monthlyBudget > 0 && budgetPeriod === "specific_month" && !budgetMonth) fail("Choisis le mois du budget ponctuel.");
-  if (!name) fail("Indique le nom de la catégorie.");
+  const creationKind = text(fd, "creation_kind") === "budget" ? "budget" : "category";
+  const name = text(fd, "name");
+  const requestedMovementType = text(fd, "movement_type");
+  const movementType = creationKind === "budget" ? "expense" : requestedMovementType;
+  const parentId = optional(fd, "parent_id");
+  const accountId = creationKind === "budget" ? optional(fd, "account_id") : null;
+  const monthlyBudget = creationKind === "budget" ? Math.max(0, number(fd, "monthly_budget") || 0) : 0;
+  const budgetStartDate = creationKind === "budget" ? optional(fd, "budget_start_date") : null;
+  const budgetEndDate = creationKind === "budget" ? optional(fd, "budget_end_date") : null;
+  const isPrimaryIncome = creationKind === "category" && movementType === "income" && text(fd, "is_primary_income") === "on";
+  if (!name) fail("Indique le nom de la catégorie ou du budget.");
   if (!["income", "expense"].includes(movementType)) fail("Type de catégorie incorrect.");
+  if (creationKind === "budget" && monthlyBudget <= 0) fail("Indique le montant mensuel du budget.");
+  if (budgetStartDate && budgetEndDate && budgetEndDate < budgetStartDate) fail("La date de fin du budget doit être postérieure à sa date de début.");
   if (isPrimaryIncome) { const { error: resetError } = await supabase.from("personal_categories").update({ is_primary_income: false }).eq("owner_id", user.id).eq("is_primary_income", true); if (resetError) fail(resetError.message); }
-  const { error } = await supabase.from("personal_categories").insert({ owner_id: user.id, name, movement_type: movementType, parent_id: parentId, monthly_budget: movementType === "expense" ? monthlyBudget : 0, account_id: movementType === "expense" ? accountId : null, budget_period: movementType === "expense" ? budgetPeriod : "monthly", budget_month: movementType === "expense" ? budgetMonth : null, is_primary_income: isPrimaryIncome });
-  if (error) fail(error.message); refresh(parentId ? "Sous-catégorie ajoutée." : "Catégorie ajoutée.");
+  const { error } = await supabase.from("personal_categories").insert({
+    owner_id: user.id,
+    name,
+    movement_type: movementType,
+    parent_id: parentId,
+    monthly_budget: monthlyBudget,
+    account_id: accountId,
+    budget_period: "monthly",
+    budget_month: null,
+    budget_start_date: budgetStartDate,
+    budget_end_date: budgetEndDate,
+    is_primary_income: isPrimaryIncome,
+  });
+  if (error) fail(error.message); refresh(creationKind === "budget" ? "Budget ajouté." : parentId ? "Sous-catégorie ajoutée." : "Catégorie ajoutée.");
 }
 
 export async function createSnapshot(fd: FormData) {
@@ -67,15 +85,24 @@ export async function createMovement(fd: FormData) {
 
 export async function createTransfer(fd: FormData) {
   const { supabase, user } = await auth();
-  const source = text(fd, "source_account_id"); const destination = text(fd, "destination_account_id"); const amount = number(fd, "amount"); const date = text(fd, "movement_date"); const label = text(fd, "label") || "Versement épargne";
-  if (!source || !destination || source === destination || !date || !Number.isFinite(amount) || amount <= 0) fail("Le transfert est incomplet ou incorrect.");
+  const source = text(fd, "source_account_id");
+  const destination = text(fd, "destination_account_id");
+  const amount = number(fd, "amount");
+  const date = text(fd, "movement_date");
+  const label = text(fd, "label") || "Virement interne";
+  const status = text(fd, "status") === "completed" ? "completed" : "planned";
+  if (!source || !destination || source === destination || !date || !Number.isFinite(amount) || amount <= 0) fail("Le virement interne est incomplet ou incorrect.");
   const group = crypto.randomUUID();
-  const completedDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const completedDate = status === "completed"
+    ? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())
+    : null;
+  const completedAt = status === "completed" ? new Date().toISOString() : null;
   const { error } = await supabase.from("personal_movements").insert([
-    { owner_id: user.id, account_id: source, movement_type: "transfer_out", label, amount, movement_date: date, status: "completed", completed_date: completedDate, completed_at: new Date().toISOString(), transfer_group_id: group },
-    { owner_id: user.id, account_id: destination, movement_type: "transfer_in", label, amount, movement_date: date, status: "completed", completed_date: completedDate, completed_at: new Date().toISOString(), transfer_group_id: group },
+    { owner_id: user.id, account_id: source, movement_type: "transfer_out", label, amount, movement_date: date, status, completed_date: completedDate, completed_at: completedAt, transfer_group_id: group },
+    { owner_id: user.id, account_id: destination, movement_type: "transfer_in", label, amount, movement_date: date, status, completed_date: completedDate, completed_at: completedAt, transfer_group_id: group },
   ]);
-  if (error) fail(error.message); refresh("Transfert d’épargne enregistré.");
+  if (error) fail(error.message);
+  refresh(status === "completed" ? "Virement interne effectué." : "Virement interne ajouté aux prévisions.");
 }
 
 export async function createRecurrence(fd: FormData) {
@@ -195,10 +222,13 @@ export async function updateCategory(fd: FormData) {
   const budgetPeriod = text(fd, "budget_period") === "specific_month" ? "specific_month" : "monthly";
   const budgetMonthInput = optional(fd, "budget_month");
   const budgetMonth = budgetPeriod === "specific_month" && budgetMonthInput ? `${budgetMonthInput.slice(0, 7)}-01` : null;
+  const budgetStartDate = optional(fd, "budget_start_date");
+  const budgetEndDate = optional(fd, "budget_end_date");
   if (!id || !name) fail("Catégorie incomplète.");
   if (monthlyBudget > 0 && budgetPeriod === "specific_month" && !budgetMonth) fail("Choisis le mois du budget ponctuel.");
+  if (budgetStartDate && budgetEndDate && budgetEndDate < budgetStartDate) fail("La date de fin du budget doit être postérieure à sa date de début.");
   if (isPrimaryIncome) { const { error: resetError } = await supabase.from("personal_categories").update({ is_primary_income: false }).eq("owner_id", user.id).eq("is_primary_income", true).neq("id", id); if (resetError) fail(resetError.message); }
-  const { error } = await supabase.from("personal_categories").update({ name, monthly_budget: monthlyBudget, account_id: accountId, budget_period: budgetPeriod, budget_month: budgetMonth, is_primary_income: isPrimaryIncome, is_essential: isEssential }).eq("id", id).eq("owner_id", user.id);
+  const { error } = await supabase.from("personal_categories").update({ name, monthly_budget: monthlyBudget, account_id: accountId, budget_period: budgetPeriod, budget_month: budgetMonth, budget_start_date: budgetStartDate, budget_end_date: budgetEndDate, is_primary_income: isPrimaryIncome, is_essential: isEssential }).eq("id", id).eq("owner_id", user.id);
   if (error) fail(error.message); revalidatePath(PATH, "page"); redirect(`${PATH}?vue=finances&succes=${encodeURIComponent("Catégorie modifiée et soldes recalculés.")}`);
 }
 

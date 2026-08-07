@@ -1,7 +1,7 @@
 import { calculateBudgetRemaining, createCategoryRootResolver, isBudgetActiveForMonth, resolveBudgetAccountId, type BudgetAccount } from "./budget-engine";
 
 export type SavingsAccount = BudgetAccount;
-export type SavingsCategory = { id:string; parent_id:string|null; monthly_budget:number; account_id?:string|null; movement_type?:string; budget_period?:"monthly"|"specific_month"; budget_month?:string|null; is_primary_income?:boolean; is_essential?:boolean };
+export type SavingsCategory = { id:string; parent_id:string|null; monthly_budget:number; account_id?:string|null; movement_type?:string; budget_period?:"monthly"|"specific_month"; budget_month?:string|null; budget_start_date?:string|null; budget_end_date?:string|null; is_primary_income?:boolean; is_essential?:boolean };
 export type SavingsMovement = { id?:string; account_id:string; category_id:string|null; movement_type:string; label?:string; amount:number; movement_date:string; status:string; recurrence_id?:string|null; transfer_group_id?:string|null };
 export type SavingsRecurrence = { id:string; account_id:string; destination_account_id:string|null; category_id:string|null; movement_type:"income"|"expense"|"transfer"; amount:number; frequency:string; interval_count:number; start_date:string; end_date:string|null; is_active?:boolean };
 export type SavingsOverride={recurrence_id:string;occurrence_month:string;amount:number};

@@ -14,7 +14,7 @@ import {
 import { isBudgetActiveForMonth } from "@/lib/perso/budget-engine";
 
 type Account={id:string;name:string;color?:string|null};
-type Category={id:string;name:string;parent_id:string|null;monthly_budget:number;movement_type?:string;account_id?:string|null;budget_period?:"monthly"|"specific_month";budget_month?:string|null};
+type Category={id:string;name:string;parent_id:string|null;monthly_budget:number;movement_type?:string;account_id?:string|null;budget_period?:"monthly"|"specific_month";budget_month?:string|null;budget_start_date?:string|null;budget_end_date?:string|null};
 type Movement={id:string;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;recurrence_id?:string|null;transfer_group_id?:string|null};
 type Recurrence={id:string;account_id:string;destination_account_id:string|null;category_id:string|null;movement_type:"income"|"expense"|"transfer";label:string;amount:number;frequency:"weekly"|"monthly"|"quarterly"|"yearly";interval_count:number;start_date:string;end_date:string|null};
 type Override={recurrence_id:string;occurrence_month:string;amount:number};

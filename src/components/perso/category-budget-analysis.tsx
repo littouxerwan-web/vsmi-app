@@ -24,6 +24,8 @@ type Category = {
   movement_type?: string;
   budget_period?: string;
   budget_month?: string | null;
+  budget_start_date?: string | null;
+  budget_end_date?: string | null;
   account_id?: string | null;
   is_essential?: boolean;
 };
@@ -416,6 +418,8 @@ function CategoryRow({ row, simulatedBudget, onSimulatedBudgetChange }: { row: A
           <input type="hidden" name="monthly_budget" value={row.monthly_budget ?? 0} />
           <input type="hidden" name="budget_period" value={row.budget_period ?? "monthly"} />
           <input type="hidden" name="budget_month" value={row.budget_month?.slice(0, 7) ?? ""} />
+          <input type="hidden" name="budget_start_date" value={row.budget_start_date ?? ""} />
+          <input type="hidden" name="budget_end_date" value={row.budget_end_date ?? ""} />
           <input type="hidden" name="account_id" value={row.account_id ?? ""} />
           <label
             className={`flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold ${

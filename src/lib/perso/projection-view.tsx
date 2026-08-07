@@ -7,7 +7,7 @@ import { calculateSavingsPlan, type SavingsProposalDecision } from "@/lib/perso/
 import { isBudgetActiveForMonth } from "@/lib/perso/budget-engine";
 
 type Account={id:string;name:string;account_type:"checking"|"savings";is_default?:boolean;color?:string|null};
-type Category={id:string;name:string;parent_id:string|null;monthly_budget:number;movement_type?:string;account_id?:string|null;budget_period?:"monthly"|"specific_month";budget_month?:string|null;is_primary_income?:boolean};
+type Category={id:string;name:string;parent_id:string|null;monthly_budget:number;movement_type?:string;account_id?:string|null;budget_period?:"monthly"|"specific_month";budget_month?:string|null;budget_start_date?:string|null;budget_end_date?:string|null;is_primary_income?:boolean};
 type Snapshot={account_id:string;balance:number;snapshot_date:string};
 type Movement={id:string;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;completed_date?:string|null;recurrence_id?:string|null;transfer_group_id?:string|null};
 type Override={recurrence_id:string;occurrence_month:string;amount:number};

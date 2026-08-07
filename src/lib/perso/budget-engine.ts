@@ -6,6 +6,8 @@ export type BudgetCategory = {
   movement_type?: string;
   budget_period?: "monthly" | "specific_month";
   budget_month?: string | null;
+  budget_start_date?: string | null;
+  budget_end_date?: string | null;
 };
 
 export type BudgetAccount = {
@@ -45,11 +47,19 @@ export function resolveBudgetAccountId(
 }
 
 export function isBudgetActiveForMonth(
-  category: Pick<BudgetCategory, "budget_period" | "budget_month">,
+  category: Pick<BudgetCategory, "budget_period" | "budget_month" | "budget_start_date" | "budget_end_date">,
   month: string,
 ): boolean {
-  if ((category.budget_period ?? "monthly") === "monthly") return true;
-  return Boolean(category.budget_month && String(category.budget_month).slice(0, 7) === month.slice(0, 7));
+  const monthKey = month.slice(0, 7);
+  if ((category.budget_period ?? "monthly") === "specific_month") {
+    return Boolean(category.budget_month && String(category.budget_month).slice(0, 7) === monthKey);
+  }
+
+  const startMonth = category.budget_start_date ? String(category.budget_start_date).slice(0, 7) : null;
+  const endMonth = category.budget_end_date ? String(category.budget_end_date).slice(0, 7) : null;
+  if (startMonth && monthKey < startMonth) return false;
+  if (endMonth && monthKey > endMonth) return false;
+  return true;
 }
 
 export function calculateBudgetRemaining(
