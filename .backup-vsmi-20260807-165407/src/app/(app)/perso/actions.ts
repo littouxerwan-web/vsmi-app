@@ -116,195 +116,11 @@ export async function createRecurrence(fd: FormData) {
   if (error) fail(error.message); refresh("Récurrence ajoutée aux projections.");
 }
 
-export async function deleteCategoryFromSettings(id: string) {
-  const { supabase, user } = await auth();
-
-  if (!id) fail("Catégorie introuvable.");
-
-  const { error } = await supabase
-    .from("personal_categories")
-    .delete()
-    .eq("id", id)
-    .eq("owner_id", user.id);
-
-  if (error) fail(error.message);
-
-  revalidatePath(PATH, "page");
-
-  redirect(
-    `${PATH}?vue=parametres&section=categories-budgets&succes=${encodeURIComponent(
-      "Catégorie ou budget supprimé.",
-    )}`,
-  );
-}
-
 export async function deleteItem(table: "personal_movements" | "personal_recurrences" | "personal_categories" | "personal_accounts" | "personal_savings_goals", id: string) {
   const { supabase, user } = await auth();
   const { error } = await supabase.from(table).delete().eq("id", id).eq("owner_id", user.id);
   if (error) fail(error.message); refresh("Élément supprimé.");
 }
-
-export async function deleteMovement(id: string) {
-  const { supabase, user } = await auth();
-  if (!id) fail("Mouvement introuvable.");
-  const { data: movement, error: readError } = await supabase.from("personal_movements").select("id,transfer_group_id,recurrence_id,movement_date").eq("id", id).eq("owner_id", user.id).maybeSingle();
-  if (readError) fail(readError.message);
-  if (!movement) fail("Mouvement introuvable.");
-  let deleteQuery = supabase.from("personal_movements").delete().eq("owner_id", user.id);
-  deleteQuery = movement.transfer_group_id ? deleteQuery.eq("transfer_group_id", movement.transfer_group_id) : deleteQuery.eq("id", movement.id);
-  const { error: deleteError } = await deleteQuery;
-  if (deleteError) fail(deleteError.message);
-  if (movement.recurrence_id && movement.movement_date) {
-    const { error: exclusionError } = await supabase.from("personal_recurrence_exclusions").upsert({ owner_id: user.id, recurrence_id: movement.recurrence_id, occurrence_date: movement.movement_date }, { onConflict: "recurrence_id,occurrence_date" });
-    if (exclusionError) fail(exclusionError.message);
-  }
-  refresh("Mouvement supprimé.");
-}
-
-
-export async function deleteMovementOccurrence(
-  movementId: string | null,
-  recurrenceId: string,
-  occurrenceDate: string,
-) {
-  const { supabase, user } = await auth();
-
-  if (!recurrenceId || !occurrenceDate) {
-    fail("Échéance récurrente introuvable.");
-  }
-
-  const { error: exclusionError } = await supabase
-    .from("personal_recurrence_exclusions")
-    .upsert(
-      {
-        owner_id: user.id,
-        recurrence_id: recurrenceId,
-        occurrence_date: occurrenceDate,
-      },
-      { onConflict: "recurrence_id,occurrence_date" },
-    );
-
-  if (exclusionError) fail(exclusionError.message);
-
-  if (movementId) {
-    const { data: movement, error: movementError } = await supabase
-      .from("personal_movements")
-      .select("id,transfer_group_id")
-      .eq("id", movementId)
-      .eq("owner_id", user.id)
-      .maybeSingle();
-
-    if (movementError) fail(movementError.message);
-
-    if (movement) {
-      let query = supabase
-        .from("personal_movements")
-        .delete()
-        .eq("owner_id", user.id);
-
-      query = movement.transfer_group_id
-        ? query.eq("transfer_group_id", movement.transfer_group_id)
-        : query.eq("id", movement.id);
-
-      const { error: deleteError } = await query;
-      if (deleteError) fail(deleteError.message);
-    }
-  }
-
-  refresh("Échéance supprimée pour ce mois.");
-}
-
-export async function deleteRecurrenceSeriesFrom(
-  recurrenceId: string,
-  occurrenceDate: string,
-) {
-  const { supabase, user } = await auth();
-
-  if (!recurrenceId || !occurrenceDate) {
-    fail("Série récurrente introuvable.");
-  }
-
-  // Vérifie explicitement que la série appartient bien à l'utilisateur.
-  const { data: recurrence, error: readError } = await supabase
-    .from("personal_recurrences")
-    .select("id,start_date,end_date,is_active")
-    .eq("id", recurrenceId)
-    .eq("owner_id", user.id)
-    .maybeSingle();
-
-  if (readError) fail(readError.message);
-  if (!recurrence) fail("Série récurrente introuvable.");
-
-  const selected = new Date(`${occurrenceDate}T12:00:00`);
-  if (Number.isNaN(selected.getTime())) {
-    fail("Date d'échéance invalide.");
-  }
-
-  // La série doit s'arrêter AVANT l'échéance sur laquelle on a cliqué.
-  selected.setDate(selected.getDate() - 1);
-  const stopDate = selected.toISOString().slice(0, 10);
-
-  const startsBeforeSelected =
-    recurrence.start_date && recurrence.start_date <= stopDate;
-
-  const updatePayload = startsBeforeSelected
-    ? {
-        end_date: stopDate,
-        is_active: true,
-      }
-    : {
-        end_date: recurrence.end_date ?? null,
-        is_active: false,
-      };
-
-  const { data: updated, error: updateError } = await supabase
-    .from("personal_recurrences")
-    .update(updatePayload)
-    .eq("id", recurrenceId)
-    .eq("owner_id", user.id)
-    .select("id")
-    .maybeSingle();
-
-  if (updateError) fail(updateError.message);
-  if (!updated) fail("La série n'a pas pu être arrêtée.");
-
-  // Supprime les occurrences déjà matérialisées à partir de la date choisie.
-  const { error: movementError } = await supabase
-    .from("personal_movements")
-    .delete()
-    .eq("owner_id", user.id)
-    .eq("recurrence_id", recurrenceId)
-    .gte("movement_date", occurrenceDate);
-
-  if (movementError) fail(movementError.message);
-
-  // Nettoyage des personnalisations futures.
-  const { error: overrideError } = await supabase
-    .from("personal_recurrence_overrides")
-    .delete()
-    .eq("owner_id", user.id)
-    .eq("recurrence_id", recurrenceId)
-    .gte("occurrence_month", `${occurrenceDate.slice(0, 7)}-01`);
-
-  if (overrideError) fail(overrideError.message);
-
-  const { error: exclusionError } = await supabase
-    .from("personal_recurrence_exclusions")
-    .delete()
-    .eq("owner_id", user.id)
-    .eq("recurrence_id", recurrenceId)
-    .gte("occurrence_date", occurrenceDate);
-
-  if (exclusionError) fail(exclusionError.message);
-
-  revalidatePath("/perso", "page");
-  redirect(
-    `/perso?vue=finances&succes=${encodeURIComponent(
-      "Série récurrente supprimée à partir de cette échéance.",
-    )}`,
-  );
-}
-
 
 export async function createSavingsGoal(fd: FormData) {
   const { supabase, user } = await auth();
@@ -403,29 +219,18 @@ export async function updateCategory(fd: FormData) {
   const id = text(fd, "id"); const name = text(fd, "name"); const accountId = optional(fd, "account_id"); const monthlyBudget = Math.max(0, number(fd, "monthly_budget") || 0);
   const isPrimaryIncome = text(fd, "movement_type") === "income" && text(fd, "is_primary_income") === "on";
   const isEssential = text(fd, "movement_type") !== "income" && text(fd, "is_essential") === "on";
-// Une catégorie simple n'a aucune période. Un budget est mensuel entre
-// sa date de début et sa date de fin facultative.
-const isBudget = monthlyBudget > 0;
+  const isBudget = monthlyBudget > 0;
   // Une catégorie simple n'a aucune période. Un budget est mensuel entre
   // sa date de début et sa date de fin facultative.
-  const budgetNoEnd = text(fd, "budget_no_end") === "on";
   const budgetPeriod = "monthly";
   const budgetMonth = null;
   const budgetStartDate = isBudget ? optional(fd, "budget_start_date") : null;
-  const budgetEndDate = isBudget && !budgetNoEnd ? optional(fd, "budget_end_date") : null;
+  const budgetEndDate = isBudget ? optional(fd, "budget_end_date") : null;
   if (!id || !name) fail("Catégorie incomplète.");
   if (budgetStartDate && budgetEndDate && budgetEndDate < budgetStartDate) fail("La date de fin du budget doit être postérieure à sa date de début.");
   if (isPrimaryIncome) { const { error: resetError } = await supabase.from("personal_categories").update({ is_primary_income: false }).eq("owner_id", user.id).eq("is_primary_income", true).neq("id", id); if (resetError) fail(resetError.message); }
   const { error } = await supabase.from("personal_categories").update({ name, monthly_budget: monthlyBudget, account_id: accountId, budget_period: budgetPeriod, budget_month: budgetMonth, budget_start_date: budgetStartDate, budget_end_date: budgetEndDate, is_primary_income: isPrimaryIncome, is_essential: isEssential }).eq("id", id).eq("owner_id", user.id);
-  if (error) fail(error.message);
-
-revalidatePath(PATH, "page");
-
-redirect(
-  `${PATH}?vue=parametres&section=categories-budgets&succes=${encodeURIComponent(
-    "Catégorie modifiée et soldes recalculés.",
-  )}`,
-);
+  if (error) fail(error.message); revalidatePath(PATH, "page"); redirect(`${PATH}?vue=finances&succes=${encodeURIComponent("Catégorie modifiée et soldes recalculés.")}`);
 }
 
 export async function applyCategoryBudgetSimulation(fd: FormData) {
