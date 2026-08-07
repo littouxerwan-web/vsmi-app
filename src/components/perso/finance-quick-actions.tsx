@@ -2,18 +2,32 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowDownLeft, ArrowUpRight, Plus, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, CalendarClock, Plus, X } from "lucide-react";
 
-type Props = { debitForm: ReactNode; creditForm: ReactNode; categoryForm: ReactNode };
+type Props = {
+  debitForm: ReactNode;
+  debitRecurringForm: ReactNode;
+  creditForm: ReactNode;
+  creditRecurringForm: ReactNode;
+  categoryForm: ReactNode;
+};
 type Modal = "choice" | "debit" | "credit" | "category" | null;
+type MovementMode = "oneoff" | "recurring";
 
-export function FinanceQuickActions({ debitForm, creditForm, categoryForm }: Props) {
+export function FinanceQuickActions({ debitForm, debitRecurringForm, creditForm, creditRecurringForm, categoryForm }: Props) {
   const [modal, setModal] = useState<Modal>(null);
+  const [movementMode, setMovementMode] = useState<MovementMode>("oneoff");
   const searchParams = useSearchParams();
   const router = useRouter();
 
+  const openMovement = (next: "debit" | "credit") => {
+    setMovementMode("oneoff");
+    setModal(next);
+  };
+
   useEffect(() => {
     if (searchParams.get("quick") !== "movement") return;
+    setMovementMode("oneoff");
     setModal("choice");
     const params = new URLSearchParams(searchParams.toString());
     params.delete("quick");
@@ -40,10 +54,16 @@ export function FinanceQuickActions({ debitForm, creditForm, categoryForm }: Pro
         ? "Ajouter une catégorie"
         : "Ajouter une opération";
 
+  const movementForm = modal === "debit"
+    ? (movementMode === "recurring" ? debitRecurringForm : debitForm)
+    : modal === "credit"
+      ? (movementMode === "recurring" ? creditRecurringForm : creditForm)
+      : null;
+
   return <>
     <div className="flex flex-wrap gap-2">
-      <Action label="+ Débit" onClick={() => setModal("debit")} primary />
-      <Action label="+ Crédit" onClick={() => setModal("credit")} />
+      <Action label="+ Débit" onClick={() => openMovement("debit")} primary />
+      <Action label="+ Crédit" onClick={() => openMovement("credit")} />
       <Action label="+ Catégorie" onClick={() => setModal("category")} />
     </div>
 
@@ -55,13 +75,19 @@ export function FinanceQuickActions({ debitForm, creditForm, categoryForm }: Pro
         </div>
         <div className="p-5 sm:p-6">
           {modal === "choice" ? <div className="grid gap-3">
-            <button type="button" onClick={() => setModal("debit")} className="flex min-h-16 items-center gap-4 border border-black bg-black px-5 text-left text-white">
-              <ArrowUpRight size={22}/><span><span className="block font-semibold">Ajouter un débit</span><span className="block text-sm text-white/65">Dépense ou sortie d’argent</span></span>
+            <button type="button" onClick={() => openMovement("debit")} className="flex min-h-16 items-center gap-4 border border-black bg-black px-5 text-left text-white">
+              <ArrowUpRight size={22}/><span><span className="block font-semibold">Ajouter un débit</span><span className="block text-sm text-white/65">Dépense ponctuelle ou régulière</span></span>
             </button>
-            <button type="button" onClick={() => setModal("credit")} className="flex min-h-16 items-center gap-4 border border-black/15 bg-white px-5 text-left">
-              <ArrowDownLeft size={22}/><span><span className="block font-semibold">Ajouter un crédit</span><span className="block text-sm text-neutral-500">Revenu ou entrée d’argent</span></span>
+            <button type="button" onClick={() => openMovement("credit")} className="flex min-h-16 items-center gap-4 border border-black/15 bg-white px-5 text-left">
+              <ArrowDownLeft size={22}/><span><span className="block font-semibold">Ajouter un crédit</span><span className="block text-sm text-neutral-500">Revenu ponctuel ou régulier</span></span>
             </button>
-          </div> : modal === "debit" ? debitForm : modal === "credit" ? creditForm : categoryForm}
+          </div> : modal === "debit" || modal === "credit" ? <>
+            <div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-neutral-100 p-1">
+              <button type="button" onClick={() => setMovementMode("oneoff")} className={`min-h-11 rounded-lg px-3 text-sm font-semibold ${movementMode === "oneoff" ? "bg-white shadow-sm" : "text-neutral-500"}`}>Ponctuel</button>
+              <button type="button" onClick={() => setMovementMode("recurring")} className={`flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold ${movementMode === "recurring" ? "bg-white shadow-sm" : "text-neutral-500"}`}><CalendarClock size={16}/>Régulier</button>
+            </div>
+            {movementForm}
+          </> : categoryForm}
         </div>
       </div>
     </div> : null}
