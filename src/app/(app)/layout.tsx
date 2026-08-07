@@ -6,6 +6,7 @@ import { logout } from "@/app/connexion/actions";
 import { AppNavigation } from "@/components/app-navigation";
 import { MobileNavigation } from "@/components/mobile-navigation";
 import { PrivacyModeToggle } from "@/components/privacy-mode-toggle";
+import { InteractionFeedback } from "@/components/interaction-feedback";
 import { createClient } from "@/lib/supabase/server";
 
 type AppLayoutProps = {
@@ -32,7 +33,9 @@ export default async function AppLayout({ children }: AppLayoutProps) {
       : null;
 
   return (
-    <div className="min-h-screen bg-[#f5f3ef] text-neutral-950">
+    <>
+      <InteractionFeedback />
+      <div className="min-h-screen bg-[#f5f3ef] text-neutral-950">
       <div className="flex min-h-screen">
         <AppNavigation photoAccess={photoAccess} />
 
@@ -80,5 +83,6 @@ export default async function AppLayout({ children }: AppLayoutProps) {
         </div>
       </div>
     </div>
+    </>
   );
 }
