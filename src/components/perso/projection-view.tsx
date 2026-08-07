@@ -285,7 +285,11 @@ function ProjectionChart({values,baselineValues,savingsTotalValues,savingsMobili
  const pts=linePoints(values),baselinePts=baselineValues?.length?linePoints(baselineValues):null,totalSavingsPts=linePoints(savingsTotalValues),mobilizablePts=linePoints(savingsMobilizableValues);
  const cursorX=(cursor/Math.max(1,values.length-1))*100;const gridValues:number[]=[];for(let value=axisMin;value<=axisMax;value+=1000)gridValues.push(value);
  return <div className="mt-6 overflow-hidden rounded-2xl p-3" style={{backgroundColor:color?`${color}14`:"#fafafa",borderLeft:color?`5px solid ${color}`:undefined}}>
-  <div className="mb-3 flex flex-wrap gap-4 text-xs font-medium"><span className="flex items-center gap-2"><span className="h-0.5 w-8" style={{backgroundColor:color??"#111827"}}/>Solde analysé</span><span className="flex items-center gap-2"><span className="h-0.5 w-8 bg-sky-600"/>Épargne totale</span><span className="flex items-center gap-2"><span className="w-8 border-t-2 border-dashed border-emerald-600"/>Épargne mobilisable</span></div>
+  <div className="mb-4 grid gap-2 sm:grid-cols-3">
+   <ProjectionLegendItem color={color??"#111827"} label="Solde du compte sélectionné" description="Solde projeté du compte analysé"/>
+   <ProjectionLegendItem color="#0284c7" label="Épargne totale" description="Solde total projeté des comptes d’épargne"/>
+   <ProjectionLegendItem color="#16a34a" label="Épargne mobilisable" description="Part réellement disponible pour soutenir la trésorerie" dashed/>
+  </div>
   <svg viewBox="0 0 100 100" className="h-52 w-full" preserveAspectRatio="none" role="img" aria-label="Évolution du solde, de l’épargne totale et de l’épargne mobilisable">
    {axisMax>0?<rect x="0" y="10" width="100" height={Math.max(0,yFor(0)-10)} fill="#16a34a" opacity=".035"/>:null}{axisMin<0?<rect x="0" y={yFor(0)} width="100" height={Math.max(0,90-yFor(0))} fill="#dc2626" opacity=".055"/>:null}
    {gridValues.map(value=><line key={value} x1="0" y1={yFor(value)} x2="100" y2={yFor(value)} stroke={value===0?"#dc2626":"currentColor"} strokeWidth={value===0?"1.8":"1"} opacity={value===0?".9":".14"} strokeDasharray={value===0?undefined:"2 2"} vectorEffect="non-scaling-stroke"/>)}
@@ -295,5 +299,16 @@ function ProjectionChart({values,baselineValues,savingsTotalValues,savingsMobili
   </svg>
   <div className="mt-2 flex items-center justify-between text-[11px] text-neutral-500"><span>{money(axisMin)}</span><span className="font-medium text-red-600">Ligne rouge : 0 €</span><span>{money(axisMax)}</span></div>
  </div>
+}
+function ProjectionLegendItem({color,label,description,dashed=false}:{color:string;label:string;description:string;dashed?:boolean}){
+ return <div className="flex min-w-0 items-start gap-3 rounded-xl border border-black/10 bg-white/80 px-3 py-2.5">
+  <svg width="46" height="14" viewBox="0 0 46 14" className="mt-0.5 shrink-0" aria-hidden="true">
+   <line x1="2" y1="7" x2="44" y2="7" stroke={color} strokeWidth="3" strokeDasharray={dashed?"8 5":undefined} strokeLinecap="round"/>
+  </svg>
+  <div className="min-w-0">
+   <p className="text-xs font-semibold leading-tight" style={{color}}>{label}</p>
+   <p className="mt-1 text-[10px] leading-snug text-neutral-500">{description}</p>
+  </div>
+ </div>;
 }
 function Metric({label,value,dark,tone}:{label:string;value:string;dark?:boolean;tone?:"danger"|"success"|"warning"|"neutral"}){return <div className={`rounded-2xl p-4 ${dark?"bg-black text-white":tone==="danger"?"bg-red-50 text-red-800":tone==="success"?"bg-emerald-50 text-emerald-800":tone==="warning"?"bg-amber-50 text-amber-800":"bg-neutral-100"}`}><p className="text-xs opacity-70">{label}</p><p className="mt-2 text-xl font-semibold">{value}</p></div>}
