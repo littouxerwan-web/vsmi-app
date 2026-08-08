@@ -80,3 +80,111 @@ export async function toggleCommonRecurrenceOccurrence(recurrenceId:string, occu
    ok("Échéance replacée en prévision.");
  }
 }
+
+export async function updateCommonMovement(f:FormData){
+ const {s}=await db(),id=t(f,"id"),amount=num(f,"amount"),type=t(f,"movement_type");
+ if(!id||!t(f,"label")||!t(f,"movement_date")||amount<=0)fail("Mouvement incomplet.");
+ const {error}=await s.from("common_movements").update({
+   category_id:t(f,"category_id")||null,
+   movement_type:type,
+   label:t(f,"label"),
+   amount,
+   movement_date:t(f,"movement_date")
+ }).eq("id",id);
+ if(error)fail(error.message);
+ ok("Mouvement modifié.");
+}
+
+export async function updateCommonRecurrenceSeries(f:FormData){
+ const {s}=await db(),id=t(f,"id"),amount=num(f,"amount");
+ if(!id||!t(f,"label")||!t(f,"start_date")||amount<=0)fail("Récurrence incomplète.");
+ const {error}=await s.from("common_recurrences").update({
+   category_id:t(f,"category_id")||null,
+   movement_type:t(f,"movement_type"),
+   label:t(f,"label"),
+   amount,
+   frequency:t(f,"frequency")||"monthly",
+   interval_count:Math.max(1,Math.trunc(num(f,"interval_count")||1)),
+   start_date:t(f,"start_date"),
+   end_date:t(f,"end_date")||null
+ }).eq("id",id);
+ if(error)fail(error.message);
+ ok("Toute la série a été modifiée.");
+}
+
+export async function updateCommonRecurrenceOccurrence(f:FormData){
+ const {s}=await db(),recurrenceId=t(f,"recurrence_id"),date=t(f,"occurrence_date"),amount=num(f,"amount");
+ if(!recurrenceId||!date||!t(f,"label")||amount<=0)fail("Modification mensuelle incomplète.");
+ const payload={
+   recurrence_id:recurrenceId,
+   occurrence_date:date,
+   label:t(f,"label"),
+   amount,
+   category_id:t(f,"category_id")||null,
+   movement_type:t(f,"movement_type")
+ };
+ const {error}=await s.from("common_recurrence_overrides").upsert(payload,{onConflict:"recurrence_id,occurrence_date"});
+ if(error)fail(error.message);
+
+ const {data:existing,error:existingError}=await s.from("common_movements")
+   .select("id").eq("recurrence_id",recurrenceId).eq("movement_date",date).maybeSingle();
+ if(existingError)fail(existingError.message);
+ if(existing){
+   const {error:updateError}=await s.from("common_movements").update({
+     category_id:payload.category_id,
+     movement_type:payload.movement_type,
+     label:payload.label,
+     amount:payload.amount
+   }).eq("id",existing.id);
+   if(updateError)fail(updateError.message);
+ }
+ ok("Cette échéance uniquement a été modifiée.");
+}
+
+export async function deleteCommonRecurrenceOccurrence(recurrenceId:string, occurrenceDate:string){
+ const {s}=await db();
+ if(!recurrenceId||!/^\d{4}-\d{2}-\d{2}$/.test(occurrenceDate))fail("Échéance incorrecte.");
+ const {error}=await s.from("common_recurrence_exclusions").upsert({
+   recurrence_id:recurrenceId,
+   occurrence_date:occurrenceDate
+ },{onConflict:"recurrence_id,occurrence_date"});
+ if(error)fail(error.message);
+ const {error:movementError}=await s.from("common_movements")
+   .delete().eq("recurrence_id",recurrenceId).eq("movement_date",occurrenceDate);
+ if(movementError)fail(movementError.message);
+ ok("Cette échéance uniquement a été supprimée.");
+}
+
+export async function deleteCommonRecurrenceSeriesFrom(recurrenceId:string, occurrenceDate:string){
+ const {s}=await db();
+ if(!recurrenceId||!/^\d{4}-\d{2}-\d{2}$/.test(occurrenceDate))fail("Échéance incorrecte.");
+
+ const selected=new Date(`${occurrenceDate}T12:00:00`);
+ selected.setDate(selected.getDate()-1);
+ const endDate=selected.toISOString().slice(0,10);
+
+ const {error:updateError}=await s.from("common_recurrences")
+   .update({end_date:endDate})
+   .eq("id",recurrenceId);
+ if(updateError)fail(updateError.message);
+
+ const {error:movError}=await s.from("common_movements")
+   .delete()
+   .eq("recurrence_id",recurrenceId)
+   .gte("movement_date",occurrenceDate);
+ if(movError)fail(movError.message);
+
+ const {error:ovError}=await s.from("common_recurrence_overrides")
+   .delete()
+   .eq("recurrence_id",recurrenceId)
+   .gte("occurrence_date",occurrenceDate);
+ if(ovError)fail(ovError.message);
+
+ const {error:exError}=await s.from("common_recurrence_exclusions")
+   .delete()
+   .eq("recurrence_id",recurrenceId)
+   .gte("occurrence_date",occurrenceDate);
+ if(exError)fail(exError.message);
+
+ ok("La série est arrêtée à partir de cette échéance.");
+}
