@@ -210,21 +210,75 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
   if(existingDepositCount>=MAX_DEPOSITS_PER_MONTH||depositDecision?.status==="deleted"||acceptedDepositMissing)proposal=0;
   if(proposal>0&&proposalDate)addScheduled(scheduledDeposits,proposalDate,proposal);
 
-  // Après intégration du versement proposé, vérifie le risque réel de découvert.
+  // Après intégration du versement proposé, calcule le besoin de reprise d'épargne.
+  // Deux règles distinctes évitent de mélanger un léger déficit de seuil aujourd'hui
+  // avec un point bas beaucoup plus lointain :
+  // 1) si le compte est déjà sous son seuil, on attend jusqu'à 5 jours s'il remonte
+  //    naturellement au-dessus du seuil sans jamais passer sous 0 € ;
+  // 2) pour un besoin futur, la reprise est datée exactement 2 jours avant le
+  //    premier franchissement réel du seuil.
   const riskEnd=proposalDate?Math.min(Date.parse(`${addDays(proposalDate,44)}T12:00:00`),Date.parse(`${endDate}T12:00:00`)):Date.parse(`${monthEnd(shiftMonth(month,1))}T12:00:00`);
   const riskEndDate=iso(new Date(riskEnd));
   const afterDeposit=balanceSeries(rowStart,riskEndDate,checking);
   const lowestPoint=afterDeposit.reduce((best,item)=>item.balance<best.balance?item:best,afterDeposit[0]??{date:rowStart,balance:checking});
-  // Le seuil du profil est un plancher de trésorerie, pas seulement un seuil d'épargne.
-  // Tant qu'une épargne mobilisable existe, le compte courant est remonté jusqu'à ce seuil.
-  const firstOverdraft=afterDeposit.find(item=>item.balance<reserve-0.009)??null;
-  const needed=Math.max(0,roundMoney(reserve-lowestPoint.balance));
+  const firstBelowFloor=afterDeposit.find(item=>item.balance<reserve-0.009)??null;
+  const firstNegative=afterDeposit.find(item=>item.balance<-0.009)??null;
+
+  let automaticUseAmount=0;
+  let automaticUseDate:string|null=null;
+
+  if(checking<reserve-0.009){
+   // Le solde réel est déjà sous le seuil. On regarde uniquement les 5 jours à venir.
+   // Pas de reprise si le compte repasse au-dessus du seuil dans cette fenêtre et
+   // qu'aucun découvert ne survient avant cette remontée.
+   const graceEnd=addDays(rowStart,5)<=riskEndDate?addDays(rowStart,5):riskEndDate;
+   const graceSeries=afterDeposit.filter(item=>item.date>=rowStart&&item.date<=graceEnd);
+   const recoveryPoint=graceSeries.find(item=>item.balance>=reserve-0.009)??null;
+   const beforeRecovery=recoveryPoint?graceSeries.filter(item=>item.date<=recoveryPoint.date):graceSeries;
+   const minimumBeforeRecovery=beforeRecovery.reduce((minimum,item)=>Math.min(minimum,item.balance),checking);
+   const safeNaturalRecovery=Boolean(recoveryPoint)&&minimumBeforeRecovery>=-0.009;
+
+   if(!safeNaturalRecovery){
+    // Par défaut on remonte simplement au seuil aujourd'hui. Si des mouvements
+    // non cochés des prochains jours feraient malgré cela passer sous 0 €, on ajoute
+    // seulement le complément nécessaire pour éviter ce découvert.
+    const toFloor=Math.max(0,roundMoney(reserve-checking));
+    const overdraftProtection=Math.max(0,roundMoney(-minimumBeforeRecovery));
+    automaticUseAmount=Math.max(toFloor,overdraftProtection);
+    automaticUseDate=rowStart;
+   }
+  } else if(firstBelowFloor){
+   // Besoin futur : date = J-2 du premier franchissement du seuil.
+   automaticUseDate=addDays(firstBelowFloor.date,-2);
+   if(automaticUseDate<rowStart)automaticUseDate=rowStart;
+
+   // Le montant protège le compte jusqu'à sa prochaine remontée naturelle au seuil
+   // (ou, au plus tard, la fin de la fenêtre de risque). On n'utilise donc pas un
+   // point bas antérieur ou sans rapport avec ce besoin précis.
+   const fromNeed=afterDeposit.filter(item=>item.date>=firstBelowFloor.date);
+   const recoveryAfterNeed=fromNeed.find(item=>item.date>firstBelowFloor.date&&item.balance>=reserve-0.009)??null;
+   const protectionWindow=recoveryAfterNeed?fromNeed.filter(item=>item.date<=recoveryAfterNeed.date):fromNeed;
+   const minimumForNeed=protectionWindow.reduce((minimum,item)=>Math.min(minimum,item.balance),firstBelowFloor.balance);
+   automaticUseAmount=Math.max(0,roundMoney(reserve-minimumForNeed));
+  }
+
   let savingsUseDate:string|null=null;
   let usable=0;
+  const availableSavings=mobilizableSavingsForAccount(savings,input.destinationAccountId,input.savingsBudgets,SAVINGS_FLOOR);
   const acceptedUseMissing=useDecision?.status==="accepted"&&useDecision.transfer_group_id&&!uses.some(t=>t.group===useDecision.transfer_group_id);
-  if(acceptedUseMissing){savingsUseDate=firstOverdraft?addDays(firstOverdraft.date,-1):rowStart;if(savingsUseDate<rowStart)savingsUseDate=rowStart;usable=Math.min(Number(useDecision.amount),mobilizableSavingsForAccount(savings,input.destinationAccountId,input.savingsBudgets,SAVINGS_FLOOR));addScheduled(scheduledUses,savingsUseDate,usable)}
-  else if(useDecision?.status==="pending"&&needed>0){savingsUseDate=firstOverdraft?addDays(firstOverdraft.date,-1):lowestPoint.date;if(savingsUseDate<rowStart)savingsUseDate=rowStart;usable=Math.min(Number(useDecision.amount),mobilizableSavingsForAccount(savings,input.destinationAccountId,input.savingsBudgets,SAVINGS_FLOOR));addScheduled(scheduledUses,savingsUseDate,usable)}
-  else if(useDecision?.status!=="deleted"&&needed>0){savingsUseDate=firstOverdraft?addDays(firstOverdraft.date,-1):lowestPoint.date;if(savingsUseDate<rowStart)savingsUseDate=rowStart;usable=Math.min(needed,mobilizableSavingsForAccount(savings,input.destinationAccountId,input.savingsBudgets,SAVINGS_FLOOR));addScheduled(scheduledUses,savingsUseDate,usable)}
+  if(acceptedUseMissing){
+   savingsUseDate=automaticUseDate??rowStart;
+   usable=Math.min(Number(useDecision.amount),availableSavings);
+   if(usable>0)addScheduled(scheduledUses,savingsUseDate,usable);
+  } else if(useDecision?.status==="pending"&&automaticUseAmount>0){
+   savingsUseDate=automaticUseDate??rowStart;
+   usable=Math.min(Number(useDecision.amount),availableSavings);
+   if(usable>0)addScheduled(scheduledUses,savingsUseDate,usable);
+  } else if(useDecision?.status!=="deleted"&&automaticUseAmount>0){
+   savingsUseDate=automaticUseDate??rowStart;
+   usable=Math.min(automaticUseAmount,availableSavings);
+   if(usable>0)addScheduled(scheduledUses,savingsUseDate,usable);
+  }
 
   // Exécute chronologiquement les flux et tous les virements planifiés/proposés du mois.
   for(const date of dates.filter(d=>d>=rowStart&&d<=last)){
@@ -243,7 +297,7 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
    debitExcludingBudgetRemaining:monthExpense-monthBudget,budgetRemaining:monthBudget,
    balanceBeforeSavings:roundMoney(baselineEndOfMonth),requiredReserve:reserve,proposalDate,
    savingsUseDate,cycleEndDate,lowestBalance:roundMoney(lowestPoint.balance),lowestBalanceDate:lowestPoint.date,
-   nextPrimaryIncomeDate:nextPrimary,overdraftDate:firstOverdraft?.date??null
+   nextPrimaryIncomeDate:nextPrimary,overdraftDate:firstNegative?.date??null
   });
  }
  return rows;
