@@ -268,12 +268,23 @@ export async function deleteRecurrenceSeriesFrom(
   if (updateError) fail(updateError.message);
   if (!updated) fail("La série n'a pas pu être arrêtée.");
 
-  // Supprime les occurrences déjà matérialisées à partir de la date choisie.
+  // Les mouvements déjà pointés sont un historique réel : on les conserve mais on
+  // les détache de la série. Les occurrences non pointées sont réellement supprimées.
+  const { error: detachCompletedError } = await supabase
+    .from("personal_movements")
+    .update({ recurrence_id: null })
+    .eq("owner_id", user.id)
+    .eq("recurrence_id", recurrenceId)
+    .eq("status", "completed")
+    .gte("movement_date", occurrenceDate);
+  if (detachCompletedError) fail(detachCompletedError.message);
+
   const { error: movementError } = await supabase
     .from("personal_movements")
     .delete()
     .eq("owner_id", user.id)
     .eq("recurrence_id", recurrenceId)
+    .neq("status", "completed")
     .gte("movement_date", occurrenceDate);
 
   if (movementError) fail(movementError.message);
@@ -467,8 +478,15 @@ export async function applyCategoryBudgetSimulation(fd: FormData) {
 export async function updateRecurrence(fd: FormData) {
   const { supabase, user } = await auth();
   const id = text(fd, "id"); const amount = number(fd, "amount");
-  if (!id || !text(fd, "label") || !Number.isFinite(amount) || amount <= 0) fail("Mouvement régulier incomplet.");
-  const { error } = await supabase.from("personal_recurrences").update({ label: text(fd, "label"), amount, end_date: optional(fd, "end_date"), is_active: text(fd, "is_active") !== "false" }).eq("id", id).eq("owner_id", user.id);
+  const movementType = text(fd, "movement_type");
+  const accountId = text(fd, "account_id");
+  const categoryId = optional(fd, "category_id");
+  if (!id || !text(fd, "label") || !accountId || !Number.isFinite(amount) || amount <= 0) fail("Mouvement régulier incomplet.");
+  if (!["income","expense","transfer"].includes(movementType)) fail("Type de mouvement régulier incorrect.");
+  const { error } = await supabase.from("personal_recurrences").update({
+    label: text(fd, "label"), amount, movement_type: movementType, account_id: accountId,
+    category_id: categoryId, end_date: optional(fd, "end_date"), is_active: text(fd, "is_active") !== "false"
+  }).eq("id", id).eq("owner_id", user.id);
   if (error) fail(error.message); refresh("Mouvement régulier modifié.");
 }
 
@@ -511,6 +529,72 @@ export async function excludeRecurrenceOccurrence(recurrenceId: string, occurren
   refresh("Échéance supprimée uniquement pour ce mois.");
 }
 
+
+export async function saveChildrenSyncSettings(fd: FormData) {
+  const { supabase, user } = await auth();
+  const enabled = text(fd, "children_sync_enabled") === "on";
+  const accountId = optional(fd, "children_sync_account_id");
+  const day = Math.min(28, Math.max(1, Math.trunc(number(fd, "children_sync_day") || 5)));
+  const self = text(fd, "children_sync_person") === "person_1" ? "person_1" : "person_2";
+  if (enabled && !accountId) fail("Choisis le compte utilisé pour les régularisations ENFANTS.");
+  const { error } = await supabase.from("personal_settings").upsert({
+    owner_id: user.id,
+    children_sync_enabled: enabled,
+    children_sync_account_id: accountId,
+    children_sync_day: day,
+    children_sync_person: self,
+  }, { onConflict: "owner_id" });
+  if (error) fail(error.message);
+  revalidatePath(PATH, "page");
+  redirect(`${PATH}?vue=parametres&succes=${encodeURIComponent("Intégration ENFANTS mise à jour.")}`);
+}
+
+export async function completeChildrenProjectedMovement(
+  sourceKey: string,
+  accountId: string,
+  movementType: "income" | "expense",
+  label: string,
+  amount: number,
+  movementDate: string,
+) {
+  const { supabase, user } = await auth();
+  if (!sourceKey.startsWith("children:") || !accountId || !["income","expense"].includes(movementType) || !/^\d{4}-\d{2}-\d{2}$/.test(movementDate) || !Number.isFinite(amount) || amount <= 0) fail("Régularisation ENFANTS incorrecte.");
+  const completedDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const { error } = await supabase.from("personal_movements").upsert({
+    owner_id: user.id, account_id: accountId, category_id: null, movement_type: movementType,
+    label, amount, movement_date: movementDate, status: "completed", completed_date: completedDate,
+    completed_at: new Date().toISOString(), source_type: "children", source_key: sourceKey,
+  }, { onConflict: "owner_id,source_type,source_key" });
+  if (error) fail(error.message);
+  refresh("Régularisation ENFANTS pointée. Son montant est désormais figé dans l'historique.");
+}
+
+export async function resetChildrenMovement(id: string) {
+  const { supabase, user } = await auth();
+  if (!id) fail("Mouvement ENFANTS introuvable.");
+  const { error } = await supabase.from("personal_movements").delete()
+    .eq("id", id).eq("owner_id", user.id).eq("source_type", "children");
+  if (error) fail(error.message);
+  refresh("Régularisation ENFANTS replacée en prévision et resynchronisée.");
+}
+
+export async function deleteRecurrenceFromSettings(id: string) {
+  const { supabase, user } = await auth();
+  if (!id) fail("Mouvement régulier introuvable.");
+  // Les opérations déjà pointées restent un historique réel, mais sont détachées de la série.
+  const { error: detachError } = await supabase.from("personal_movements")
+    .update({ recurrence_id: null })
+    .eq("owner_id", user.id).eq("recurrence_id", id).eq("status", "completed");
+  if (detachError) fail(detachError.message);
+  // Les occurrences non réalisées sont supprimées avant la série : aucun mouvement fantôme ne subsiste.
+  const { error: plannedError } = await supabase.from("personal_movements")
+    .delete().eq("owner_id", user.id).eq("recurrence_id", id).neq("status", "completed");
+  if (plannedError) fail(plannedError.message);
+  const { error } = await supabase.from("personal_recurrences").delete().eq("id", id).eq("owner_id", user.id);
+  if (error) fail(error.message);
+  revalidatePath(PATH, "page");
+  redirect(`${PATH}?vue=parametres&section=mouvements-reguliers&succes=${encodeURIComponent("Mouvement régulier supprimé. Aucun mouvement futur masqué n'est conservé.")}`);
+}
 
 async function saveDefaultAccountSetting(
   fd: FormData,

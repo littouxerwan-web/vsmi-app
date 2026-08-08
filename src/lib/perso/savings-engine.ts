@@ -55,7 +55,7 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
  const selected=input.primaryIncomeCategoryId?(root(input.primaryIncomeCategoryId)??input.primaryIncomeCategoryId):null;
  const primaryRoots=new Set(selected?[selected]:input.categories.filter(c=>c.is_primary_income).map(c=>root(c.id)??c.id));
  const accounts=input.accounts??[{id:input.sourceAccountId,account_type:"checking" as const,is_default:true},{id:input.destinationAccountId,account_type:"savings" as const}];
- const budgetRoots=input.categories.filter(c=>!c.parent_id&&c.movement_type!=="income"&&Number(c.monthly_budget)>0&&resolveBudgetAccountId(c,input.movementDefaultAccountId,accounts)===input.sourceAccountId);
+ const budgetRoots=input.categories.filter(c=>!c.parent_id&&Number(c.monthly_budget)>0&&resolveBudgetAccountId(c,input.movementDefaultAccountId,accounts)===input.sourceAccountId);
  const overrides=new Map((input.overrides??[]).map(o=>[`${o.recurrence_id}:${String(o.occurrence_month).slice(0,7)}`,Number(o.amount)]));
  const excluded=new Set((input.exclusions??[]).map(e=>`${e.recurrence_id}:${e.occurrence_date}`));
  const materialized=new Set(input.movements.filter(m=>m.recurrence_id).map(m=>`${m.recurrence_id}:${m.movement_date}`));
@@ -89,7 +89,7 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
  // sont traités séparément pour faire évoluer les deux soldes simultanément.
  for(const m of input.movements){
   if(m.movement_date>endDate||m.account_id!==input.sourceAccountId||m.status==="cancelled")continue;
-  if(m.movement_date>=requestedStart&&m.movement_type==="expense"&&["planned","completed"].includes(m.status))registerSpent(m.movement_date,Number(m.amount),m.category_id);
+  if(m.movement_date>=requestedStart&&["expense","income"].includes(m.movement_type)&&["planned","completed"].includes(m.status))registerSpent(m.movement_date,m.movement_type==="income"?-Number(m.amount):Number(m.amount),m.category_id);
   if(m.status!=="planned"|| (m.transfer_group_id&&pairedGroups.has(m.transfer_group_id)))continue;
   const effectiveDate=m.movement_date<simulationStart?simulationStart:m.movement_date;
   if(effectiveDate>endDate)continue;
@@ -104,7 +104,7 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
    const date=iso(d),month=date.slice(0,7);
    if(date>=simulationStart&&(!r.end_date||date<=r.end_date)&&!excluded.has(`${r.id}:${date}`)&&!materialized.has(`${r.id}:${date}`)){
     const a=overrides.get(`${r.id}:${month}`)??Number(r.amount);
-    if(r.movement_type==="income"&&r.account_id===input.sourceAccountId)income(date,a,primaryRoots.has(root(r.category_id)??""));
+    if(r.movement_type==="income"&&r.account_id===input.sourceAccountId){income(date,a,primaryRoots.has(root(r.category_id)??""));registerSpent(date,-a,r.category_id)}
     else if(r.movement_type==="expense"&&r.account_id===input.sourceAccountId)expense(date,a,r.category_id);
     else if(r.movement_type==="transfer"){
      if(r.account_id===input.sourceAccountId){const f=flow(date);f.expense+=a}
@@ -215,8 +215,10 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
   const riskEndDate=iso(new Date(riskEnd));
   const afterDeposit=balanceSeries(rowStart,riskEndDate,checking);
   const lowestPoint=afterDeposit.reduce((best,item)=>item.balance<best.balance?item:best,afterDeposit[0]??{date:rowStart,balance:checking});
-  const firstOverdraft=afterDeposit.find(item=>item.balance<0)??null;
-  const needed=Math.max(0,roundMoney(-lowestPoint.balance));
+  // Le seuil du profil est un plancher de trésorerie, pas seulement un seuil d'épargne.
+  // Tant qu'une épargne mobilisable existe, le compte courant est remonté jusqu'à ce seuil.
+  const firstOverdraft=afterDeposit.find(item=>item.balance<reserve-0.009)??null;
+  const needed=Math.max(0,roundMoney(reserve-lowestPoint.balance));
   let savingsUseDate:string|null=null;
   let usable=0;
   const acceptedUseMissing=useDecision?.status==="accepted"&&useDecision.transfer_group_id&&!uses.some(t=>t.group===useDecision.transfer_group_id);
