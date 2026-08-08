@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Baby, LogOut, Settings } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
 import { redirect } from "next/navigation";
 import { logout } from "@/app/connexion/actions";
 import { AppNavigation } from "@/components/app-navigation";
@@ -57,7 +57,6 @@ export default async function AppLayout({ children }: AppLayoutProps) {
               </Link>
 
               <div className="flex items-center gap-2 sm:gap-4">
-                {childrenAccess ? <Link href="/enfants" aria-label="Ouvrir Enfants" title="Enfants" className="vsmi-press grid size-10 place-items-center rounded-full border border-[#C7A45A]/30 bg-[#C7A45A]/10 text-[#8B6929] lg:hidden"><Baby size={18}/></Link> : null}
                 <PrivacyModeToggle />
                 <Link
                   href="/perso?vue=parametres"

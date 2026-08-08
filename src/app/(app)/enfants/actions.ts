@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const text=(f:FormData,k:string)=>String(f.get(k)??"").trim();
 const number=(f:FormData,k:string)=>Number(String(f.get(k)??"0").replace(",","."));
+const monthValue=(f:FormData,k:string)=>{const v=text(f,k);return /^\d{4}-\d{2}$/.test(v)?`${v}-01`:""};
 
 async function db(){
   const supabase=await createClient();
@@ -38,10 +39,23 @@ export async function saveChildrenSettings(f:FormData){
 export async function createChildrenExpense(f:FormData){
   const {supabase,userId}=await db();
   const amount=number(f,"amount");
-  if(!text(f,"label")||!text(f,"expense_date")||!Number.isFinite(amount)||amount<=0) throw new Error("Dépense incomplète.");
+  const startMonth=monthValue(f,"start_month"),endMonth=monthValue(f,"end_month");
+  const schoolYearStart=Math.trunc(number(f,"school_year_start"));
+  const minMonth=`${schoolYearStart}-09-01`,maxMonth=`${schoolYearStart+1}-08-01`;
+  if(!text(f,"label")||!startMonth||!endMonth||endMonth<startMonth||startMonth<minMonth||endMonth>maxMonth||!Number.isFinite(amount)||amount<=0) {
+    throw new Error("Dépense ou période mensuelle incomplète.");
+  }
   const paidBy=text(f,"paid_by")==="person_2"?"person_2":"person_1";
   const {error}=await supabase.from("children_expenses").insert({
-    owner_id:userId,label:text(f,"label"),amount,expense_date:text(f,"expense_date"),notes:text(f,"notes")||null,paid_by:paidBy
+    owner_id:userId,
+    label:text(f,"label"),
+    amount,
+    start_month:startMonth,
+    end_month:endMonth,
+    school_year_start:schoolYearStart,
+    expense_date:null,
+    notes:text(f,"notes")||null,
+    paid_by:paidBy
   });
   if(error) throw new Error(error.message);
   done("Dépense ajoutée.");
@@ -50,10 +64,23 @@ export async function createChildrenExpense(f:FormData){
 export async function updateChildrenExpense(f:FormData){
   const {supabase,userId}=await db();
   const id=text(f,"id"),amount=number(f,"amount");
-  if(!id||!text(f,"label")||!text(f,"expense_date")||!Number.isFinite(amount)||amount<=0) throw new Error("Dépense incomplète.");
+  const startMonth=monthValue(f,"start_month"),endMonth=monthValue(f,"end_month");
+  const schoolYearStart=Math.trunc(number(f,"school_year_start"));
+  const minMonth=`${schoolYearStart}-09-01`,maxMonth=`${schoolYearStart+1}-08-01`;
+  if(!id||!text(f,"label")||!startMonth||!endMonth||endMonth<startMonth||startMonth<minMonth||endMonth>maxMonth||!Number.isFinite(amount)||amount<=0) {
+    throw new Error("Dépense ou période mensuelle incomplète.");
+  }
   const paidBy=text(f,"paid_by")==="person_2"?"person_2":"person_1";
   const {error}=await supabase.from("children_expenses").update({
-    label:text(f,"label"),amount,expense_date:text(f,"expense_date"),notes:text(f,"notes")||null,paid_by:paidBy,updated_at:new Date().toISOString()
+    label:text(f,"label"),
+    amount,
+    start_month:startMonth,
+    end_month:endMonth,
+    school_year_start:schoolYearStart,
+    expense_date:null,
+    notes:text(f,"notes")||null,
+    paid_by:paidBy,
+    updated_at:new Date().toISOString()
   }).eq("id",id).eq("owner_id",userId);
   if(error) throw new Error(error.message);
   done("Dépense modifiée.");
