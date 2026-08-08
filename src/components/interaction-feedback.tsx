@@ -109,10 +109,13 @@ export function InteractionFeedback() {
     };
 
     const onPointerDown = (event: PointerEvent) => {
-      const target = event.target instanceof Element ? event.target.closest("button") : null;
-      if (!target || target.closest("a")) return;
+      const target =
+        event.target instanceof Element
+          ? event.target.closest<HTMLElement>("button, a, summary, [role='button']")
+          : null;
+      if (!target) return;
       target.setAttribute("data-vsmi-pressed", "true");
-      window.setTimeout(() => target.removeAttribute("data-vsmi-pressed"), 220);
+      window.setTimeout(() => target.removeAttribute("data-vsmi-pressed"), 240);
     };
 
     document.addEventListener("submit", onSubmit, true);
@@ -130,9 +133,13 @@ export function InteractionFeedback() {
   return (
     <>
       <style jsx global>{`
-        button[data-vsmi-pressed="true"] {
-          transform: scale(0.97);
-          opacity: 0.78;
+        button[data-vsmi-pressed="true"],
+        a[data-vsmi-pressed="true"],
+        summary[data-vsmi-pressed="true"],
+        [role="button"][data-vsmi-pressed="true"] {
+          transform: scale(0.965);
+          opacity: 0.76;
+          filter: brightness(0.9);
         }
         button[data-vsmi-busy="true"],
         form[data-vsmi-submitting="true"] button[type="submit"] {
@@ -146,8 +153,11 @@ export function InteractionFeedback() {
           outline-offset: 2px;
         }
         @media (prefers-reduced-motion: no-preference) {
-          button {
-            transition: transform 120ms ease, opacity 120ms ease;
+          button,
+          a,
+          summary,
+          [role="button"] {
+            transition: transform 120ms ease, opacity 120ms ease, filter 120ms ease;
           }
           input[type="checkbox"],
           input[type="radio"] {
