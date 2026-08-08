@@ -136,7 +136,7 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
  const dates:string[]=[];
  for(let d=new Date(`${simulationStart}T12:00:00`);iso(d)<=endDate;d.setDate(d.getDate()+1))dates.push(iso(d));
  const primaryDates=dates.filter(d=>(flows.get(d)?.primaryIncome??0)>0);
- let checking=Number(input.initialChecking),savings=Math.max(SAVINGS_FLOOR,Number(input.initialSavings));
+ let checking=Number(input.initialChecking),savings=Number(input.initialSavings);
  const rows:SavingsPlanRow[]=[];
  const scheduledDeposits=new Map<string,number>(),scheduledUses=new Map<string,number>();
  const addScheduled=(map:Map<string,number>,date:string,amount:number)=>map.set(date,roundMoney((map.get(date)??0)+amount));
@@ -233,7 +233,7 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
    const f=flows.get(date);if(f){checking+=f.income-f.expense;monthIncome+=f.income;monthExpense+=f.expense;monthBudget+=f.budget}
    const deposit=scheduledDeposits.get(date)??0;
    if(deposit>0){const actualDeposit=Math.min(deposit,Math.max(0,checking-reserve));checking-=actualDeposit;savings+=actualDeposit}
-   checking=roundMoney(checking);savings=roundMoney(Math.max(SAVINGS_FLOOR,savings));
+   checking=roundMoney(checking);savings=roundMoney(savings);
   }
 
   const nextPrimary=primaryDates.find(d=>d>(proposalDate??rowStart))??null;

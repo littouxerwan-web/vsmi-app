@@ -10,7 +10,7 @@ import {
   HeartHandshake,
   LayoutDashboard,
   Plus,
-  Sparkles,
+  TrendingUp,
   UsersRound,
   WalletCards,
   X,
@@ -142,10 +142,10 @@ export function MobileNavigation({ photoAccess = false }: { photoAccess?: boolea
           )}
 
           {persoLink(
-            "/perso?vue=epargne",
-            "Épargne",
-            Sparkles,
-            pathname === "/perso" && view === "epargne",
+            "/perso?vue=projection",
+            "Projection",
+            TrendingUp,
+            pathname === "/perso" && view === "projection",
           )}
 
           <Link

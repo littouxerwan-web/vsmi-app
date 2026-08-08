@@ -7,7 +7,6 @@ import {
   CircleDollarSign,
   HeartHandshake,
   LayoutDashboard,
-  Sparkles,
   TrendingUp,
   UserRound,
   UsersRound,
@@ -17,7 +16,6 @@ import {
 const basePersoNavigation = [
   { href: "/perso?vue=finances", label: "En cours", icon: CircleDollarSign },
   { href: "/perso?vue=projection", label: "Projection", icon: TrendingUp },
-  { href: "/perso?vue=epargne", label: "Potentiel d’épargne", icon: Sparkles },
 ];
 
 const commonNavigation = [
