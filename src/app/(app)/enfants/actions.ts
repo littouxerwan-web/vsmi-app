@@ -39,17 +39,26 @@ export async function saveChildrenSettings(f:FormData){
 export async function createChildrenExpense(f:FormData){
   const {supabase,userId}=await db();
   const amount=number(f,"amount");
+  const annualAmount=number(f,"annual_amount");
+  const smoothAnnual=text(f,"smooth_annual")==="on";
   const startMonth=monthValue(f,"start_month"),endMonth=monthValue(f,"end_month");
   const schoolYearStart=Math.trunc(number(f,"school_year_start"));
   const minMonth=`${schoolYearStart}-09-01`,maxMonth=`${schoolYearStart+1}-08-01`;
-  if(!text(f,"label")||!startMonth||!endMonth||endMonth<startMonth||startMonth<minMonth||endMonth>maxMonth||!Number.isFinite(amount)||amount<=0) {
-    throw new Error("Dépense ou période mensuelle incomplète.");
-  }
+
+  if(
+    !text(f,"label") || !startMonth || !endMonth ||
+    endMonth<startMonth || startMonth<minMonth || endMonth>maxMonth ||
+    !Number.isFinite(amount) || amount<=0 ||
+    !Number.isFinite(annualAmount) || annualAmount<=0
+  ) throw new Error("Dépense ou période mensuelle incomplète.");
+
   const paidBy=text(f,"paid_by")==="person_2"?"person_2":"person_1";
   const {error}=await supabase.from("children_expenses").insert({
     owner_id:userId,
     label:text(f,"label"),
     amount,
+    annual_amount:annualAmount,
+    smooth_annual:smoothAnnual,
     start_month:startMonth,
     end_month:endMonth,
     school_year_start:schoolYearStart,
@@ -63,17 +72,25 @@ export async function createChildrenExpense(f:FormData){
 
 export async function updateChildrenExpense(f:FormData){
   const {supabase,userId}=await db();
-  const id=text(f,"id"),amount=number(f,"amount");
+  const id=text(f,"id"),amount=number(f,"amount"),annualAmount=number(f,"annual_amount");
+  const smoothAnnual=text(f,"smooth_annual")==="on";
   const startMonth=monthValue(f,"start_month"),endMonth=monthValue(f,"end_month");
   const schoolYearStart=Math.trunc(number(f,"school_year_start"));
   const minMonth=`${schoolYearStart}-09-01`,maxMonth=`${schoolYearStart+1}-08-01`;
-  if(!id||!text(f,"label")||!startMonth||!endMonth||endMonth<startMonth||startMonth<minMonth||endMonth>maxMonth||!Number.isFinite(amount)||amount<=0) {
-    throw new Error("Dépense ou période mensuelle incomplète.");
-  }
+
+  if(
+    !id || !text(f,"label") || !startMonth || !endMonth ||
+    endMonth<startMonth || startMonth<minMonth || endMonth>maxMonth ||
+    !Number.isFinite(amount) || amount<=0 ||
+    !Number.isFinite(annualAmount) || annualAmount<=0
+  ) throw new Error("Dépense ou période mensuelle incomplète.");
+
   const paidBy=text(f,"paid_by")==="person_2"?"person_2":"person_1";
   const {error}=await supabase.from("children_expenses").update({
     label:text(f,"label"),
     amount,
+    annual_amount:annualAmount,
+    smooth_annual:smoothAnnual,
     start_month:startMonth,
     end_month:endMonth,
     school_year_start:schoolYearStart,
@@ -82,6 +99,7 @@ export async function updateChildrenExpense(f:FormData){
     paid_by:paidBy,
     updated_at:new Date().toISOString()
   }).eq("id",id).eq("owner_id",userId);
+
   if(error) throw new Error(error.message);
   done("Dépense modifiée.");
 }
