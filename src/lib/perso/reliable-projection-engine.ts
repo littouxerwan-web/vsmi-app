@@ -3,7 +3,7 @@ import { mobilizableSavingsForAccount, type SavingsBudgetAllocation, type Saving
 
 export type RPAccount={id:string;name:string;account_type:'checking'|'savings';is_default?:boolean};
 export type RPCategory={id:string;name?:string;parent_id:string|null;monthly_budget:number;account_id?:string|null;budget_period?:'monthly'|'specific_month';budget_month?:string|null;budget_start_date?:string|null;budget_end_date?:string|null};
-export type RPMovement={id:string;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;completed_date?:string|null;recurrence_id?:string|null;transfer_group_id?:string|null};
+export type RPMovement={id:string;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;completed_date?:string|null;recurrence_id?:string|null;transfer_group_id?:string|null;source_type?:string|null;source_key?:string|null;virtual_source?:boolean};
 export type RPRecurrence={id:string;account_id:string;destination_account_id:string|null;category_id:string|null;movement_type:'income'|'expense'|'transfer';label:string;amount:number;frequency:'weekly'|'monthly'|'quarterly'|'yearly';interval_count:number;start_date:string;end_date:string|null;annual_change_percent:number};
 export type RPOverride={recurrence_id:string;occurrence_month:string;amount:number};
 export type RPExclusion={recurrence_id:string;occurrence_date:string};
@@ -11,8 +11,9 @@ export type RPPhoto={id:string;display_name:string;wedding_date:string|null;paym
 export type RPUrssaf={contribution_month:string;account_id:string|null;is_completed:boolean;completed_date:string|null};
 export type RPProfile={id:string;label:string;sourceAccountId:string|null;destinationAccountId:string|null;threshold:number};
 export type RPSavingsMeta={sourceAccountId:string;destinationAccountId:string;sourceMonth:string;automaticAmount:number;status:'automatic'|'pending'|'accepted';kind:'deposit'|'use';previousTransferGroupId?:string|null};
-export type RPOperation={id:string;projected:boolean;recurrence_id?:string|null;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;transfer_group_id?:string|null;savingsProposal?:RPSavingsMeta;source?:'movement'|'recurrence'|'photo'|'urssaf'|'budget'|'savings'};
+export type RPOperation={id:string;projected:boolean;recurrence_id?:string|null;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;transfer_group_id?:string|null;source_type?:string|null;source_key?:string|null;virtual_source?:boolean;photo?:boolean;photoPayment?:RPPhoto;savingsProposal?:RPSavingsMeta;source?:'movement'|'recurrence'|'photo'|'urssaf'|'budget'|'savings'};
 export type RPPoint={date:string;balances:Record<string,number>;checking:number;savings:number;total:number};
+export type RPMonthAudit={month:string;opening:Record<string,number>;credits:Record<string,number>;debits:Record<string,number>;budgetDebits:Record<string,number>;savingsUsed:Record<string,number>;savingsDeposited:Record<string,number>;closing:Record<string,number>;};
 
 type Input={
  accounts:RPAccount[];categories:RPCategory[];movements:RPMovement[];recurrences:RPRecurrence[];overrides:RPOverride[];exclusions:RPExclusion[];photoPayments:RPPhoto[];photoDefaultAccountId:string|null;movementDefaultAccountId:string|null;urssafDefaultAccountId:string|null;urssafStates:RPUrssaf[];savingsProposals:SavingsProposalDecision[];savingsBudgets:SavingsBudgetAllocation[];profiles:RPProfile[];currentBalances:Record<string,number>;todayIso:string;months?:number;
@@ -69,7 +70,7 @@ export function buildReliableProjection(input:Input){
  }
  for(const p of input.photoPayments){
   if(p.status!=='expected')continue;const raw=photoDate(p);if(!raw)continue;const date=raw<input.todayIso?input.todayIso:raw;if(date>horizonEnd)continue;const account=p.personal_account_id??input.photoDefaultAccountId;if(!account)continue;
-  ops.push({id:`photo-${p.id}`,projected:false,account_id:account,category_id:null,movement_type:'income',label:photoLabel(p),amount:Number(p.amount),movement_date:date,status:'planned',source:'photo'});
+  ops.push({id:`photo-${p.id}`,projected:false,account_id:account,category_id:null,movement_type:'income',label:photoLabel(p),amount:Number(p.amount),movement_date:date,status:'planned',source:'photo',photo:true,photoPayment:p});
  }
  const photoMonthAmount=(m:string)=>input.photoPayments.filter(p=>p.status!=='cancelled'&&String((p.accounting_status==='received'?(p.received_date??p.expected_date):p.expected_date)??'').slice(0,7)===m).reduce((s,p)=>s+Number(p.amount),0);
  for(let i=0;i<months;i++){
@@ -92,56 +93,77 @@ export function buildReliableProjection(input:Input){
 
  const baseOps=ops.sort((a,b)=>a.movement_date.localeCompare(b.movement_date)||a.id.localeCompare(b.id));
  const balances=new Map(input.accounts.map(a=>[a.id,round(Number(input.currentBalances[a.id]??0))]));
- const allOps:RPOperation[]=[...baseOps];const points:RPPoint[]=[];
+ const allOps:RPOperation[]=[...baseOps];const points:RPPoint[]=[];const audits:RPMonthAudit[]=[];
  const monthOps=new Map<string,RPOperation[]>();for(const o of baseOps){const m=o.movement_date.slice(0,7);monthOps.set(m,[...(monthOps.get(m)??[]),o])}
  const profileByChecking=new Map(input.profiles.filter(p=>p.sourceAccountId&&p.destinationAccountId).map(p=>[p.sourceAccountId!,p]));
  const pendingProposal=(source:string,dest:string,m:string)=>input.savingsProposals.find(p=>p.source_account_id===source&&p.destination_account_id===dest&&String(p.source_month).slice(0,7)===m&&p.status==='pending');
 
  const transferCaps=new Map<string,number>();
- const apply=(o:RPOperation)=>{
-  const account=accountById.get(o.account_id);if(!account)return;const before=Number(balances.get(o.account_id)??0);const plus=['income','transfer_in'].includes(o.movement_type);let amount=Number(o.amount);
+ const apply=(o:RPOperation,audit?:RPMonthAudit)=>{
+  const account=accountById.get(o.account_id);if(!account)return;const before=Number(balances.get(o.account_id)??0);const plus=['income','transfer_in'].includes(o.movement_type);let amount=round(Number(o.amount));
   if(o.movement_type==='transfer_in'&&o.transfer_group_id&&transferCaps.has(o.transfer_group_id))amount=Number(transferCaps.get(o.transfer_group_id));
   if(!plus&&account.account_type==='savings'){amount=Math.min(amount,Math.max(0,before));if(o.movement_type==='transfer_out'&&o.transfer_group_id)transferCaps.set(o.transfer_group_id,amount);}
   balances.set(o.account_id,round(plus?before+amount:before-amount));
+  if(audit){
+   if(plus)audit.credits[o.account_id]=round((audit.credits[o.account_id]??0)+amount);else audit.debits[o.account_id]=round((audit.debits[o.account_id]??0)+amount);
+   if(o.source==='budget'&&!plus)audit.budgetDebits[o.account_id]=round((audit.budgetDebits[o.account_id]??0)+amount);
+  }
  };
- const synthetic=(m:string,date:string,source:string,dest:string,amount:number,kind:'use'|'deposit',label:string)=>{
-  amount=round(Math.max(0,amount));if(amount<0.01)return;
+ const synthetic=(m:string,date:string,source:string,dest:string,amount:number,kind:'use'|'deposit',label:string,audit:RPMonthAudit)=>{
+  amount=round(Math.max(0,amount));if(amount<0.01)return 0;
   const sourceAccount=accountById.get(source);const sourceBalance=Number(balances.get(source)??0);
   if(sourceAccount?.account_type==='savings')amount=Math.min(amount,mobilizableSavingsForAccount(sourceBalance,source,input.savingsBudgets,SAVINGS_FLOOR));else amount=Math.min(amount,Math.max(0,sourceBalance));
-  if(amount<0.01)return;
+  if(amount<0.01)return 0;
   const stored=pendingProposal(source,dest,m);if(stored)amount=Math.min(amount,Number(stored.amount));
+  if(amount<0.01)return 0;
   const meta:RPSavingsMeta={sourceAccountId:source,destinationAccountId:dest,sourceMonth:m,automaticAmount:amount,status:stored?'pending':'automatic',kind};
   const group=`auto-${kind}-${source}-${dest}-${m}`;
   const out:RPOperation={id:`${group}-out`,projected:true,transfer_group_id:group,account_id:source,category_id:null,movement_type:'transfer_out',label,amount,movement_date:date,status:'planned',source:'savings',savingsProposal:meta};
   const inn:RPOperation={...out,id:`${group}-in`,account_id:dest,movement_type:'transfer_in'};
   apply(out);apply(inn);allOps.push(out,inn);monthOps.set(m,[...(monthOps.get(m)??[]),out,inn]);
+  if(kind==='use')audit.savingsUsed[dest]=round((audit.savingsUsed[dest]??0)+amount);else audit.savingsDeposited[source]=round((audit.savingsDeposited[source]??0)+amount);
+  return amount;
+ };
+ const delta=(o:RPOperation)=>['income','transfer_in'].includes(o.movement_type)?Number(o.amount):-Number(o.amount);
+ const safeSurplus45=(checkingId:string,threshold:number,fromMonth:string)=>{
+  let simulated=Number(balances.get(checkingId)??0);let minimum=simulated;const from=monthEnd(fromMonth);const through=addDays(from,45);
+  for(const o of baseOps.filter(o=>o.account_id===checkingId&&o.movement_date>from&&o.movement_date<=through).sort((a,b)=>a.movement_date.localeCompare(b.movement_date))){simulated=round(simulated+delta(o));minimum=Math.min(minimum,simulated);}
+  return round(Math.max(0,minimum-threshold));
  };
 
  for(let mi=0;mi<months;mi++){
-  const m=shiftMonth(startMonth,mi),rows=(monthOps.get(m)??[]).filter(o=>o.source!=='savings').sort((a,b)=>a.movement_date.localeCompare(b.movement_date));
+  const m=shiftMonth(startMonth,mi),rows=(monthOps.get(m)??[]).filter(o=>o.source!=='savings').sort((a,b)=>a.movement_date.localeCompare(b.movement_date)||a.id.localeCompare(b.id));
+  const audit:RPMonthAudit={month:m,opening:Object.fromEntries([...balances].map(([k,v])=>[k,round(v)])),credits:{},debits:{},budgetDebits:{},savingsUsed:{},savingsDeposited:{},closing:{}};
   const opening=new Map(balances);
-  const firstNeedDate=(checkingId:string,threshold:number)=>{
-   let bal=Number(opening.get(checkingId)??0);let first:string|null=null;
-   const relevant=rows.filter(o=>o.account_id===checkingId).sort((a,b)=>a.movement_date.localeCompare(b.movement_date));
-   for(const o of relevant){bal+=['income','transfer_in'].includes(o.movement_type)?Number(o.amount):-Number(o.amount);if(first===null&&bal<threshold-0.009)first=o.movement_date;}
-   return first;
+  const needInfo=(checkingId:string,threshold:number)=>{
+   let bal=Number(opening.get(checkingId)??0),minimum=bal,first:string|null=bal<threshold-0.009?`${m}-01`:null;
+   for(const o of rows.filter(o=>o.account_id===checkingId).sort((a,b)=>a.movement_date.localeCompare(b.movement_date))){bal=round(bal+delta(o));if(bal<minimum)minimum=bal;if(first===null&&bal<threshold-0.009)first=o.movement_date;}
+   return {minimum,first,required:round(Math.max(0,threshold-minimum))};
   };
-  // Applique les flux réels/théoriques du mois dans l'ordre.
-  for(const o of rows)apply(o);
 
-  // Protection : l'épargne associée est mobilisée avant de laisser le courant sous son seuil.
+  // 1. Flux du mois, une seule fois et dans l'ordre chronologique.
+  for(const o of rows)apply(o,audit);
+
+  // 2. Protection du seuil : besoin calculé sur le minimum intramensuel, pas uniquement sur la clôture.
   for(const checking of input.accounts.filter(a=>a.account_type==='checking')){
-   const p=profileByChecking.get(checking.id);if(!p?.destinationAccountId)continue;const threshold=Math.max(0,Number(p.threshold||0));const bal=Number(balances.get(checking.id)??0);if(bal>=threshold-0.009)continue;
-   const savings=p.destinationAccountId;const avail=mobilizableSavingsForAccount(Number(balances.get(savings)??0),savings,input.savingsBudgets,SAVINGS_FLOOR);const need=round(threshold-bal);const needDate=firstNeedDate(checking.id,threshold)??monthEnd(m);let useDate=addDays(needDate,-2);if(useDate<`${m}-01`)useDate=`${m}-01`;if(m===startMonth&&useDate<input.todayIso)useDate=input.todayIso;if(avail>0)synthetic(m,useDate,savings,checking.id,Math.min(need,avail),'use',`Utilisation d'épargne · ${p.label}`);
+   const p=profileByChecking.get(checking.id);if(!p?.destinationAccountId)continue;const threshold=Math.max(0,Number(p.threshold||0));const info=needInfo(checking.id,threshold);if(info.required<=0.009)continue;
+   const savings=p.destinationAccountId;const avail=mobilizableSavingsForAccount(Number(balances.get(savings)??0),savings,input.savingsBudgets,SAVINGS_FLOOR);if(avail<=0.009)continue;
+   let needDate=info.first??monthEnd(m);let useDate=addDays(needDate,-2);if(useDate<`${m}-01`)useDate=`${m}-01`;if(m===startMonth&&useDate<input.todayIso)useDate=input.todayIso;
+   synthetic(m,useDate,savings,checking.id,Math.min(info.required,avail),'use',`Utilisation d'épargne · ${p.label}`,audit);
   }
-  // Mise de côté : à la clôture mensuelle, tout excédent au-dessus du seuil est envoyé vers l'épargne associée.
+
+  // 3. Mise de côté prudente : seulement l'excédent qui reste sûr sur les 45 jours suivants.
   for(const checking of input.accounts.filter(a=>a.account_type==='checking')){
-   const p=profileByChecking.get(checking.id);if(!p?.destinationAccountId)continue;const threshold=Math.max(0,Number(p.threshold||0));const bal=Number(balances.get(checking.id)??0);const surplus=round(bal-threshold);if(surplus>0)synthetic(m,monthEnd(m),checking.id,p.destinationAccountId,surplus,'deposit',`Versement épargne proposé · ${p.label}`);
+   const p=profileByChecking.get(checking.id);if(!p?.destinationAccountId)continue;const threshold=Math.max(0,Number(p.threshold||0));const balance=Number(balances.get(checking.id)??0);if(balance<=threshold+0.009)continue;
+   const safe45=safeSurplus45(checking.id,threshold,m);const surplus=round(Math.min(balance-threshold,safe45));
+   if(surplus>0.009)synthetic(m,monthEnd(m),checking.id,p.destinationAccountId,surplus,'deposit',`Versement épargne proposé · ${p.label}`,audit);
   }
-  // Invariant physique absolu : aucune épargne négative.
+
+  // 4. Invariants physiques : l'épargne ne peut jamais être négative.
   for(const a of input.accounts.filter(a=>a.account_type==='savings'))if(Number(balances.get(a.id)??0)<0)balances.set(a.id,0);
-  const copy=Object.fromEntries([...balances].map(([k,v])=>[k,round(v)]));const checking=input.accounts.filter(a=>a.account_type==='checking').reduce((s,a)=>s+Number(copy[a.id]??0),0);const savings=input.accounts.filter(a=>a.account_type==='savings').reduce((s,a)=>s+Number(copy[a.id]??0),0);
+  const copy=Object.fromEntries([...balances].map(([k,v])=>[k,round(v)]));audit.closing=copy;audits.push(audit);
+  const checking=input.accounts.filter(a=>a.account_type==='checking').reduce((s,a)=>s+Number(copy[a.id]??0),0);const savings=input.accounts.filter(a=>a.account_type==='savings').reduce((s,a)=>s+Number(copy[a.id]??0),0);
   points.push({date:monthEnd(m),balances:copy,checking:round(checking),savings:round(savings),total:round(checking+savings)});
  }
- return {points,operations:allOps.sort((a,b)=>a.movement_date.localeCompare(b.movement_date)),operationsByMonth:monthOps};
+ return {points,operations:allOps.sort((a,b)=>a.movement_date.localeCompare(b.movement_date)||a.id.localeCompare(b.id)),operationsByMonth:monthOps,audits};
 }
