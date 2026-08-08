@@ -14,7 +14,7 @@ export async function login(formData: FormData) {
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -30,6 +30,12 @@ export async function login(formData: FormData) {
 }
 
   revalidatePath("/", "layout");
+
+  const appMetadata = data.user?.app_metadata ?? {};
+  if (appMetadata.role === "personal" || appMetadata.photo_access !== true) {
+    redirect("/perso?vue=finances");
+  }
+
   redirect("/aujourd-hui");
 }
 

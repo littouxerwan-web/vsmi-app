@@ -19,20 +19,26 @@ type AppLayoutProps = {
 export default async function AppLayout({ children }: AppLayoutProps) {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data, error } = await supabase.auth.getClaims();
+  const claims = data?.claims as
+    | {
+        sub?: string;
+        email?: string;
+        app_metadata?: { role?: string; photo_access?: boolean };
+        user_metadata?: { first_name?: string };
+      }
+    | undefined;
 
-  if (!user) {
+  if (error || !claims?.sub) {
     redirect("/connexion");
   }
 
-  const personalOnly = user.app_metadata?.role === "personal";
-  const photoAccess = user.app_metadata?.photo_access === true;
+  const personalOnly = claims.app_metadata?.role === "personal";
+  const photoAccess = claims.app_metadata?.photo_access === true;
 
   const firstName =
-    typeof user.user_metadata?.first_name === "string"
-      ? user.user_metadata.first_name
+    typeof claims.user_metadata?.first_name === "string"
+      ? claims.user_metadata.first_name
       : null;
 
   return (
@@ -61,7 +67,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
                 </Link>
                 <div className="hidden text-right sm:block">
                   <p className="text-sm font-medium">
-                    {firstName ?? user.email ?? "Utilisateur"}
+                    {firstName ?? claims.email ?? "Utilisateur"}
                   </p>
                   {personalOnly ? <p className="text-xs text-neutral-500">Personnel</p> : null}
                 </div>
