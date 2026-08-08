@@ -69,7 +69,10 @@ export function buildReliableProjection(input:Input){
   }
  }
  for(const p of input.photoPayments){
-  if(p.status!=='expected')continue;const raw=photoDate(p);if(!raw)continue;const date=raw<input.todayIso?input.todayIso:raw;if(date>horizonEnd)continue;const account=p.personal_account_id??input.photoDefaultAccountId;if(!account)continue;
+  // PHOTO: une recette n'est projetée que si elle est encore réellement attendue côté PHOTO
+  // ET qu'elle n'a pas déjà été intégrée manuellement dans PERSO.
+  // `status` = état PERSO; `accounting_status` = état réel du paiement PHOTO.
+  if(p.status!=='expected'||p.accounting_status==='received'||p.accounting_status==='cancelled')continue;const raw=photoDate(p);if(!raw)continue;const date=raw<input.todayIso?input.todayIso:raw;if(date>horizonEnd)continue;const account=p.personal_account_id??input.photoDefaultAccountId;if(!account)continue;
   ops.push({id:`photo-${p.id}`,projected:false,account_id:account,category_id:null,movement_type:'income',label:photoLabel(p),amount:Number(p.amount),movement_date:date,status:'planned',source:'photo',photo:true,photoPayment:p});
  }
  const photoMonthAmount=(m:string)=>input.photoPayments.filter(p=>p.status!=='cancelled'&&String((p.accounting_status==='received'?(p.received_date??p.expected_date):p.expected_date)??'').slice(0,7)===m).reduce((s,p)=>s+Number(p.amount),0);
