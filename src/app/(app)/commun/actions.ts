@@ -2,7 +2,27 @@
 import {revalidatePath} from "next/cache"; import {redirect} from "next/navigation"; import {createClient} from "@/lib/supabase/server";
 const PATH="/commun",t=(f:FormData,k:string)=>String(f.get(k)??"").trim(),num=(f:FormData,k:string)=>Number(t(f,k).replace(",",".")); function fail(m:string):never{redirect(`${PATH}?erreur=${encodeURIComponent(m)}`)} function ok(m:string,v="encours"):never{revalidatePath(PATH);redirect(`${PATH}?vue=${v}&succes=${encodeURIComponent(m)}`)}
 async function db(){const s=await createClient();const {data:{user}}=await s.auth.getUser();if(!user)redirect("/connexion");return {s,user}}
-export async function saveCommonSettings(f:FormData){const {s}=await db(),a=num(f,"income_n1_person_1"),b=num(f,"income_n1_person_2");if(!Number.isFinite(a)||a<0||!Number.isFinite(b)||b<0)fail("Revenus incorrects.");const {error}=await s.from("common_settings").upsert({singleton:true,account_name:t(f,"account_name")||"Compte commun",person_1_name:t(f,"person_1_name")||"Personne 1",person_2_name:t(f,"person_2_name")||"Personne 2",income_n1_person_1:a,income_n1_person_2:b,updated_at:new Date().toISOString()},{onConflict:"singleton"});if(error)fail(error.message);ok("Paramètres enregistrés.",t(f,"return_view")||"encours")}
+export async function saveCommonSettings(f:FormData){
+ const {s}=await db(),a=num(f,"income_n1_person_1"),b=num(f,"income_n1_person_2");
+ const caf=num(f,"caf_credit_amount"),caf1=num(f,"caf_person_1_amount"),caf2=num(f,"caf_person_2_amount");
+ if(!Number.isFinite(a)||a<0||!Number.isFinite(b)||b<0)fail("Revenus incorrects.");
+ if(!Number.isFinite(caf)||caf<0||!Number.isFinite(caf1)||caf1<0||!Number.isFinite(caf2)||caf2<0)fail("Montants CAF incorrects.");
+ if(caf1+caf2>caf+0.005)fail("La CAF affectée aux deux personnes ne peut pas dépasser le crédit CAF total.");
+ const {error}=await s.from("common_settings").upsert({
+   singleton:true,
+   account_name:t(f,"account_name")||"Compte commun",
+   person_1_name:t(f,"person_1_name")||"Personne 1",
+   person_2_name:t(f,"person_2_name")||"Personne 2",
+   income_n1_person_1:a,
+   income_n1_person_2:b,
+   caf_credit_amount:caf,
+   caf_person_1_amount:caf1,
+   caf_person_2_amount:caf2,
+   updated_at:new Date().toISOString()
+ },{onConflict:"singleton"});
+ if(error)fail(error.message);
+ ok("Paramètres enregistrés.",t(f,"return_view")||"encours")
+}
 export async function createCommonSnapshot(f:FormData){const {s,user}=await db(),b=num(f,"balance"),d=t(f,"snapshot_date");if(!d||!Number.isFinite(b))fail("Solde incorrect.");const {error}=await s.from("common_balance_snapshots").upsert({balance:b,snapshot_date:d,created_by:user.id},{onConflict:"snapshot_date"});if(error)fail(error.message);ok("Solde mis à jour.")}
 export async function createCommonCategory(f:FormData){const {s}=await db(),name=t(f,"name"),type=t(f,"movement_type");if(!name||!["income","expense"].includes(type))fail("Catégorie incomplète.");const {error}=await s.from("common_categories").insert({name,movement_type:type});if(error)fail(error.message);ok("Catégorie ajoutée.")}
 export async function createCommonMovement(f:FormData){const {s,user}=await db(),amount=num(f,"amount"),type=t(f,"movement_type"),completed=t(f,"status")==="completed";if(!t(f,"label")||!t(f,"movement_date")||amount<=0)fail("Mouvement incomplet.");const day=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Paris",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());const {error}=await s.from("common_movements").insert({category_id:t(f,"category_id")||null,movement_type:type,label:t(f,"label"),amount,movement_date:t(f,"movement_date"),status:completed?"completed":"planned",completed_date:completed?day:null,completed_at:completed?new Date().toISOString():null,created_by:user.id});if(error)fail(error.message);ok("Mouvement ajouté.")}
