@@ -13,6 +13,9 @@ const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Paris",year:"numer
 function Field({label,name,type="text",defaultValue,...props}:any){
  return <label className="grid gap-1 text-sm"><span className="text-xs font-medium text-neutral-600">{label}</span><input name={name} type={type} defaultValue={defaultValue} {...props} className="rounded-xl border border-black/15 bg-white px-3 py-2.5 outline-none focus:border-black"/></label>
 }
+function SelectField({label,name,defaultValue,options}:any){
+ return <label className="grid gap-1 text-sm"><span className="text-xs font-medium text-neutral-600">{label}</span><select name={name} defaultValue={defaultValue} className="rounded-xl border border-black/15 bg-white px-3 py-2.5 outline-none focus:border-black">{options.map((o:any)=><option key={o[0]} value={o[0]}>{o[1]}</option>)}</select></label>
+}
 
 export default async function ChildrenPage({searchParams}:{searchParams:Promise<any>}){
  const supabase=await createClient();
@@ -35,6 +38,12 @@ export default async function ChildrenPage({searchParams}:{searchParams:Promise<
  const month=today.slice(0,7);
  const monthRows=rows.filter(x=>String(x.expense_date).slice(0,7)===month);
  const monthTotal=monthRows.reduce((a,x)=>a+x.amount,0);
+ const paid1=rows.filter(x=>x.paid_by!=="person_2").reduce((a,x)=>a+x.amount,0);
+ const paid2=rows.filter(x=>x.paid_by==="person_2").reduce((a,x)=>a+x.amount,0);
+ const balance1=paid1-due1;
+ const transferAmount=Math.abs(balance1);
+ const transferFrom=balance1<-.005?(settings?.person_1_name??"Moi"):balance1>.005?(settings?.person_2_name??"Autre parent"):null;
+ const transferTo=balance1<-.005?(settings?.person_2_name??"Autre parent"):balance1>.005?(settings?.person_1_name??"Moi"):null;
 
  return <main className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6 lg:p-8">
   <header className="flex items-center gap-3">
@@ -62,12 +71,13 @@ export default async function ChildrenPage({searchParams}:{searchParams:Promise<
 
   <section className="rounded-2xl border bg-white p-5">
    <div className="flex items-center gap-2"><Plus size={18}/><h2 className="font-semibold">Ajouter une dépense</h2></div>
-   <form action={createChildrenExpense} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+   <form action={createChildrenExpense} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
     <Field label="Dépense" name="label" placeholder="Cantine, vêtements…" required/>
     <Field label="Montant" name="amount" type="number" min=".01" step=".01" required/>
     <Field label="Date" name="expense_date" type="date" defaultValue={today} required/>
+    <SelectField label="Payé par" name="paid_by" defaultValue="person_1" options={[["person_1",settings?.person_1_name??"Moi"],["person_2",settings?.person_2_name??"Autre parent"]]}/>
     <Field label="Note (facultatif)" name="notes"/>
-    <button className="vsmi-press rounded-xl bg-black px-4 py-3 text-sm font-medium text-white sm:col-span-2 lg:col-span-4">Ajouter la dépense</button>
+    <button className="vsmi-press rounded-xl bg-black px-4 py-3 text-sm font-medium text-white sm:col-span-2 lg:col-span-5">Ajouter la dépense</button>
    </form>
   </section>
 
@@ -85,22 +95,37 @@ export default async function ChildrenPage({searchParams}:{searchParams:Promise<
    </div>
   </section>
 
+  <section className="rounded-2xl border bg-white p-5">
+   <h2 className="font-semibold">Montants payés directement</h2>
+   <p className="mt-1 text-sm text-neutral-500">Total des dépenses effectivement avancées par chacun.</p>
+   <div className="mt-4 grid gap-3 sm:grid-cols-2">
+    <div className="rounded-xl bg-neutral-100 p-4"><p className="text-sm text-neutral-500">{settings?.person_1_name??"Moi"}</p><b className="text-2xl">{money(paid1)}</b><p className="mt-1 text-xs text-neutral-500">Part théorique : {money(due1)}</p></div>
+    <div className="rounded-xl bg-neutral-100 p-4"><p className="text-sm text-neutral-500">{settings?.person_2_name??"Autre parent"}</p><b className="text-2xl">{money(paid2)}</b><p className="mt-1 text-xs text-neutral-500">Part théorique : {money(due2)}</p></div>
+   </div>
+  </section>
+
+  <section className="rounded-2xl bg-black p-5 text-white">
+   <h2 className="font-semibold">Régularisation à effectuer</h2>
+   {transferFrom&&transferTo?<><p className="mt-2 text-sm text-neutral-300">{transferFrom} doit verser à {transferTo} :</p><p className="mt-1 text-3xl font-semibold">{money(transferAmount)}</p><p className="mt-2 text-xs text-neutral-400">Après ce versement, la dépense nette supportée par chacun correspond exactement à son prorata selon les revenus.</p></>:<><p className="mt-2 text-2xl font-semibold">Aucune régularisation</p><p className="mt-1 text-sm text-neutral-400">Les paiements directs correspondent déjà aux parts théoriques.</p></>}
+  </section>
+
   <section className="overflow-hidden rounded-2xl border bg-white">
    <div className="border-b px-4 py-3"><h2 className="font-semibold">Dépenses</h2><p className="text-xs text-neutral-500">Chaque dépense est répartie selon le prorata ci-dessus.</p></div>
    {rows.length?rows.map(x=><div key={x.id} className="border-b p-4 last:border-0">
     <div className="flex items-start justify-between gap-4">
-     <div className="min-w-0"><p className="font-medium">{x.label}</p><p className="text-xs text-neutral-500">{new Intl.DateTimeFormat("fr-FR").format(new Date(`${x.expense_date}T12:00:00`))}{x.notes?` · ${x.notes}`:""}</p></div>
+     <div className="min-w-0"><p className="font-medium">{x.label}</p><p className="text-xs text-neutral-500">{new Intl.DateTimeFormat("fr-FR").format(new Date(`${x.expense_date}T12:00:00`))}{x.notes?` · ${x.notes}`:""}</p><p className="mt-1 text-xs font-medium text-[#8B6929]">Payé par {x.paid_by==="person_2"?(settings?.person_2_name??"Autre parent"):(settings?.person_1_name??"Moi")}</p></div>
      <b className="shrink-0">{money(x.amount)}</b>
     </div>
     <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-neutral-500"><span>{settings?.person_1_name??"Moi"} : <b className="text-neutral-800">{money(x.amount*share1)}</b></span><span>{settings?.person_2_name??"Autre parent"} : <b className="text-neutral-800">{money(x.amount*share2)}</b></span></div>
     <details className="mt-3"><summary className="flex cursor-pointer items-center gap-2 text-xs font-medium text-neutral-600"><Pencil size={14}/>Modifier / Supprimer</summary>
-     <form action={updateChildrenExpense} className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+     <form action={updateChildrenExpense} className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
       <input type="hidden" name="id" value={x.id}/>
       <Field label="Dépense" name="label" defaultValue={x.label}/>
       <Field label="Montant" name="amount" type="number" min=".01" step=".01" defaultValue={x.amount}/>
       <Field label="Date" name="expense_date" type="date" defaultValue={x.expense_date}/>
+      <SelectField label="Payé par" name="paid_by" defaultValue={x.paid_by??"person_1"} options={[["person_1",settings?.person_1_name??"Moi"],["person_2",settings?.person_2_name??"Autre parent"]]}/>
       <Field label="Note" name="notes" defaultValue={x.notes??""}/>
-      <button className="rounded-xl bg-black px-3 py-2 text-sm text-white sm:col-span-2 lg:col-span-4">Enregistrer</button>
+      <button className="rounded-xl bg-black px-3 py-2 text-sm text-white sm:col-span-2 lg:col-span-5">Enregistrer</button>
      </form>
      <form action={deleteChildrenExpense.bind(null,x.id)} className="mt-2"><button className="flex items-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50"><Trash2 size={14}/>Supprimer cette dépense</button></form>
     </details>

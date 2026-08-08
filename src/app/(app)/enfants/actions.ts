@@ -39,8 +39,9 @@ export async function createChildrenExpense(f:FormData){
   const {supabase,userId}=await db();
   const amount=number(f,"amount");
   if(!text(f,"label")||!text(f,"expense_date")||!Number.isFinite(amount)||amount<=0) throw new Error("Dépense incomplète.");
+  const paidBy=text(f,"paid_by")==="person_2"?"person_2":"person_1";
   const {error}=await supabase.from("children_expenses").insert({
-    owner_id:userId,label:text(f,"label"),amount,expense_date:text(f,"expense_date"),notes:text(f,"notes")||null
+    owner_id:userId,label:text(f,"label"),amount,expense_date:text(f,"expense_date"),notes:text(f,"notes")||null,paid_by:paidBy
   });
   if(error) throw new Error(error.message);
   done("Dépense ajoutée.");
@@ -50,8 +51,9 @@ export async function updateChildrenExpense(f:FormData){
   const {supabase,userId}=await db();
   const id=text(f,"id"),amount=number(f,"amount");
   if(!id||!text(f,"label")||!text(f,"expense_date")||!Number.isFinite(amount)||amount<=0) throw new Error("Dépense incomplète.");
+  const paidBy=text(f,"paid_by")==="person_2"?"person_2":"person_1";
   const {error}=await supabase.from("children_expenses").update({
-    label:text(f,"label"),amount,expense_date:text(f,"expense_date"),notes:text(f,"notes")||null,updated_at:new Date().toISOString()
+    label:text(f,"label"),amount,expense_date:text(f,"expense_date"),notes:text(f,"notes")||null,paid_by:paidBy,updated_at:new Date().toISOString()
   }).eq("id",id).eq("owner_id",userId);
   if(error) throw new Error(error.message);
   done("Dépense modifiée.");
