@@ -1,11 +1,15 @@
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, Camera, CircleDollarSign, HeartHandshake, LayoutDashboard, Sparkles, TrendingUp } from "lucide-react";
+import { CalendarDays, Camera, CircleDollarSign, HeartHandshake, LayoutDashboard, Sparkles, TrendingUp, UsersRound, WalletCards } from "lucide-react";
 
 const persoNavigation = [
   { href: "/perso?vue=finances", label: "En cours", icon: CircleDollarSign },
   { href: "/perso?vue=projection", label: "Projection", icon: TrendingUp },
   { href: "/perso?vue=epargne", label: "Potentiel d’épargne", icon: Sparkles },
+];
+const commonNavigation = [
+  { href: "/commun?vue=encours", label: "En cours", icon: WalletCards },
+  { href: "/commun?vue=budget", label: "Budget", icon: CircleDollarSign },
 ];
 const photoNavigation = [
   { href: "/aujourd-hui", label: "Aujourd’hui", icon: LayoutDashboard },
@@ -24,7 +28,7 @@ export function AppNavigation({ photoAccess = false }: { photoAccess?: boolean }
     <div className="flex justify-center border-b border-white/10 px-7 py-7"><Link href="/perso?vue=finances"><Image src="/vsmi-logo.gif" alt="Vue sur mer imprenable" width={150} height={150} priority className="h-auto w-36 object-contain"/></Link></div>
     <nav className="flex-1 px-4 py-6">
       <p className="mb-2 px-4 text-[10px] font-semibold uppercase tracking-[.2em] text-neutral-500">Personnel</p>
-      <div className="space-y-1">{persoNavigation.map(item=><NavLink key={item.href} item={item}/>)}</div>
+      <div className="space-y-1">{persoNavigation.map(item=><NavLink key={item.href} item={item}/>)}</div><details className="group mt-6" open><summary className="flex cursor-pointer list-none items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-white hover:bg-white/10"><span className="flex items-center gap-3"><UsersRound size={19}/>COMMUN</span><span className="text-lg transition group-open:rotate-45">+</span></summary><div className="mt-1 space-y-1 border-l border-white/15 pl-2">{commonNavigation.map(item=><NavLink key={item.href} item={item}/>)}</div></details>
       {photoAccess ? <details className="group mt-6" open>
         <summary className="flex cursor-pointer list-none items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-white hover:bg-white/10"><span className="flex items-center gap-3"><Camera size={19}/>PHOTO</span><span className="text-lg transition group-open:rotate-45">+</span></summary>
         <div className="mt-1 space-y-1 border-l border-white/15 pl-2">{photoNavigation.map(item=><NavLink key={item.href} item={item}/>)}</div>
