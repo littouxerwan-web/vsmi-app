@@ -9,6 +9,9 @@ import { PrivacyModeToggle } from "@/components/privacy-mode-toggle";
 import { InteractionFeedback } from "@/components/interaction-feedback";
 import { createClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type AppLayoutProps = {
   children: React.ReactNode;
 };
