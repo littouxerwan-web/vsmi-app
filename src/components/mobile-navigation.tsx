@@ -56,14 +56,14 @@ export function MobileNavigation({ photoAccess = false }: { photoAccess?: boolea
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`vsmi-press flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-semibold transition ${
+      className={`vsmi-press flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-medium leading-none transition ${
         active
           ? "bg-[#C7A45A]/14 text-[#9A7530]"
           : "text-neutral-500"
       }`}
     >
       <Icon size={ICON_SIZE} strokeWidth={1.9} />
-      <span className="whitespace-nowrap">{label}</span>
+      <span className="whitespace-nowrap text-[10px] font-medium leading-none">{label}</span>
     </Link>
   );
 
@@ -160,14 +160,14 @@ export function MobileNavigation({ photoAccess = false }: { photoAccess?: boolea
             type="button"
             onClick={() => setPanel(panel === "common" ? null : "common")}
             aria-expanded={panel === "common"}
-            className={`vsmi-press flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-semibold transition ${
+            className={`vsmi-press flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-medium leading-none transition ${
               pathname === "/commun" || panel === "common"
                 ? "bg-[#4F8F86]/12 text-[#3D776F]"
                 : "text-neutral-500"
             }`}
           >
             <UsersRound size={ICON_SIZE} strokeWidth={1.9} />
-            <span>Commun</span>
+            <span className="text-[10px] font-medium leading-none">Commun</span>
           </button>
 
           {photoAccess ? (
@@ -175,14 +175,14 @@ export function MobileNavigation({ photoAccess = false }: { photoAccess?: boolea
               type="button"
               onClick={() => setPanel(panel === "photo" ? null : "photo")}
               aria-expanded={panel === "photo"}
-              className={`vsmi-press flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-semibold transition ${
+              className={`vsmi-press flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-medium leading-none transition ${
                 (pathname !== "/perso" && pathname !== "/commun") || panel === "photo"
                   ? "bg-neutral-900 text-white"
                   : "text-neutral-500"
               }`}
             >
               <Camera size={ICON_SIZE} strokeWidth={1.9} />
-              <span>Photo</span>
+              <span className="text-[10px] font-medium leading-none">Photo</span>
             </button>
           ) : (
             <div aria-hidden="true" />

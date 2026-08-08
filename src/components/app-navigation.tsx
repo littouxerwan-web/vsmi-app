@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Sparkles,
   TrendingUp,
+  UserRound,
   UsersRound,
   WalletCards,
 } from "lucide-react";
@@ -79,16 +80,22 @@ export function AppNavigation({ photoAccess = false }: { photoAccess?: boolean }
       </div>
 
       <nav className="flex-1 px-4 py-6">
-        <p className="mb-2 px-4 text-[11px] font-semibold uppercase tracking-[.22em] text-[#C7A45A]">
-          PERSO
-        </p>
-        <div className="space-y-1">
-          {persoNavigation.map((item) => (
-            <NavLink key={item.href} item={item} accent="perso" />
-          ))}
-        </div>
+        <details className="group" open>
+          <summary className="vsmi-press flex cursor-pointer list-none items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-[#C7A45A] transition hover:bg-[#C7A45A]/14">
+            <span className="flex items-center gap-3">
+              <UserRound size={19} />
+              PERSO
+            </span>
+            <span className="text-lg transition group-open:rotate-45">+</span>
+          </summary>
+          <div className="mt-1 space-y-1 border-l border-[#C7A45A]/45 pl-2">
+            {persoNavigation.map((item) => (
+              <NavLink key={item.href} item={item} accent="perso" />
+            ))}
+          </div>
+        </details>
 
-        <details className="group mt-6" open>
+        <details className="group mt-4" open>
           <summary className="vsmi-press flex cursor-pointer list-none items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-[#79B8AE] transition hover:bg-[#4F8F86]/18">
             <span className="flex items-center gap-3">
               <UsersRound size={19} />
@@ -104,7 +111,7 @@ export function AppNavigation({ photoAccess = false }: { photoAccess?: boolean }
         </details>
 
         {photoAccess ? (
-          <details className="group mt-6" open>
+          <details className="group mt-4" open>
             <summary className="vsmi-press flex cursor-pointer list-none items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
               <span className="flex items-center gap-3">
                 <Camera size={19} />
