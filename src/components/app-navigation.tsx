@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import {
+  Baby,
   CalendarDays,
   Camera,
   CircleDollarSign,
@@ -13,7 +14,7 @@ import {
   WalletCards,
 } from "lucide-react";
 
-const persoNavigation = [
+const basePersoNavigation = [
   { href: "/perso?vue=finances", label: "En cours", icon: CircleDollarSign },
   { href: "/perso?vue=projection", label: "Projection", icon: TrendingUp },
   { href: "/perso?vue=epargne", label: "Potentiel d’épargne", icon: Sparkles },
@@ -63,7 +64,10 @@ function NavLink({
   );
 }
 
-export function AppNavigation({ photoAccess = false }: { photoAccess?: boolean }) {
+export function AppNavigation({ photoAccess = false, childrenAccess = false }: { photoAccess?: boolean; childrenAccess?: boolean }) {
+  const persoNavigation = childrenAccess
+    ? [...basePersoNavigation, { href: "/enfants", label: "Enfants", icon: Baby }]
+    : basePersoNavigation;
   return (
     <aside className="hidden min-h-screen w-64 shrink-0 bg-black text-white lg:flex lg:flex-col">
       <div className="flex justify-center border-b border-white/10 px-7 py-7">

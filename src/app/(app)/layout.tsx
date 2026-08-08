@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { LogOut, Settings } from "lucide-react";
+import { Baby, LogOut, Settings } from "lucide-react";
 import { redirect } from "next/navigation";
 import { logout } from "@/app/connexion/actions";
 import { AppNavigation } from "@/components/app-navigation";
@@ -35,6 +35,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
 
   const personalOnly = claims.app_metadata?.role === "personal";
   const photoAccess = claims.app_metadata?.photo_access === true;
+  const childrenAccess = photoAccess && !personalOnly;
 
   const firstName =
     typeof claims.user_metadata?.first_name === "string"
@@ -46,7 +47,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
       <InteractionFeedback />
       <div className="min-h-screen bg-[#f5f3ef] text-neutral-950">
       <div className="flex min-h-screen">
-        <AppNavigation photoAccess={photoAccess} />
+        <AppNavigation photoAccess={photoAccess} childrenAccess={childrenAccess} />
 
         <div className="min-w-0 flex-1">
           <header className="sticky top-0 z-30 border-b border-black/10 bg-white/95 backdrop-blur">
@@ -56,6 +57,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
               </Link>
 
               <div className="flex items-center gap-2 sm:gap-4">
+                {childrenAccess ? <Link href="/enfants" aria-label="Ouvrir Enfants" title="Enfants" className="vsmi-press grid size-10 place-items-center rounded-full border border-[#C7A45A]/30 bg-[#C7A45A]/10 text-[#8B6929] lg:hidden"><Baby size={18}/></Link> : null}
                 <PrivacyModeToggle />
                 <Link
                   href="/perso?vue=parametres"
