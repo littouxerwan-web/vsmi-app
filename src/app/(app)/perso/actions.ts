@@ -521,6 +521,21 @@ export async function updateMovement(fd: FormData) {
   refresh("Mouvement modifié.");
 }
 
+export async function updateMovementAnalysisEssential(fd: FormData) {
+  const { supabase, user } = await auth();
+  const movementId = text(fd, "movement_id");
+  if (!movementId) fail("Mouvement introuvable.");
+  const isEssential = text(fd, "is_essential") === "on";
+  const { error } = await supabase
+    .from("personal_movements")
+    .update({ is_essential_override: isEssential })
+    .eq("id", movementId)
+    .eq("owner_id", user.id)
+    .eq("movement_type", "expense");
+  if (error) fail(error.message);
+  revalidatePath(PATH, "page");
+}
+
 export async function assignMovementCategory(fd: FormData) {
   const { supabase, user } = await auth();
   const movementId = text(fd, "movement_id");
