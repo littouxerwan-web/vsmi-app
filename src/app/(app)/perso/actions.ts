@@ -108,7 +108,7 @@ export async function createTransfer(fd: FormData) {
 export async function createRecurrence(fd: FormData) {
   const { supabase, user } = await auth();
   const movementType = text(fd, "movement_type"); const amount = number(fd, "amount");
-  const payload = { owner_id: user.id, account_id: text(fd, "account_id"), destination_account_id: optional(fd, "destination_account_id"), category_id: optional(fd, "category_id"), movement_type: movementType, label: text(fd, "label"), amount, frequency: text(fd, "frequency"), interval_count: Math.max(1, Math.trunc(number(fd, "interval_count") || 1)), start_date: text(fd, "start_date"), end_date: optional(fd, "end_date"), annual_change_percent: number(fd, "annual_change_percent") || 0, notes: optional(fd, "notes") };
+  const payload = { owner_id: user.id, account_id: text(fd, "account_id"), destination_account_id: optional(fd, "destination_account_id"), category_id: optional(fd, "category_id"), movement_type: movementType, label: text(fd, "label"), amount, frequency: text(fd, "frequency"), interval_count: Math.max(1, Math.trunc(number(fd, "interval_count") || 1)), start_date: text(fd, "start_date"), end_date: optional(fd, "end_date"), annual_change_percent: number(fd, "annual_change_percent") || 0, is_essential: movementType === "expense" && text(fd, "is_essential") === "on", exclude_from_analysis: text(fd, "exclude_from_analysis") === "on", notes: optional(fd, "notes") };
   if (!payload.account_id || !payload.label || !payload.start_date || !Number.isFinite(amount) || amount <= 0) fail("Complète la récurrence.");
   if (movementType === "transfer" && !payload.destination_account_id) fail("Choisis le compte d’épargne destinataire.");
   if (movementType === "transfer" && payload.destination_account_id === payload.account_id) fail("Le compte émetteur et le compte destinataire doivent être différents.");
@@ -414,6 +414,7 @@ export async function updateCategory(fd: FormData) {
   const id = text(fd, "id"); const name = text(fd, "name"); const accountId = optional(fd, "account_id"); const monthlyBudget = Math.max(0, number(fd, "monthly_budget") || 0);
   const isPrimaryIncome = text(fd, "movement_type") === "income" && text(fd, "is_primary_income") === "on";
   const isEssential = text(fd, "movement_type") !== "income" && text(fd, "is_essential") === "on";
+  const excludeFromAnalysis = text(fd, "exclude_from_analysis") === "on";
 // Une catégorie simple n'a aucune période. Un budget est mensuel entre
 // sa date de début et sa date de fin facultative.
 const isBudget = monthlyBudget > 0;
@@ -427,7 +428,7 @@ const isBudget = monthlyBudget > 0;
   if (!id || !name) fail("Catégorie incomplète.");
   if (budgetStartDate && budgetEndDate && budgetEndDate < budgetStartDate) fail("La date de fin du budget doit être postérieure à sa date de début.");
   if (isPrimaryIncome) { const { error: resetError } = await supabase.from("personal_categories").update({ is_primary_income: false }).eq("owner_id", user.id).eq("is_primary_income", true).neq("id", id); if (resetError) fail(resetError.message); }
-  const { error } = await supabase.from("personal_categories").update({ name, monthly_budget: monthlyBudget, account_id: accountId, budget_period: budgetPeriod, budget_month: budgetMonth, budget_start_date: budgetStartDate, budget_end_date: budgetEndDate, is_primary_income: isPrimaryIncome, is_essential: isEssential }).eq("id", id).eq("owner_id", user.id);
+  const { error } = await supabase.from("personal_categories").update({ name, monthly_budget: monthlyBudget, account_id: accountId, budget_period: budgetPeriod, budget_month: budgetMonth, budget_start_date: budgetStartDate, budget_end_date: budgetEndDate, is_primary_income: isPrimaryIncome, is_essential: isEssential, exclude_from_analysis: excludeFromAnalysis }).eq("id", id).eq("owner_id", user.id);
   if (error) fail(error.message);
 
 revalidatePath(PATH, "page");
@@ -485,7 +486,8 @@ export async function updateRecurrence(fd: FormData) {
   if (!["income","expense","transfer"].includes(movementType)) fail("Type de mouvement régulier incorrect.");
   const { error } = await supabase.from("personal_recurrences").update({
     label: text(fd, "label"), amount, movement_type: movementType, account_id: accountId,
-    category_id: categoryId, end_date: optional(fd, "end_date"), is_active: text(fd, "is_active") !== "false"
+    category_id: categoryId, end_date: optional(fd, "end_date"), is_active: text(fd, "is_active") !== "false",
+    is_essential: movementType === "expense" && text(fd, "is_essential") === "on", exclude_from_analysis: text(fd, "exclude_from_analysis") === "on"
   }).eq("id", id).eq("owner_id", user.id);
   if (error) fail(error.message); refresh("Mouvement régulier modifié.");
 }
