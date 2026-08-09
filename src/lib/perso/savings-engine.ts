@@ -1,4 +1,4 @@
-import { calculateBudgetRemaining, createCategoryRootResolver, isBudgetActiveForMonth, resolveBudgetAccountId, type BudgetAccount } from "./budget-engine";
+import { budgetFlowImpact, calculateBudgetRemaining, createCategoryRootResolver, isBudgetActiveForMonth, resolveBudgetAccountId, type BudgetAccount } from "./budget-engine";
 
 export type SavingsAccount = BudgetAccount;
 export type SavingsCategory = { id:string; parent_id:string|null; monthly_budget:number; account_id?:string|null; movement_type?:string; budget_period?:"monthly"|"specific_month"; budget_month?:string|null; budget_start_date?:string|null; budget_end_date?:string|null; is_primary_income?:boolean; is_essential?:boolean };
@@ -81,15 +81,15 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
  const flows=new Map<string,DayFlow>(),spent=new Map<string,number>();
  const flow=(date:string)=>{const f=flows.get(date)??{income:0,expense:0,primaryIncome:0,budget:0};flows.set(date,f);return f};
  const income=(date:string,amount:number,primary=false)=>{const f=flow(date);f.income+=amount;if(primary)f.primaryIncome+=amount};
- const registerSpent=(date:string,amount:number,categoryId?:string|null)=>{const r=root(categoryId??null);if(r){const k=`${date.slice(0,7)}:${r}`;spent.set(k,(spent.get(k)??0)+amount)}};
- const expense=(date:string,amount:number,categoryId?:string|null,budget=false)=>{const f=flow(date);f.expense+=amount;if(budget)f.budget+=amount;else registerSpent(date,amount,categoryId)};
+ const registerSpent=(date:string,movementType:string,amount:number,categoryId?:string|null)=>{const r=root(categoryId??null);if(r){const k=`${date.slice(0,7)}:${r}`;spent.set(k,(spent.get(k)??0)+budgetFlowImpact({movement_type:movementType,amount}))}};
+ const expense=(date:string,amount:number,categoryId?:string|null,budget=false)=>{const f=flow(date);f.expense+=amount;if(budget)f.budget+=amount;else registerSpent(date,"expense",amount,categoryId)};
 
  // Les opérations pointées sont déjà incluses dans initialChecking. Les non pointées
  // restent dues même si leur date est passée. Les virements du couple courant/épargne
  // sont traités séparément pour faire évoluer les deux soldes simultanément.
  for(const m of input.movements){
   if(m.movement_date>endDate||m.account_id!==input.sourceAccountId||m.status==="cancelled")continue;
-  if(m.movement_date>=requestedStart&&["expense","income"].includes(m.movement_type)&&["planned","completed"].includes(m.status))registerSpent(m.movement_date,m.movement_type==="income"?-Number(m.amount):Number(m.amount),m.category_id);
+  if(m.movement_date>=requestedStart&&["expense","income"].includes(m.movement_type)&&["planned","completed"].includes(m.status))registerSpent(m.movement_date,m.movement_type,Number(m.amount),m.category_id);
   if(m.status!=="planned"|| (m.transfer_group_id&&pairedGroups.has(m.transfer_group_id)))continue;
   const effectiveDate=m.movement_date<simulationStart?simulationStart:m.movement_date;
   if(effectiveDate>endDate)continue;
@@ -104,7 +104,7 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
    const date=iso(d),month=date.slice(0,7);
    if(date>=simulationStart&&(!r.end_date||date<=r.end_date)&&!excluded.has(`${r.id}:${date}`)&&!materialized.has(`${r.id}:${date}`)){
     const a=overrides.get(`${r.id}:${month}`)??Number(r.amount);
-    if(r.movement_type==="income"&&r.account_id===input.sourceAccountId){income(date,a,primaryRoots.has(root(r.category_id)??""));registerSpent(date,-a,r.category_id)}
+    if(r.movement_type==="income"&&r.account_id===input.sourceAccountId){income(date,a,primaryRoots.has(root(r.category_id)??""));registerSpent(date,"income",a,r.category_id)}
     else if(r.movement_type==="expense"&&r.account_id===input.sourceAccountId)expense(date,a,r.category_id);
     else if(r.movement_type==="transfer"){
      if(r.account_id===input.sourceAccountId){const f=flow(date);f.expense+=a}

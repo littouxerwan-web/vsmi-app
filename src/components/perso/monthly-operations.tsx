@@ -14,7 +14,7 @@ import {
   toggleWeddingPayment,
   updateMovement,
 } from "@/app/(app)/perso/actions";
-import { isBudgetActiveForMonth } from "@/lib/perso/budget-engine";
+import { calculateBudgetUsage, isBudgetActiveForMonth } from "@/lib/perso/budget-engine";
 
 type Account={id:string;name:string;color?:string|null};
 type Category={id:string;name:string;parent_id:string|null;monthly_budget:number;movement_type?:string;account_id?:string|null;budget_period?:"monthly"|"specific_month";budget_month?:string|null;budget_start_date?:string|null;budget_end_date?:string|null};
@@ -66,7 +66,7 @@ export function MonthlyOperations({accounts,categories,movements,recurrences,ove
  // Les filtres de recherche/type/statut sont strictement visuels : ils ne doivent jamais
  // modifier le budget consommé ni, indirectement, la prévision de solde.
  const budgetOps=accountFilter==="all"?ops:ops.filter(o=>o.account_id===accountFilter);
- const budgets=categories.filter(c=>!c.parent_id&&Number(c.monthly_budget||0)>0&&isBudgetActiveForMonth(c,month)&&(accountFilter==="all"||c.account_id===accountFilter)).map(c=>{const spent=budgetOps.filter(o=>["expense","income"].includes(o.movement_type)&&rootFor(o.category_id)===c.id).reduce((sum,o)=>sum+(o.movement_type==="income"?-1:1)*Number(o.amount),0);return {...c,spent,remaining:Math.max(0,Number(c.monthly_budget)-spent)};});
+ const budgets=categories.filter(c=>!c.parent_id&&Number(c.monthly_budget||0)>0&&isBudgetActiveForMonth(c,month)&&(accountFilter==="all"||c.account_id===accountFilter)).map(c=>{const linked=budgetOps.filter(o=>rootFor(o.category_id)===c.id);const usage=calculateBudgetUsage(Number(c.monthly_budget),linked);return {...c,spent:usage.spent,remaining:usage.remaining};});
  const isCredit=(o:Operation)=>o.movement_type==="income"||o.movement_type==="transfer_in";
  const isDebit=(o:Operation)=>o.movement_type==="expense"||o.movement_type==="transfer"||o.movement_type==="transfer_out";
  const checkedCredits=visibleOps.filter(o=>o.status==="completed"&&isCredit(o)).reduce((s,o)=>s+Number(o.amount),0)+visiblePhotos.filter(p=>p.status==="received").reduce((s,p)=>s+Number(p.amount),0);

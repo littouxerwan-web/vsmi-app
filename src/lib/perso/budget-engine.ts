@@ -62,6 +62,28 @@ export function isBudgetActiveForMonth(
   return true;
 }
 
+
+export type BudgetFlow = { movement_type: string; amount: number };
+
+export function budgetFlowImpact(flow: BudgetFlow): number {
+  const amount = Number(flow.amount || 0);
+  if (["expense", "transfer_out"].includes(flow.movement_type)) return amount;
+  if (["income", "transfer_in"].includes(flow.movement_type)) return -amount;
+  return 0;
+}
+
+export function calculateBudgetUsage(
+  monthlyBudget: number,
+  flows: BudgetFlow[],
+): { netUsed: number; spent: number; remaining: number } {
+  const netUsed = flows.reduce((sum, flow) => sum + budgetFlowImpact(flow), 0);
+  const spent = Math.max(0, netUsed);
+  return {
+    netUsed,
+    spent,
+    remaining: calculateBudgetRemaining(monthlyBudget, spent),
+  };
+}
 export function calculateBudgetRemaining(
   monthlyBudget: number,
   spentAmount: number,

@@ -6,7 +6,7 @@ import { AlertTriangle, Baby, BarChart3, Camera, Check, Pencil, Search, Shopping
 import { acceptSavingsProposal, deleteItem, deleteSavingsProposal, excludeRecurrenceOccurrence, setRecurrenceOverride, toggleUrssafContribution, toggleWeddingPayment, updateMovement, updateSavingsProposalAmount } from "@/app/(app)/perso/actions";
 import { mobilizableSavingsForAccount, type SavingsBudgetAllocation, type SavingsProposalDecision } from "@/lib/perso/savings-engine";
 import { buildReliableProjection } from "@/lib/perso/reliable-projection-engine";
-import { isBudgetActiveForMonth } from "@/lib/perso/budget-engine";
+import { calculateBudgetUsage, isBudgetActiveForMonth } from "@/lib/perso/budget-engine";
 
 type Account={id:string;name:string;account_type:"checking"|"savings";is_default?:boolean;color?:string|null};
 type Category={id:string;name:string;parent_id:string|null;monthly_budget:number;movement_type?:string;account_id?:string|null;budget_period?:"monthly"|"specific_month";budget_month?:string|null;budget_start_date?:string|null;budget_end_date?:string|null;is_primary_income?:boolean};
@@ -79,7 +79,7 @@ export function ProjectionView({accounts,categories,snapshots,movements,recurren
    },new Map<string,ProjectedOperation>())
    .values(),
  );
- const monthBudgets=budgetRoots.filter(b=>isBudgetActiveForMonth(b,month)&&(accountId==="all"||budgetTarget(b)===accountId)).map(b=>{const linked=monthOps.filter(o=>rootFor(o.category_id)===b.id&&o.source!=="budget");const netUsed=linked.reduce((s,o)=>s+(["expense","transfer_out"].includes(o.movement_type)?Number(o.amount):["income","transfer_in"].includes(o.movement_type)?-Number(o.amount):0),0);const spent=Math.max(0,netUsed);return {...b,spent,remaining:Math.max(0,Number(b.monthly_budget)-spent)};});
+ const monthBudgets=budgetRoots.filter(b=>isBudgetActiveForMonth(b,month)&&(accountId==="all"||budgetTarget(b)===accountId)).map(b=>{const linked=monthOps.filter(o=>rootFor(o.category_id)===b.id&&o.source!=="budget");const usage=calculateBudgetUsage(Number(b.monthly_budget),linked);return {...b,spent:usage.spent,remaining:usage.remaining};});
  const monthSummary=useMemo(()=>{
   const visible=monthOps;
   const isCredit=(o:ProjectedOperation)=>["income","transfer_in"].includes(o.movement_type);

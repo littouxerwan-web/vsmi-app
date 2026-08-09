@@ -1,4 +1,4 @@
-import { isBudgetActiveForMonth } from './budget-engine';
+import { calculateBudgetUsage, isBudgetActiveForMonth } from './budget-engine';
 import { mobilizableSavingsForAccount, type SavingsBudgetAllocation, type SavingsProposalDecision } from './savings-engine';
 
 export type RPAccount={id:string;name:string;account_type:'checking'|'savings';is_default?:boolean};
@@ -85,11 +85,9 @@ export function buildReliableProjection(input:Input){
  for(let i=0;i<months;i++){
   const m=shiftMonth(startMonth,i);
   for(const b of input.categories.filter(c=>!c.parent_id&&Number(c.monthly_budget)>0&&isBudgetActiveForMonth(c,m))){
-   const target=b.account_id??defaultChecking;if(!target)continue;let netUsed=0;
-   for(const o of ops.filter(o=>o.movement_date.slice(0,7)===m&&root(o.category_id)===b.id)){
-    if(['expense','transfer_out'].includes(o.movement_type))netUsed+=Number(o.amount);else if(['income','transfer_in'].includes(o.movement_type))netUsed-=Number(o.amount);
-   }
-   const remaining=round(Math.max(0,Number(b.monthly_budget)-Math.max(0,netUsed)));
+   const target=b.account_id??defaultChecking;if(!target)continue;
+   const linked=ops.filter(o=>o.movement_date.slice(0,7)===m&&root(o.category_id)===b.id&&o.source!=="budget");
+   const {remaining}=calculateBudgetUsage(Number(b.monthly_budget),linked);
    if(remaining>0)ops.push({id:`budget-${b.id}-${m}`,projected:true,account_id:target,category_id:b.id,movement_type:'expense',label:`Budget restant · ${b.name??'Budget'}`,amount:remaining,movement_date:monthEnd(m),status:'planned',source:'budget'});
   }
  }
