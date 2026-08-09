@@ -76,7 +76,7 @@ export async function createMovement(fd: FormData) {
   const completedDate = status === "completed"
     ? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())
     : null;
-  const payload = { owner_id: user.id, account_id: text(fd, "account_id"), category_id: optional(fd, "category_id"), movement_type: movementType, label: text(fd, "label"), amount, movement_date: movementDate, status, completed_date: completedDate, completed_at: status === "completed" ? new Date().toISOString() : null, notes: optional(fd, "notes") };
+  const payload = { owner_id: user.id, account_id: text(fd, "account_id"), category_id: optional(fd, "category_id"), movement_type: movementType, label: text(fd, "label"), amount, movement_date: movementDate, status, completed_date: completedDate, completed_at: status === "completed" ? new Date().toISOString() : null, exclude_from_analysis: text(fd, "exclude_from_analysis") === "on", notes: optional(fd, "notes") };
   if (!payload.account_id || !payload.label || !payload.movement_date || !Number.isFinite(amount) || amount <= 0) fail("Complète les informations du mouvement.");
   if (!["income", "expense"].includes(movementType)) fail("Type de mouvement incorrect.");
   const { error } = await supabase.from("personal_movements").insert(payload);
@@ -510,14 +510,74 @@ export async function updateMovement(fd: FormData) {
   const movementDate = text(fd, "movement_date");
   const accountId = text(fd, "account_id");
   const categoryId = optional(fd, "category_id");
+  const excludeFromAnalysis = text(fd, "exclude_from_analysis") === "on";
   if (!id || !label || !accountId || !movementDate || !Number.isFinite(amount) || amount <= 0) fail("Mouvement incomplet.");
   const { error } = await supabase
     .from("personal_movements")
-    .update({ label, amount, movement_date: movementDate, account_id: accountId, category_id: categoryId })
+    .update({ label, amount, movement_date: movementDate, account_id: accountId, category_id: categoryId, exclude_from_analysis: excludeFromAnalysis })
     .eq("id", id)
     .eq("owner_id", user.id);
   if (error) fail(error.message);
   refresh("Mouvement modifié.");
+}
+
+export async function assignMovementCategory(fd: FormData) {
+  const { supabase, user } = await auth();
+  const movementId = text(fd, "movement_id");
+  const categoryId = text(fd, "category_id");
+  if (!movementId || !categoryId) fail("Choisis une catégorie.");
+  const { error } = await supabase
+    .from("personal_movements")
+    .update({ category_id: categoryId })
+    .eq("id", movementId)
+    .eq("owner_id", user.id);
+  if (error) fail(error.message);
+  revalidatePath(PATH, "page");
+}
+
+export async function createCategoryAndAssignMovement(fd: FormData) {
+  const { supabase, user } = await auth();
+  const movementId = text(fd, "movement_id");
+  const categoryName = text(fd, "category_name");
+  if (!movementId || !categoryName) fail("Indique un nom de catégorie.");
+
+  const { data: movement, error: movementError } = await supabase
+    .from("personal_movements")
+    .select("id,movement_type,account_id")
+    .eq("id", movementId)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (movementError) fail(movementError.message);
+  if (!movement || !["income", "expense"].includes(movement.movement_type)) fail("Mouvement introuvable.");
+
+  const { data: category, error: categoryError } = await supabase
+    .from("personal_categories")
+    .insert({
+      owner_id: user.id,
+      name: categoryName,
+      movement_type: movement.movement_type,
+      parent_id: null,
+      monthly_budget: 0,
+      account_id: movement.account_id,
+      budget_period: "monthly",
+      is_active: true,
+      is_essential: false,
+      exclude_from_analysis: false,
+    })
+    .select("id")
+    .single();
+  if (categoryError) fail(categoryError.message);
+
+  const { error: updateError } = await supabase
+    .from("personal_movements")
+    .update({ category_id: category.id })
+    .eq("id", movementId)
+    .eq("owner_id", user.id);
+  if (updateError) {
+    await supabase.from("personal_categories").delete().eq("id", category.id).eq("owner_id", user.id);
+    fail(updateError.message);
+  }
+  revalidatePath(PATH, "page");
 }
 
 export async function excludeRecurrenceOccurrence(recurrenceId: string, occurrenceDate: string) {
