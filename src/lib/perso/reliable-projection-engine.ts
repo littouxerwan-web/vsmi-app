@@ -122,7 +122,15 @@ export function buildReliableProjection(input:Input){
   const out:RPOperation={id:`${group}-out`,projected:true,transfer_group_id:group,account_id:source,category_id:null,movement_type:'transfer_out',label,amount,movement_date:date,status:'planned',source:'savings',savingsProposal:meta};
   const inn:RPOperation={...out,id:`${group}-in`,account_id:dest,movement_type:'transfer_in'};
   apply(out);apply(inn);allOps.push(out,inn);monthOps.set(m,[...(monthOps.get(m)??[]),out,inn]);
-  if(kind==='use')audit.savingsUsed[dest]=round((audit.savingsUsed[dest]??0)+amount);else audit.savingsDeposited[source]=round((audit.savingsDeposited[source]??0)+amount);
+  if(kind==='use'){
+   // Impact signé sur les DEUX comptes : sortie de l'épargne, entrée sur le courant.
+   audit.savingsUsed[source]=round((audit.savingsUsed[source]??0)-amount);
+   audit.savingsUsed[dest]=round((audit.savingsUsed[dest]??0)+amount);
+  }else{
+   // Impact signé sur les DEUX comptes : sortie du courant, entrée sur l'épargne.
+   audit.savingsDeposited[source]=round((audit.savingsDeposited[source]??0)-amount);
+   audit.savingsDeposited[dest]=round((audit.savingsDeposited[dest]??0)+amount);
+  }
   return amount;
  };
  const delta=(o:RPOperation)=>['income','transfer_in'].includes(o.movement_type)?Number(o.amount):-Number(o.amount);
