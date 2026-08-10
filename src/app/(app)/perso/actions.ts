@@ -22,8 +22,12 @@ export async function createAccount(fd: FormData) {
   const name = text(fd, "name"); const accountType = text(fd, "account_type"); const color = text(fd, "color") || "#dbeafe";
   if (!name) fail("Indique le nom du compte.");
   if (!["checking", "savings", "crypto"].includes(accountType)) fail("Type de compte incorrect.");
-  const { count } = await supabase.from("personal_accounts").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("account_type", accountType);
-  const { error } = await supabase.from("personal_accounts").insert({ owner_id: user.id, name, account_type: accountType, color, is_default: (count ?? 0) === 0 });
+  const [{ count }, { data: lastRows }] = await Promise.all([
+    supabase.from("personal_accounts").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("account_type", accountType),
+    supabase.from("personal_accounts").select("display_order").eq("owner_id", user.id).eq("is_active", true).order("display_order", { ascending: false }).limit(1),
+  ]);
+  const nextDisplayOrder = Number((lastRows?.[0] as any)?.display_order ?? -1) + 1;
+  const { error } = await supabase.from("personal_accounts").insert({ owner_id: user.id, name, account_type: accountType, color, display_order: nextDisplayOrder, is_default: (count ?? 0) === 0 });
   if (error) fail(error.message); refresh("Compte ajouté.");
 }
 
@@ -399,6 +403,35 @@ export async function completeRecurrenceOccurrence(recurrenceId: string, occurre
     if (error) fail(error.message);
   }
   refresh("Échéance pointée et intégrée au solde à date.");
+}
+
+
+export async function moveAccount(fd: FormData) {
+  const { supabase, user } = await auth();
+  const id = text(fd, "id");
+  const direction = text(fd, "direction");
+  if (!id || !["up", "down"].includes(direction)) fail("Déplacement de compte incorrect.");
+  const { data: rows, error: loadError } = await supabase
+    .from("personal_accounts")
+    .select("id,display_order")
+    .eq("owner_id", user.id)
+    .eq("is_active", true)
+    .order("display_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (loadError) fail(loadError.message);
+  const ordered = (rows ?? []).map((row: any, index: number) => ({ ...row, effective_order: Number(row.display_order ?? index) }));
+  const currentIndex = ordered.findIndex((row: any) => row.id === id);
+  const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+  if (currentIndex < 0 || targetIndex < 0 || targetIndex >= ordered.length) refresh("Ordre des comptes inchangé.");
+  const current = ordered[currentIndex];
+  const target = ordered[targetIndex];
+  const currentOrder = Number(current.display_order ?? currentIndex);
+  const targetOrder = Number(target.display_order ?? targetIndex);
+  const { error: firstError } = await supabase.from("personal_accounts").update({ display_order: targetOrder }).eq("id", current.id).eq("owner_id", user.id);
+  if (firstError) fail(firstError.message);
+  const { error: secondError } = await supabase.from("personal_accounts").update({ display_order: currentOrder }).eq("id", target.id).eq("owner_id", user.id);
+  if (secondError) fail(secondError.message);
+  refresh("Ordre des comptes modifié.");
 }
 
 export async function updateAccount(fd: FormData) {
