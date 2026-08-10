@@ -21,7 +21,7 @@ export async function createAccount(fd: FormData) {
   const { supabase, user } = await auth();
   const name = text(fd, "name"); const accountType = text(fd, "account_type"); const color = text(fd, "color") || "#dbeafe";
   if (!name) fail("Indique le nom du compte.");
-  if (!["checking", "savings"].includes(accountType)) fail("Type de compte incorrect.");
+  if (!["checking", "savings", "crypto"].includes(accountType)) fail("Type de compte incorrect.");
   const { count } = await supabase.from("personal_accounts").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("account_type", accountType);
   const { error } = await supabase.from("personal_accounts").insert({ owner_id: user.id, name, account_type: accountType, color, is_default: (count ?? 0) === 0 });
   if (error) fail(error.message); refresh("Compte ajouté.");
