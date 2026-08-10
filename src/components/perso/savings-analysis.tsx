@@ -15,7 +15,7 @@ import {
   type SavingsBudgetAllocation,
 } from "@/lib/perso/savings-engine";
 
-type Account = { id: string; name: string; account_type: "checking" | "savings" };
+type Account = { id: string; name: string; account_type: "checking" | "savings" | "crypto" };
 type Profile = {
   id: "profile-1" | "profile-2";
   label: string;

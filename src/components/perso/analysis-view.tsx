@@ -459,7 +459,7 @@ export function AnalysisView({
                     <input type="hidden" name="movement_id" value={m.id} />
                     <select name="category_id" required className="min-h-10 min-w-0 flex-1 rounded-xl border border-black/10 bg-white px-3 text-sm">
                       <option value="">Choisir une catégorie</option>
-                      {compatible.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      {compatible.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.movement_type==="income"?"Crédit":"Débit"}</option>)}
                     </select>
                     <button className="rounded-xl bg-black px-3 text-sm font-medium text-white">Affecter</button>
                   </form>

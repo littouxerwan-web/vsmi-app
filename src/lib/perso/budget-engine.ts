@@ -12,7 +12,7 @@ export type BudgetCategory = {
 
 export type BudgetAccount = {
   id: string;
-  account_type: "checking" | "savings";
+  account_type: "checking" | "savings" | "crypto";
   is_default?: boolean;
 };
 

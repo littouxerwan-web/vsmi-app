@@ -5,7 +5,7 @@ import { AlertTriangle, ArrowRight, PiggyBank, Plus, ShieldCheck, Sparkles, Tras
 import { applySavingsBudgetReallocation, createSavingsBudget, deleteSavingsBudget, updateSavingsBudget } from "@/app/(app)/perso/actions";
 import { mobilizableSavingsForAccount, savingsBudgetAmount, type SavingsBudgetAllocation } from "@/lib/perso/savings-engine";
 
-type Account={id:string;name:string;account_type:"checking"|"savings";color?:string|null};
+type Account={id:string;name:string;account_type:"checking"|"savings"|"crypto";color?:string|null};
 type ForecastRow={month:string;accountId:string;savings:number;savingsUsed:number;proposal?:number;proposalDate?:string|null;savingsUseDate?:string|null};
 type Props={accounts:Account[];budgets:SavingsBudgetAllocation[];currentBalances:Record<string,number>;forecastRows:ForecastRow[]};
 type BudgetPoint={date:string;total:number;mobile:number;budgetValues:Record<string,number>};

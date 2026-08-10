@@ -6,7 +6,7 @@ create table if not exists public.personal_accounts (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   name text not null,
-  account_type text not null default 'checking' check (account_type in ('checking','savings')),
+  account_type text not null default 'checking' check (account_type in ('checking','savings','crypto')),
   is_default boolean not null default false,
   is_active boolean not null default true,
   created_at timestamptz not null default now(),

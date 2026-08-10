@@ -1,7 +1,7 @@
 import { calculateBudgetUsage, isBudgetActiveForMonth } from './budget-engine';
 import { mobilizableSavingsForAccount, type SavingsBudgetAllocation, type SavingsProposalDecision } from './savings-engine';
 
-export type RPAccount={id:string;name:string;account_type:'checking'|'savings';is_default?:boolean};
+export type RPAccount={id:string;name:string;account_type:'checking'|'savings'|'crypto';is_default?:boolean};
 export type RPCategory={id:string;name?:string;parent_id:string|null;monthly_budget:number;account_id?:string|null;budget_period?:'monthly'|'specific_month';budget_month?:string|null;budget_start_date?:string|null;budget_end_date?:string|null};
 export type RPMovement={id:string;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;completed_date?:string|null;recurrence_id?:string|null;transfer_group_id?:string|null;source_type?:string|null;source_key?:string|null;virtual_source?:boolean};
 export type RPRecurrence={id:string;account_id:string;destination_account_id:string|null;category_id:string|null;movement_type:'income'|'expense'|'transfer';label:string;amount:number;frequency:'weekly'|'monthly'|'quarterly'|'yearly';interval_count:number;start_date:string;end_date:string|null;annual_change_percent:number};
@@ -12,7 +12,7 @@ export type RPUrssaf={contribution_month:string;account_id:string|null;is_comple
 export type RPProfile={id:string;label:string;sourceAccountId:string|null;destinationAccountId:string|null;threshold:number};
 export type RPSavingsMeta={sourceAccountId:string;destinationAccountId:string;sourceMonth:string;automaticAmount:number;status:'automatic'|'pending'|'accepted';kind:'deposit'|'use';previousTransferGroupId?:string|null};
 export type RPOperation={id:string;projected:boolean;recurrence_id?:string|null;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;transfer_group_id?:string|null;source_type?:string|null;source_key?:string|null;virtual_source?:boolean;photo?:boolean;photoPayment?:RPPhoto;savingsProposal?:RPSavingsMeta;source?:'movement'|'recurrence'|'photo'|'urssaf'|'budget'|'savings'};
-export type RPPoint={date:string;balances:Record<string,number>;checking:number;savings:number;total:number};
+export type RPPoint={date:string;balances:Record<string,number>;checking:number;savings:number;crypto:number;total:number};
 export type RPMonthAudit={month:string;opening:Record<string,number>;credits:Record<string,number>;debits:Record<string,number>;budgetDebits:Record<string,number>;savingsUsed:Record<string,number>;savingsDeposited:Record<string,number>;closing:Record<string,number>;};
 
 type Input={
@@ -163,8 +163,8 @@ export function buildReliableProjection(input:Input){
   // 4. Invariants physiques : l'épargne ne peut jamais être négative.
   for(const a of input.accounts.filter(a=>a.account_type==='savings'))if(Number(balances.get(a.id)??0)<0)balances.set(a.id,0);
   const copy=Object.fromEntries([...balances].map(([k,v])=>[k,round(v)]));audit.closing=copy;audits.push(audit);
-  const checking=input.accounts.filter(a=>a.account_type==='checking').reduce((s,a)=>s+Number(copy[a.id]??0),0);const savings=input.accounts.filter(a=>a.account_type==='savings').reduce((s,a)=>s+Number(copy[a.id]??0),0);
-  points.push({date:monthEnd(m),balances:copy,checking:round(checking),savings:round(savings),total:round(checking+savings)});
+  const checking=input.accounts.filter(a=>a.account_type==='checking').reduce((s,a)=>s+Number(copy[a.id]??0),0);const savings=input.accounts.filter(a=>a.account_type==='savings').reduce((s,a)=>s+Number(copy[a.id]??0),0);const crypto=input.accounts.filter(a=>a.account_type==='crypto').reduce((s,a)=>s+Number(copy[a.id]??0),0);
+  points.push({date:monthEnd(m),balances:copy,checking:round(checking),savings:round(savings),crypto:round(crypto),total:round(checking+savings+crypto)});
  }
  return {points,operations:allOps.sort((a,b)=>a.movement_date.localeCompare(b.movement_date)||a.id.localeCompare(b.id)),operationsByMonth:monthOps,audits};
 }

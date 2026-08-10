@@ -1,6 +1,7 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import Image from "next/image";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 type FeedbackState = "idle" | "pending" | "done";
@@ -42,10 +43,14 @@ function readScrollPosition(pathname: string) {
 
 export function InteractionFeedback() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const routeKey = `${pathname}?${searchParams.toString()}`;
+  const [navigationPending, setNavigationPending] = useState(false);
   const [state, setState] = useState<FeedbackState>("idle");
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    setNavigationPending(false);
     const targetY = readScrollPosition(pathname);
     if (targetY === null) return;
 
@@ -60,7 +65,7 @@ export function InteractionFeedback() {
     setState("done");
     const timer = setTimeout(() => setState("idle"), 1200);
     return () => clearTimeout(timer);
-  }, [pathname]);
+  }, [routeKey, pathname]);
 
   useEffect(() => {
     const clearResetTimer = () => {
@@ -118,15 +123,31 @@ export function InteractionFeedback() {
       window.setTimeout(() => target.removeAttribute("data-vsmi-pressed"), 240);
     };
 
+    const onClick = (event: MouseEvent) => {
+      const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
+      if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (link.target === "_blank" || link.hasAttribute("download")) return;
+      let next: URL;
+      try { next = new URL(link.href, window.location.href); } catch { return; }
+      if (next.origin !== window.location.origin) return;
+      const current = `${window.location.pathname}${window.location.search}`;
+      const target = `${next.pathname}${next.search}`;
+      if (target === current && (!next.hash || next.hash === window.location.hash)) return;
+      setNavigationPending(true);
+      scheduleIdle(8000);
+    };
+
     document.addEventListener("submit", onSubmit, true);
     document.addEventListener("change", onChange, true);
     document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("click", onClick, true);
 
     return () => {
       clearResetTimer();
       document.removeEventListener("submit", onSubmit, true);
       document.removeEventListener("change", onChange, true);
       document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("click", onClick, true);
     };
   }, []);
 
@@ -170,7 +191,17 @@ export function InteractionFeedback() {
         }
       `}</style>
 
-      {state !== "idle" ? (
+
+      {navigationPending ? (
+        <div className="fixed inset-0 z-[300] grid place-items-center bg-[#f5f3ef]/96 backdrop-blur-sm" aria-live="polite" aria-label="Chargement de la page">
+          <div className="flex flex-col items-center gap-4">
+            <Image src="/vsmi-logo.gif" alt="VSMI" width={180} height={180} priority unoptimized className="h-auto w-32 object-contain sm:w-40" />
+            <span className="h-1 w-24 overflow-hidden rounded-full bg-black/10"><span className="block h-full w-1/2 animate-pulse rounded-full bg-black/70" /></span>
+          </div>
+        </div>
+      ) : null}
+
+      {state !== "idle" && !navigationPending ? (
         <div
           aria-live="polite"
           className="pointer-events-none fixed left-1/2 top-3 z-[200] -translate-x-1/2 rounded-full border border-black/10 bg-black px-4 py-2 text-xs font-semibold text-white shadow-xl"
