@@ -1,7 +1,6 @@
-# Correctif lissage des budgets
+# Correctif cohérence épargne / détail graphique
 
-- Le reliquat de chaque budget est réparti quotidiennement sur les jours restants du mois.
-- Mois courant : répartition d'aujourd'hui jusqu'au dernier jour.
-- Mois futurs : répartition du 1er au dernier jour.
-- Les mouvements fixes, récurrents et prévus conservent leur date réelle.
-- Le total réparti reste strictement égal au reliquat, au centime près.
+- L'assistant de trésorerie sélectionne désormais l'utilisation d'épargne du mois courant uniquement, comme le graphique.
+- Le détail sous le graphique est synthétisé : total des budgets restants lissés, nombre de jours, moyenne quotidienne et période.
+- Les transferts d'épargne restent affichés séparément et lisiblement.
+- Aucun changement de schéma Supabase.

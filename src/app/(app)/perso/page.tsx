@@ -133,7 +133,7 @@ export default async function PersoPage({searchParams}:{searchParams:Promise<SP>
  });
  const savingsOps=(analysisProjection.operations as any[]).filter(o=>o.source==="savings"&&o.movement_type==="transfer_out"&&o.savingsProposal);
  const depositFor=(source:string|null,dest:string|null)=>savingsOps.find(o=>o.savingsProposal?.kind==="deposit"&&o.savingsProposal?.sourceAccountId===source&&o.savingsProposal?.destinationAccountId===dest&&o.movement_date.startsWith(currentMonth));
- const useFor=(source:string|null,dest:string|null)=>savingsOps.find(o=>o.savingsProposal?.kind==="use"&&o.savingsProposal?.sourceAccountId===dest&&o.savingsProposal?.destinationAccountId===source);
+ const useFor=(source:string|null,dest:string|null)=>savingsOps.find(o=>o.savingsProposal?.kind==="use"&&o.savingsProposal?.sourceAccountId===dest&&o.savingsProposal?.destinationAccountId===source&&o.movement_date.startsWith(currentMonth));
  const deposit1=depositFor(savingsSourceAccountId,savingsDestinationAccountId), use1=useFor(savingsSourceAccountId,savingsDestinationAccountId);
  const deposit2=depositFor(savingsSourceAccount2Id,savingsDestinationAccount2Id), use2=useFor(savingsSourceAccount2Id,savingsDestinationAccount2Id);
  const reliableSavingsForecastRows=(analysisProjection.audits as any[]).flatMap(a=>[
