@@ -1,7 +1,13 @@
-# Correctif Aujourd’hui — Après épargne
+# VSMI — Correctif lisibilité Noir / Or / Argent
 
-- Aligne le moteur du dashboard Aujourd’hui sur le même horizon de projection (60 mois) que la vue En cours.
-- Le montant « Après épargne » reste issu de `audit.closing[accountId]` : aucun nouveau calcul financier n’est créé.
-- Corrige les retours Supabase `null` sur les collections pour éviter les erreurs `.map`, `.filter` et `is not iterable` en dev.
-- Aligne visuellement le libellé « Après épargne », le pictogramme et le montant, sans troncature.
-- Aucun changement de base de données / Supabase.
+Correctif strictement visuel.
+
+- Blocs neutres éclaircis vers des graphites chauds.
+- Fonds sémantiques rouge / vert / ambre / bleu / violet plus lisibles.
+- Boutons principaux en or.
+- Boutons secondaires graphite avec liseré discret.
+- Champs de formulaire mieux détachés du fond.
+- Cases à cocher blanches cerclées de noir, coche noire.
+- Les couleurs personnalisées des comptes restent pilotées par Paramètres.
+- Aucun calcul, moteur de projection, action serveur ou donnée métier modifié.
+- Aucune migration Supabase.
