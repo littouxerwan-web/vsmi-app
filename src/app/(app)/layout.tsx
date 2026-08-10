@@ -45,7 +45,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
   return (
     <>
       <InteractionFeedback />
-      <div className="min-h-screen bg-[#f5f3ef] text-neutral-950">
+      <div className="vsmi-lux-theme min-h-screen bg-[#0B0B0B] text-[#F4F4F2]">
       <div className="flex min-h-screen">
         <AppNavigation photoAccess={photoAccess} childrenAccess={childrenAccess} />
 

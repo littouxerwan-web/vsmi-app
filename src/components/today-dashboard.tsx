@@ -183,22 +183,27 @@ export function TodayDashboard({
                   <div className="mt-auto space-y-1.5">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="text-[9px] uppercase tracking-[.11em] opacity-55">Aujourd’hui</span>
-                      <strong className="truncate text-[12px] font-semibold sm:text-[13px]">{money(tile.balance)}</strong>
+                      <strong className="whitespace-nowrap text-[11px] font-semibold tabular-nums sm:text-[13px]">{money(tile.balance)}</strong>
                     </div>
                     <div className="flex items-baseline justify-between gap-2 border-t border-current/10 pt-1.5">
                       <span className="text-[9px] uppercase tracking-[.11em] opacity-55">Fin de mois</span>
-                      <strong className={`truncate text-[12px] font-semibold sm:text-[13px] ${tile.monthEnd < 0 ? "text-red-500" : ""}`}>{money(tile.monthEnd)}</strong>
+                      <strong className={`whitespace-nowrap text-[11px] font-semibold tabular-nums sm:text-[13px] ${tile.monthEnd < 0 ? "text-red-500" : ""}`}>{money(tile.monthEnd)}</strong>
                     </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[9px] uppercase tracking-[.11em] opacity-55">Après épargne</span>
-                      <span className="flex min-w-0 items-center justify-end gap-1.5">
-                        <strong className={`truncate text-[12px] font-semibold sm:text-[13px] ${tile.afterSavings < 0 ? "text-red-500" : tone === "black" && tile.type === "checking" ? "text-[#E3C97E]" : ""}`}>{money(tile.afterSavings)}</strong>
+                    <div className="grid grid-cols-[minmax(0,1fr)_minmax(6.8rem,auto)] items-center gap-3">
+                      <span className="flex min-w-0 items-center gap-1 whitespace-nowrap text-[9px] uppercase tracking-[.08em] opacity-55">
+                        <span>Après épargne</span>
                         {useProposed > 0 ? (
                           <span className="pointer-events-auto inline-flex shrink-0" title={`Utilisation d’épargne proposée : ${money(useProposed)}`} aria-label={`Utilisation d’épargne proposée : ${money(useProposed)}`}>
-                            <PiggyBank size={15} className={tone === "black" ? "text-[#E3C97E]" : "text-red-700"}/>
+                            <PiggyBank size={13} className={tone === "black" ? "text-[#E3C97E]" : "text-red-700"}/>
                           </span>
                         ) : null}
                       </span>
+                      <strong
+                        className={`min-w-[6.8rem] whitespace-nowrap text-right text-[11px] font-semibold tabular-nums sm:text-[13px] ${tile.afterSavings < 0 ? "text-red-500" : tone === "black" && tile.type === "checking" ? "text-[#E3C97E]" : ""}`}
+                        title={money(tile.afterSavings)}
+                      >
+                        {money(tile.afterSavings)}
+                      </strong>
                     </div>
                   </div>
 

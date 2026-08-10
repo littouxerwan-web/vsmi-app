@@ -193,10 +193,10 @@ export function InteractionFeedback() {
 
 
       {navigationPending ? (
-        <div className="fixed inset-0 z-[300] grid place-items-center bg-[#f5f3ef]/96 backdrop-blur-sm" aria-live="polite" aria-label="Chargement de la page">
+        <div className="fixed inset-0 z-[300] grid place-items-center bg-[#0B0B0B]/96 backdrop-blur-sm" aria-live="polite" aria-label="Chargement de la page">
           <div className="flex flex-col items-center gap-4">
             <Image src="/vsmi-logo.gif" alt="VSMI" width={180} height={180} priority unoptimized className="h-auto w-32 object-contain sm:w-40" />
-            <span className="h-1 w-24 overflow-hidden rounded-full bg-black/10"><span className="block h-full w-1/2 animate-pulse rounded-full bg-black/70" /></span>
+            <span className="h-1 w-24 overflow-hidden rounded-full bg-white/10"><span className="block h-full w-1/2 animate-pulse rounded-full bg-[#D2AE57]" /></span>
           </div>
         </div>
       ) : null}
@@ -204,7 +204,7 @@ export function InteractionFeedback() {
       {state !== "idle" && !navigationPending ? (
         <div
           aria-live="polite"
-          className="pointer-events-none fixed left-1/2 top-3 z-[200] -translate-x-1/2 rounded-full border border-black/10 bg-black px-4 py-2 text-xs font-semibold text-white shadow-xl"
+          className="pointer-events-none fixed left-1/2 top-3 z-[200] -translate-x-1/2 rounded-full border border-[#D2AE57]/35 bg-[#111111] px-4 py-2 text-xs font-semibold text-[#E3C97E] shadow-xl"
         >
           {state === "pending" ? "Action en cours…" : "✓ Mise à jour effectuée"}
         </div>

@@ -145,32 +145,147 @@ input[type="radio"]:not(:disabled) {
   }
 }
 
-/* Responsive iPhone : évite les débordements natifs des contrôles WebKit et
-   garde les vues PERSO dans la largeur utile de l'écran. */
+/* --------------------------------------------------------------------------
+   VSMI V2 — thème Noir / Or / Argent
+   Couche strictement visuelle : aucune règle métier ni donnée n'est modifiée.
+   -------------------------------------------------------------------------- */
+.vsmi-lux-theme {
+  --vsmi-bg: #0b0b0b;
+  --vsmi-panel: #141414;
+  --vsmi-panel-2: #1a1a1a;
+  --vsmi-border: rgba(255,255,255,.10);
+  --vsmi-border-strong: rgba(210,174,87,.30);
+  --vsmi-gold: #d2ae57;
+  --vsmi-gold-soft: #e3c97e;
+  --vsmi-silver: #d7d9dd;
+  --vsmi-text: #f4f4f2;
+  --vsmi-muted: #9d9d9a;
+  background: var(--vsmi-bg);
+  color: var(--vsmi-text);
+}
+
+.vsmi-lux-theme #app-private-content {
+  background:
+    radial-gradient(circle at 88% -10%, rgba(210,174,87,.08), transparent 26rem),
+    var(--vsmi-bg);
+  color: var(--vsmi-text);
+}
+
+.vsmi-lux-theme #app-private-content > main,
+.vsmi-lux-theme #app-private-content > div,
+.vsmi-lux-theme #app-private-content main {
+  background-color: transparent;
+}
+
+/* Surfaces neutres existantes : passage au graphite sans toucher aux alertes colorées. */
+.vsmi-lux-theme #app-private-content .bg-white,
+.vsmi-lux-theme #app-private-content .bg-neutral-50,
+.vsmi-lux-theme #app-private-content .bg-neutral-100,
+.vsmi-lux-theme #app-private-content .bg-neutral-200 {
+  background-color: var(--vsmi-panel) !important;
+  color: var(--vsmi-text) !important;
+}
+
+.vsmi-lux-theme #app-private-content [class*="border-black/"],
+.vsmi-lux-theme #app-private-content [class*="border-neutral-"] {
+  border-color: var(--vsmi-border) !important;
+}
+
+.vsmi-lux-theme #app-private-content .text-neutral-950,
+.vsmi-lux-theme #app-private-content .text-neutral-900,
+.vsmi-lux-theme #app-private-content .text-neutral-800,
+.vsmi-lux-theme #app-private-content .text-neutral-700 {
+  color: var(--vsmi-text) !important;
+}
+
+.vsmi-lux-theme #app-private-content .text-neutral-600,
+.vsmi-lux-theme #app-private-content .text-neutral-500,
+.vsmi-lux-theme #app-private-content .text-neutral-400 {
+  color: var(--vsmi-muted) !important;
+}
+
+/* Titres et repères de section. */
+.vsmi-lux-theme #app-private-content h1,
+.vsmi-lux-theme #app-private-content h2,
+.vsmi-lux-theme #app-private-content h3 {
+  letter-spacing: -.025em;
+}
+
+.vsmi-lux-theme #app-private-content :is(section, article, details)[class*="shadow"] {
+  box-shadow: 0 14px 40px rgba(0,0,0,.22) !important;
+}
+
+/* Formulaires — contraste homogène iPhone / iPad / desktop. */
+.vsmi-lux-theme #app-private-content input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.vsmi-lux-theme #app-private-content select,
+.vsmi-lux-theme #app-private-content textarea {
+  background-color: #101010 !important;
+  color: var(--vsmi-text) !important;
+  border-color: rgba(255,255,255,.14) !important;
+  color-scheme: dark;
+}
+
+.vsmi-lux-theme #app-private-content input::placeholder,
+.vsmi-lux-theme #app-private-content textarea::placeholder {
+  color: rgba(244,244,242,.38) !important;
+}
+
+.vsmi-lux-theme #app-private-content select option {
+  background: #101010;
+  color: var(--vsmi-text);
+}
+
+/* Boutons principaux existants : noir profond + liseré or discret. */
+.vsmi-lux-theme #app-private-content button.bg-black,
+.vsmi-lux-theme #app-private-content a.bg-black {
+  background-color: #111 !important;
+  border-color: rgba(210,174,87,.35) !important;
+  box-shadow: inset 0 0 0 1px rgba(210,174,87,.12);
+}
+
+.vsmi-lux-theme #app-private-content button.bg-black:hover,
+.vsmi-lux-theme #app-private-content a.bg-black:hover {
+  background-color: #181818 !important;
+}
+
+/* Tables et listes : séparateurs argentés doux. */
+.vsmi-lux-theme #app-private-content table {
+  color: var(--vsmi-text);
+}
+
+.vsmi-lux-theme #app-private-content tr[class*="border-"],
+.vsmi-lux-theme #app-private-content div[class*="divide-"] > * + * {
+  border-color: var(--vsmi-border) !important;
+}
+
+/* Les cartes modernes gagnent un rayon plus premium, sans changer leur taille. */
+.vsmi-lux-theme #app-private-content .rounded-2xl,
+.vsmi-lux-theme #app-private-content .rounded-3xl {
+  border-radius: 1rem !important;
+}
+
+/* Les panneaux informatifs colorés conservent leur sémantique et gagnent un léger contraste. */
+.vsmi-lux-theme #app-private-content [class*="bg-sky-50"],
+.vsmi-lux-theme #app-private-content [class*="bg-emerald-50"],
+.vsmi-lux-theme #app-private-content [class*="bg-amber-50"],
+.vsmi-lux-theme #app-private-content [class*="bg-red-50"] {
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+}
+
+/* Accent de focus unique. */
+.vsmi-lux-theme :where(button, a, summary, input, select, textarea):focus-visible {
+  outline-color: var(--vsmi-gold) !important;
+}
+
+/* iPhone : densité légèrement accrue, sans écraser les contrôles tactiles. */
 @media (max-width: 639px) {
-  #app-private-content main,
-  #app-private-content main > div {
-    min-width: 0;
-    max-width: 100%;
+  .vsmi-lux-theme #app-private-content main {
+    padding-left: .75rem;
+    padding-right: .75rem;
   }
 
-  #app-private-content input,
-  #app-private-content select,
-  #app-private-content textarea {
-    min-width: 0;
-    max-width: 100%;
-  }
-
-  #app-private-content input[type="date"],
-  #app-private-content input[type="month"],
-  #app-private-content input[type="datetime-local"],
-  #app-private-content input[type="time"] {
-    width: 100%;
-    min-width: 0;
-  }
-
-  #app-private-content details,
-  #app-private-content summary {
-    min-width: 0;
+  .vsmi-lux-theme #app-private-content .rounded-2xl,
+  .vsmi-lux-theme #app-private-content .rounded-3xl {
+    border-radius: .9rem !important;
   }
 }

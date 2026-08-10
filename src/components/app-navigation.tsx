@@ -48,7 +48,7 @@ function NavLink({
     accent === "perso"
       ? "hover:bg-[#C7A45A]/14 hover:text-[#E0C27E]"
       : accent === "common"
-        ? "hover:bg-[#4F8F86]/18 hover:text-[#8BC7BE]"
+        ? "hover:bg-white/10 hover:text-[#D9DADD]"
         : "hover:bg-white/10 hover:text-white";
 
   return (
@@ -95,14 +95,14 @@ export function AppNavigation({ photoAccess = false, childrenAccess = false }: {
         </details>
 
         <details className="group mt-4" open>
-          <summary className="vsmi-press flex cursor-pointer list-none items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-[#79B8AE] transition hover:bg-[#4F8F86]/18">
+          <summary className="vsmi-press flex cursor-pointer list-none items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-[#D9DADD] transition hover:bg-white/10">
             <span className="flex items-center gap-3">
               <UsersRound size={19} />
               COMMUN
             </span>
             <span className="text-lg transition group-open:rotate-45">+</span>
           </summary>
-          <div className="mt-1 space-y-1 border-l border-[#4F8F86]/45 pl-2">
+          <div className="mt-1 space-y-1 border-l border-white/20 pl-2">
             {commonNavigation.map((item) => (
               <NavLink key={item.href} item={item} accent="common" />
             ))}
@@ -131,7 +131,7 @@ export function AppNavigation({ photoAccess = false, childrenAccess = false }: {
         <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.16em]">
           <span className="text-[#C7A45A]">PERSO</span>
           <span className="text-neutral-600">•</span>
-          <span className="text-[#79B8AE]">COMMUN</span>
+          <span className="text-[#D9DADD]">COMMUN</span>
           {photoAccess ? (
             <>
               <span className="text-neutral-600">•</span>
