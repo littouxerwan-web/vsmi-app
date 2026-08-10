@@ -88,7 +88,27 @@ export function buildReliableProjection(input:Input){
    const target=b.account_id??defaultChecking;if(!target)continue;
    const linked=ops.filter(o=>o.movement_date.slice(0,7)===m&&root(o.category_id)===b.id&&o.source!=="budget");
    const {remaining}=calculateBudgetUsage(Number(b.monthly_budget),linked);
-   if(remaining>0)ops.push({id:`budget-${b.id}-${m}`,projected:true,account_id:target,category_id:b.id,movement_type:'expense',label:`Budget restant · ${b.name??'Budget'}`,amount:remaining,movement_date:monthEnd(m),status:'planned',source:'budget'});
+   if(remaining>0){
+    // Le reliquat budgétaire n'est pas débité artificiellement en bloc le dernier jour.
+    // Il est réparti sur chaque jour restant du mois afin de produire une trajectoire
+    // de trésorerie prudente mais réaliste. Pour le mois courant, le lissage commence
+    // aujourd'hui ; pour les mois futurs, il commence le 1er.
+    const firstDay=m===startMonth?input.todayIso:`${m}-01`;
+    const lastDay=monthEnd(m);
+    const days:string[]=[];
+    for(let d=firstDay;d<=lastDay;d=addDays(d,1))days.push(d);
+    if(days.length){
+     const cents=Math.round(remaining*100);
+     const base=Math.floor(cents/days.length);
+     let remainder=cents-base*days.length;
+     days.forEach((date,index)=>{
+      const dayCents=base+(remainder>0?1:0);
+      if(remainder>0)remainder--;
+      if(dayCents<=0)return;
+      ops.push({id:`budget-${b.id}-${m}-${index}`,projected:true,account_id:target,category_id:b.id,movement_type:'expense',label:`Budget restant · ${b.name??'Budget'}`,amount:dayCents/100,movement_date:date,status:'planned',source:'budget'});
+     });
+    }
+   }
   }
  }
 

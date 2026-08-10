@@ -1,9 +1,7 @@
-# Correctif projection d'épargne
+# Correctif lissage des budgets
 
-Ce correctif supprime le cumul artificiel des mêmes liquidités :
-
-- chaque proposition d'épargne est désormais réinjectée dans le solde projeté des mois suivants ;
-- chaque reprise d'épargne est également réinjectée ;
-- la vue générale ne recumule plus des propositions déjà incluses dans l'épargne projetée ;
-- un même excédent ne peut donc plus être proposé plusieurs mois de suite ;
-- les découverts artificiels provoqués par l'empilement des virements disparaissent.
+- Le reliquat de chaque budget est réparti quotidiennement sur les jours restants du mois.
+- Mois courant : répartition d'aujourd'hui jusqu'au dernier jour.
+- Mois futurs : répartition du 1er au dernier jour.
+- Les mouvements fixes, récurrents et prévus conservent leur date réelle.
+- Le total réparti reste strictement égal au reliquat, au centime près.
