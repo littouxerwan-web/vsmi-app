@@ -22,13 +22,25 @@ export function AccountBalanceCards({accounts,audits,operations,currentMonth}:{a
  const chart=useMemo(()=>{
   if(!selected)return null;
   const audit=auditByMonth.get(month);if(!audit)return null;
-  let balance=Number(audit.opening[selected.id]??0);
+  const opening=Number(audit.opening[selected.id]??0);
+  let balance=opening;
   const rows=operations.filter(o=>o.account_id===selected.id&&o.movement_date.startsWith(month)).sort((a,b)=>a.movement_date.localeCompare(b.movement_date)||a.id.localeCompare(b.id));
-  const pts=[{date:`${month}-01`,balance,label:"Ouverture"}];
-  for(const o of rows){balance+=isCredit(o.movement_type)?Number(o.amount):-Number(o.amount);pts.push({date:o.movement_date,balance,label:o.label});}
+  const daily=new Map<string,{date:string;balance:number;label:string}>();
+  for(const o of rows){
+   balance+=isCredit(o.movement_type)?Number(o.amount):-Number(o.amount);
+   // Une seule valeur par date : le solde après la dernière opération de la journée.
+   // Cela évite les segments verticaux artificiels lorsque plusieurs mouvements
+   // partagent la même date (notamment le 1er et le dernier jour du mois).
+   daily.set(o.movement_date,{date:o.movement_date,balance,label:o.label});
+  }
   const closing=Number(audit.closing[selected.id]??balance);
   const lastDay=daysInMonth(month);
-  if(pts.at(-1)?.date!==`${month}-${String(lastDay).padStart(2,"0")}`)pts.push({date:`${month}-${String(lastDay).padStart(2,"0")}`,balance:closing,label:"Clôture"});
+  const firstDate=`${month}-01`;
+  const lastDate=`${month}-${String(lastDay).padStart(2,"0")}`;
+  if(!daily.has(firstDate))daily.set(firstDate,{date:firstDate,balance:opening,label:"Ouverture"});
+  // La clôture du moteur fait foi pour le dernier point du mois.
+  daily.set(lastDate,{date:lastDate,balance:closing,label:"Clôture"});
+  const pts=[...daily.values()].sort((a,b)=>a.date.localeCompare(b.date));
 
   const rawMin=Math.min(...pts.map(p=>p.balance),0),rawMax=Math.max(...pts.map(p=>p.balance),0);
   let axisMin=Math.floor(rawMin/500)*500,axisMax=Math.ceil(rawMax/500)*500;
