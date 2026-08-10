@@ -57,7 +57,7 @@ export function ProjectionView({accounts,categories,snapshots,movements,recurren
   return {account,firstRisk:firstRisk??null,minimum};
  }),[accounts,points,todayIso,currentBalances,profiles]);
  const visibleSummaries=accountSummaries.filter(item=>accountId==="all"||item.account.id===accountId);
- const savingsBudgetAlerts=accounts.filter(a=>a.account_type==="savings").flatMap(account=>{const rows=savingsBudgets.filter(b=>b.account_id===account.id&&b.allow_recovery&&b.protection!=="untouchable"&&Number(b.critical_threshold??0)>0);if(!rows.length)return [];const threshold=Math.max(...rows.map(b=>Number(b.critical_threshold??0)));const first=points.find(point=>mobilizableSavingsForAccount(Number(point.balances[account.id]??0),account.id,savingsBudgets,SAVINGS_FLOOR)<=threshold);return first?[{account,threshold,date:first.date,available:mobilizableSavingsForAccount(Number(first.balances[account.id]??0),account.id,savingsBudgets,SAVINGS_FLOOR)}]:[];});
+ const savingsBudgetAlerts=accounts.filter(a=>a.account_type==="savings").flatMap(account=>{const rows=savingsBudgets.filter(b=>b.account_id===account.id&&b.protection==="free"&&Number(b.critical_threshold??0)>0);if(!rows.length)return [];const threshold=Math.max(...rows.map(b=>Number(b.critical_threshold??0)));const first=points.find(point=>mobilizableSavingsForAccount(Number(point.balances[account.id]??0),account.id,savingsBudgets,SAVINGS_FLOOR)<=threshold);return first?[{account,threshold,date:first.date,available:mobilizableSavingsForAccount(Number(first.balances[account.id]??0),account.id,savingsBudgets,SAVINGS_FLOOR)}]:[];});
  const monthOps=useMemo<ProjectedOperation[]>(()=>reliableOps
   .filter(o=>o.movement_date.startsWith(month))
   .filter(o=>accountId==="all"||o.account_id===accountId)

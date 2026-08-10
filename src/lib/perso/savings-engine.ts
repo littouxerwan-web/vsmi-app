@@ -18,12 +18,28 @@ export function savingsBudgetAmount(budget:SavingsBudgetAllocation,savingsBalanc
  return Math.max(0,Math.round(raw*100)/100);
 }
 
-export function mobilizableSavingsForAccount(savingsBalance:number,accountId:string,budgets:SavingsBudgetAllocation[]|undefined,floor=30){
+export function savingsAvailabilityForAccount(savingsBalance:number,accountId:string,budgets:SavingsBudgetAllocation[]|undefined,floor=30){
+ const balance=Math.max(0,Number(savingsBalance)||0);
+ const physical=Math.max(0,balance-floor);
  const rows=(budgets??[]).filter(b=>b.account_id===accountId);
- const physical=Math.max(0,Number(savingsBalance)-floor);
- if(!rows.length)return physical;
- const protectedAmount=rows.filter(b=>b.protection==="untouchable"||!b.allow_recovery).reduce((sum,b)=>sum+savingsBudgetAmount(b,Number(savingsBalance)),0);
- return Math.max(0,Math.min(physical,Math.round((Number(savingsBalance)-floor-protectedAmount)*100)/100));
+ const amount=(b:SavingsBudgetAllocation)=>savingsBudgetAmount(b,balance);
+ // Compatibilité avec les anciennes données : "À préserver" reste libre uniquement
+ // lorsqu'il était déjà explicitement autorisé à la récupération. Sinon il est traité
+ // comme intouchable jusqu'à la migration.
+ const freeAllocated=rows.filter(b=>b.protection==="free"||(b.protection==="preserve"&&b.allow_recovery)).reduce((sum,b)=>sum+amount(b),0);
+ const untouchableAllocated=rows.filter(b=>b.protection==="untouchable"||(b.protection==="preserve"&&!b.allow_recovery)).reduce((sum,b)=>sum+amount(b),0);
+ const untouchable=Math.min(physical,Math.max(0,untouchableAllocated));
+ const afterUntouchable=Math.max(0,physical-untouchable);
+ const free=Math.min(afterUntouchable,Math.max(0,freeAllocated));
+ // L'épargne non affectée est la réserve mobilisable de premier rang. Les enveloppes
+ // "Libre" ne sont utilisées qu'ensuite. L'intouchable n'entre jamais dans le calcul.
+ const mobilizable=Math.max(0,afterUntouchable-free);
+ const totalUsable=Math.max(0,mobilizable+free);
+ return {physical,mobilizable,free,untouchable,totalUsable};
+}
+
+export function mobilizableSavingsForAccount(savingsBalance:number,accountId:string,budgets:SavingsBudgetAllocation[]|undefined,floor=30){
+ return savingsAvailabilityForAccount(savingsBalance,accountId,budgets,floor).totalUsable;
 }
 export type SavingsProposalDecision={source_account_id:string;destination_account_id:string;source_month:string;amount:number;status:"pending"|"accepted"|"deleted";transfer_group_id?:string|null};
 export type SavingsPlanRow={

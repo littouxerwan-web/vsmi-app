@@ -12,6 +12,7 @@ import {
   TrendingDown,
   TrendingUp,
   WalletCards,
+  PiggyBank,
 } from "lucide-react";
 import {
   assignMovementCategory,
@@ -56,6 +57,11 @@ type ProjectionPoint = {
   checking: number;
   savings: number;
   total: number;
+};
+type ProjectionAudit = {
+  month: string;
+  opening: Record<string, number>;
+  closing: Record<string, number>;
 };
 type Period = "month" | "1y" | "3y";
 type AnalysisRow = Movement & { analysisKind: "realized" | "forecast"; essential: boolean };
@@ -107,6 +113,7 @@ export function AnalysisView({
   movements,
   projectedOperations,
   projectionPoints,
+  projectionAudits,
   categories,
   accounts,
   recurrences,
@@ -114,6 +121,7 @@ export function AnalysisView({
   movements: Movement[];
   projectedOperations: Movement[];
   projectionPoints: ProjectionPoint[];
+  projectionAudits: ProjectionAudit[];
   categories: Category[];
   accounts: Account[];
   recurrences: Recurrence[];
@@ -301,6 +309,53 @@ export function AnalysisView({
     };
   }, [period, accountId, movements, projectedOperations, projectionPoints, categories, recurrences, accounts]);
 
+  const savingsAnalysis = useMemo(() => {
+    const savingsIds = new Set(accounts.filter((a) => a.account_type === "savings").map((a) => a.id));
+    const accountType = new Map(accounts.map((a) => [a.id, a.account_type]));
+    const byGroup = new Map<string, Movement[]>();
+    for (const op of projectedOperations) {
+      if (!op.transfer_group_id) continue;
+      const rows = byGroup.get(op.transfer_group_id) ?? [];
+      rows.push(op);
+      byGroup.set(op.transfer_group_id, rows);
+    }
+    const externalIncoming = (op: Movement) => {
+      if (!savingsIds.has(op.account_id)) return false;
+      if (op.movement_type === "income") return true;
+      if (op.movement_type !== "transfer_in") return false;
+      const pair = op.transfer_group_id ? byGroup.get(op.transfer_group_id) ?? [] : [];
+      const source = pair.find((x) => x.movement_type === "transfer_out");
+      return !source || accountType.get(source.account_id) !== "savings";
+    };
+    const externalOutgoing = (op: Movement) => {
+      if (!savingsIds.has(op.account_id)) return false;
+      if (op.movement_type === "expense") return true;
+      if (op.movement_type !== "transfer_out") return false;
+      const pair = op.transfer_group_id ? byGroup.get(op.transfer_group_id) ?? [] : [];
+      const destination = pair.find((x) => x.movement_type === "transfer_in");
+      return !destination || accountType.get(destination.account_id) !== "savings";
+    };
+    const rows = projectionAudits.slice(0, 60).map((audit) => {
+      const opening = [...savingsIds].reduce((sum, id) => sum + Number(audit.opening?.[id] ?? 0), 0);
+      const closing = [...savingsIds].reduce((sum, id) => sum + Number(audit.closing?.[id] ?? 0), 0);
+      const ops = projectedOperations.filter((op) => op.movement_date.slice(0, 7) === audit.month);
+      const planned = ops.filter(externalIncoming).reduce((sum, op) => sum + Number(op.amount), 0);
+      const used = ops.filter(externalOutgoing).reduce((sum, op) => sum + Number(op.amount), 0);
+      return { month: audit.month, opening, planned, used, closing };
+    });
+    const years = Array.from(new Set(rows.map((r) => r.month.slice(0, 4)))).map((year) => {
+      const months = rows.filter((r) => r.month.startsWith(year));
+      return {
+        year, months,
+        opening: months[0]?.opening ?? 0,
+        planned: months.reduce((s, r) => s + r.planned, 0),
+        used: months.reduce((s, r) => s + r.used, 0),
+        closing: months.at(-1)?.closing ?? 0,
+      };
+    });
+    return { rows, years };
+  }, [accounts, projectedOperations, projectionAudits]);
+
   const top = context.ranked[0];
   const savingsPotential = context.nonEssential * 0.1;
   const coverage = context.totalExp ? context.totalInc / context.totalExp : 0;
@@ -440,6 +495,44 @@ export function AnalysisView({
             <Insight icon={BarChart3} title="Poids des cinq premiers postes" text={`${context.totalExp ? pct(context.top5 / context.totalExp) : "0 %"} de toutes les dépenses analysées.`} />
           </div>
         </Panel>
+      </div>
+
+      <div className="px-3 pb-4 sm:px-5 lg:px-6">
+        <section className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-neutral-100"><PiggyBank size={17} /></span>
+            <div>
+              <h3 className="font-semibold">Analyse de l’épargne · 5 ans</h3>
+              <p className="mt-1 text-xs text-neutral-500">60 mois issus du même moteur que Projection. « Épargne prévue » regroupe les versements conseillés et les autres entrées prévues vers les comptes d’épargne. « Épargne utilisée » regroupe les sorties vers la trésorerie ou dépenses depuis l’épargne.</p>
+            </div>
+          </div>
+          <div className="mt-4 space-y-3">
+            {savingsAnalysis.years.map((year, index) => (
+              <details key={year.year} open={index === 0} className="rounded-xl border border-black/10">
+                <summary className="cursor-pointer list-none p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div><p className="font-semibold">{year.year}</p><p className="text-xs text-neutral-500">{year.months.length} mois projeté(s)</p></div>
+                    <div className="grid grid-cols-2 gap-x-5 gap-y-1 text-xs sm:grid-cols-4">
+                      <span>Début <b className="ml-1">{euro2(year.opening)}</b></span>
+                      <span>Prévue <b className="ml-1 text-emerald-700">+{euro2(year.planned)}</b></span>
+                      <span>Utilisée <b className="ml-1 text-amber-700">−{euro2(year.used)}</b></span>
+                      <span>Fin <b className="ml-1">{euro2(year.closing)}</b></span>
+                    </div>
+                  </div>
+                </summary>
+                <div className="overflow-x-auto border-t border-black/10">
+                  <table className="w-full min-w-[720px] text-sm">
+                    <thead className="bg-neutral-50 text-left text-xs text-neutral-500"><tr><th className="px-4 py-3">Mois</th><th className="px-4 py-3 text-right">Solde début théorique</th><th className="px-4 py-3 text-right">Épargne prévue</th><th className="px-4 py-3 text-right">Épargne utilisée</th><th className="px-4 py-3 text-right">Solde fin théorique</th></tr></thead>
+                    <tbody className="divide-y divide-black/10">
+                      {year.months.map((row) => <tr key={row.month}><td className="px-4 py-3 font-medium capitalize">{monthLabel(row.month)}</td><td className="px-4 py-3 text-right">{euro2(row.opening)}</td><td className="px-4 py-3 text-right font-medium text-emerald-700">+{euro2(row.planned)}</td><td className="px-4 py-3 text-right font-medium text-amber-700">−{euro2(row.used)}</td><td className="px-4 py-3 text-right font-semibold">{euro2(row.closing)}</td></tr>)}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            ))}
+            {!savingsAnalysis.rows.length ? <Empty text="Aucune projection d’épargne disponible." /> : null}
+          </div>
+        </section>
       </div>
 
       <div className="px-3 pb-4 sm:px-5 lg:px-6">
