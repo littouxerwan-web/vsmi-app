@@ -52,7 +52,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
         <div className="min-w-0 flex-1">
           <header className="sticky top-0 z-30 border-b border-black/10 bg-white/95 backdrop-blur">
             <div className="relative flex h-18 items-center justify-between px-5 lg:px-8">
-              <Link href={personalOnly || !photoAccess ? "/perso?vue=finances" : "/aujourd-hui"} className="flex items-center lg:hidden" aria-label="Accueil VSMI">
+              <Link href="/aujourd-hui" className="flex items-center lg:hidden" aria-label="Accueil VSMI">
                 <Image src="/vsmi-logo.gif" alt="Logo VSMI" width={54} height={54} className="h-11 w-auto object-contain" unoptimized priority />
               </Link>
 

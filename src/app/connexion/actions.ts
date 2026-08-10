@@ -31,11 +31,6 @@ export async function login(formData: FormData) {
 
   revalidatePath("/", "layout");
 
-  const appMetadata = data.user?.app_metadata ?? {};
-  if (appMetadata.role === "personal" || appMetadata.photo_access !== true) {
-    redirect("/perso?vue=finances");
-  }
-
   redirect("/aujourd-hui");
 }
 

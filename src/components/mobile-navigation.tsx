@@ -8,7 +8,6 @@ import {
   Camera,
   CircleDollarSign,
   HeartHandshake,
-  LayoutDashboard,
   Plus,
   TrendingUp,
   UsersRound,
@@ -24,7 +23,6 @@ const commonItems = [
 ];
 
 const photoItems = [
-  { href: "/aujourd-hui", label: "Aujourd’hui", icon: LayoutDashboard },
   { href: "/mariages", label: "Mariages", icon: HeartHandshake },
   { href: "/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/comptabilite", label: "Comptabilité", icon: CircleDollarSign },

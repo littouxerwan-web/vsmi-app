@@ -26,7 +26,6 @@ const commonNavigation = [
 ];
 
 const photoNavigation = [
-  { href: "/aujourd-hui", label: "Aujourd’hui", icon: LayoutDashboard },
   { href: "/mariages", label: "Mes Mariages", icon: HeartHandshake },
   { href: "/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/comptabilite", label: "Comptabilité photo", icon: CircleDollarSign },
@@ -71,7 +70,7 @@ export function AppNavigation({ photoAccess = false, childrenAccess = false }: {
   return (
     <aside className="hidden min-h-screen w-64 shrink-0 bg-black text-white lg:flex lg:flex-col">
       <div className="flex justify-center border-b border-white/10 px-7 py-7">
-        <Link href="/perso?vue=finances" className="vsmi-press rounded-xl">
+        <Link href="/aujourd-hui" className="vsmi-press rounded-xl">
           <Image
             src="/vsmi-logo.gif"
             alt="Vue sur mer imprenable"
@@ -84,6 +83,14 @@ export function AppNavigation({ photoAccess = false, childrenAccess = false }: {
       </div>
 
       <nav className="flex-1 px-4 py-6">
+        <Link
+          href="/aujourd-hui"
+          className="vsmi-press mb-5 flex items-center gap-3 rounded-2xl border border-[#C7A45A]/35 bg-[#C7A45A]/10 px-4 py-3.5 text-sm font-semibold text-[#E0C27E] transition hover:bg-[#C7A45A]/18"
+        >
+          <LayoutDashboard size={19} strokeWidth={1.8} />
+          Aujourd’hui
+        </Link>
+
         <details className="group" open>
           <summary className="vsmi-press flex cursor-pointer list-none items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-[#C7A45A] transition hover:bg-[#C7A45A]/14">
             <span className="flex items-center gap-3">
