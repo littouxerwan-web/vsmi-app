@@ -141,8 +141,8 @@ export function PrivacyModeToggle() {
       data-private-visible="true"
       className={`grid size-10 place-items-center rounded-full border transition ${
         privateMode
-          ? "border-black bg-black text-white"
-          : "border-black/10 bg-white text-black hover:bg-neutral-100"
+          ? "border-[#D2AE57] bg-[#D2AE57] text-black shadow-[0_0_0_3px_rgba(210,174,87,.10)]"
+          : "border-white/15 bg-white/[0.06] text-[#C8C8C8] hover:border-[#D2AE57]/55 hover:bg-[#D2AE57]/10 hover:text-[#D2AE57]"
       }`}
     >
       <Icon size={18} />

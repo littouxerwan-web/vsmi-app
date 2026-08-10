@@ -50,34 +50,49 @@ export default async function AppLayout({ children }: AppLayoutProps) {
         <AppNavigation photoAccess={photoAccess} childrenAccess={childrenAccess} />
 
         <div className="min-w-0 flex-1">
-          <header className="sticky top-0 z-30 border-b border-black/10 bg-white/95 backdrop-blur">
-            <div className="relative flex h-18 items-center justify-between px-5 lg:px-8">
-              <Link href="/aujourd-hui" className="flex items-center lg:hidden" aria-label="Accueil VSMI">
-                <Image src="/vsmi-logo.gif" alt="Logo VSMI" width={54} height={54} className="h-11 w-auto object-contain" unoptimized priority />
+          <header className="sticky top-0 z-30 border-b border-white/10 bg-[#101010]/95 text-white shadow-[0_8px_28px_rgba(0,0,0,.18)] backdrop-blur">
+            <div className="relative grid h-18 grid-cols-[1fr_auto_1fr] items-center px-4 sm:px-5 lg:px-8">
+              <div className="flex items-center justify-start">
+                <PrivacyModeToggle />
+              </div>
+
+              <Link
+                href="/aujourd-hui"
+                className="vsmi-press flex items-center justify-center rounded-xl px-2"
+                aria-label="Accueil"
+              >
+                <Image
+                  src="/vsmi-logo.gif"
+                  alt="Logo"
+                  width={68}
+                  height={54}
+                  className="h-11 w-auto max-w-[7rem] object-contain sm:h-12"
+                  unoptimized
+                  priority
+                />
               </Link>
 
-              <div className="flex items-center gap-2 sm:gap-4">
-                <PrivacyModeToggle />
+              <div className="flex min-w-0 items-center justify-end gap-2 sm:gap-3">
                 <Link
                   href="/perso?vue=parametres"
                   aria-label="Ouvrir les paramètres personnels"
                   title="Paramètres"
-                  className="grid size-10 place-items-center rounded-full border border-black/10 bg-white transition hover:bg-neutral-100"
+                  className="grid size-10 place-items-center rounded-full border border-[#D2AE57]/35 bg-white/[0.06] text-[#D2AE57] transition hover:border-[#D2AE57]/65 hover:bg-[#D2AE57]/12"
                 >
                   <Settings size={18} />
                 </Link>
-                <div className="hidden text-right sm:block">
-                  <p className="text-sm font-medium">
+                <div className="hidden max-w-44 text-right sm:block">
+                  <p className="truncate text-sm font-medium text-[#E7E7E7]">
                     {firstName ?? claims.email ?? "Utilisateur"}
                   </p>
-                  {personalOnly ? <p className="text-xs text-neutral-500">Personnel</p> : null}
+                  {personalOnly ? <p className="text-xs text-[#A9A9A9]">Personnel</p> : null}
                 </div>
 
                 <form action={logout}>
                   <button
                     type="submit"
                     title="Se déconnecter"
-                    className="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white transition hover:bg-neutral-100"
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] text-[#C8C8C8] transition hover:border-[#D2AE57]/55 hover:bg-[#D2AE57]/10 hover:text-[#D2AE57]"
                   >
                     <LogOut size={18} />
                   </button>

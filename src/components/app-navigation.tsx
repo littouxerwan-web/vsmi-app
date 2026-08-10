@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import {
   Baby,
@@ -69,18 +68,7 @@ export function AppNavigation({ photoAccess = false, childrenAccess = false }: {
     : basePersoNavigation;
   return (
     <aside className="hidden min-h-screen w-64 shrink-0 bg-black text-white lg:flex lg:flex-col">
-      <div className="flex justify-center border-b border-white/10 px-7 py-7">
-        <Link href="/aujourd-hui" className="vsmi-press rounded-xl">
-          <Image
-            src="/vsmi-logo.gif"
-            alt="Vue sur mer imprenable"
-            width={150}
-            height={150}
-            priority
-            className="h-auto w-36 object-contain"
-          />
-        </Link>
-      </div>
+      <div className="h-18 border-b border-white/10" aria-hidden="true" />
 
       <nav className="flex-1 px-4 py-6">
         <Link

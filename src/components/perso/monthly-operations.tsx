@@ -1,6 +1,7 @@
 "use client";
 
 import { MovementDeleteChoices } from "@/components/perso/movement-delete-actions";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Baby, Camera, Check, Clock3, Pencil, Repeat2, Search, SlidersHorizontal, Trash2 } from "lucide-react";
 import {
@@ -33,7 +34,10 @@ function occurrences(r:Recurrence,month:string){const start=new Date(`${r.start_
 function photoLabel(p:PhotoPayment){const kind=p.payment_type==="deposit"?"Acompte":"Solde";const date=p.wedding_date?formatDate(p.wedding_date):"date à définir";return `Mariage ${p.display_name} ${date} · ${kind}`;}
 
 export function MonthlyOperations({accounts,categories,movements,recurrences,overrides,exclusions=[],photoPayments=[],photoDefaultAccountId=null,urssafDefaultAccountId=null,urssafStates=[]}:{accounts:Account[];categories:Category[];movements:Movement[];recurrences:Recurrence[];overrides:Override[];exclusions?:Exclusion[];photoPayments?:PhotoPayment[];photoDefaultAccountId?:string|null;urssafDefaultAccountId?:string|null;urssafStates?:UrssafState[];budgetRows?:unknown[]}){
- const now=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Paris",year:"numeric",month:"2-digit"}).format(new Date());const [month,setMonth]=useState(now);const [accountFilter,setAccountFilter]=useState("all");const [query,setQuery]=useState("");const [typeFilter,setTypeFilter]=useState("all");const [statusFilter,setStatusFilter]=useState("planned");const [sortBy,setSortBy]=useState("date-asc");
+ const searchParams=useSearchParams();
+ const requestedAccount=searchParams.get("account");
+ const initialAccount=requestedAccount&&accounts.some(a=>a.id===requestedAccount)?requestedAccount:"all";
+ const now=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Paris",year:"numeric",month:"2-digit"}).format(new Date());const [month,setMonth]=useState(now);const [accountFilter,setAccountFilter]=useState(initialAccount);const [query,setQuery]=useState("");const [typeFilter,setTypeFilter]=useState("all");const [statusFilter,setStatusFilter]=useState("planned");const [sortBy,setSortBy]=useState("date-asc");
  const selectedAccount=accounts.find(a=>a.id===accountFilter);
  const accountTint=selectedAccount?.color??null;
  const shiftMonth=(value:string,delta:number)=>{const d=new Date(`${value}-01T12:00:00`);d.setMonth(d.getMonth()+delta);return d.toISOString().slice(0,7);};

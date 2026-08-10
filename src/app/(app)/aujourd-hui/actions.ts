@@ -38,6 +38,21 @@ export async function saveDashboardOrder(order: string[]) {
   return { ok: true };
 }
 
+
+export async function saveDashboardColors(colors: Record<string, string>) {
+  const { supabase } = await session();
+  const allowed = new Set(["black", "gold", "silver"]);
+  const safeColors = Object.fromEntries(
+    Object.entries(colors ?? {})
+      .filter(([key, color]) => (key === "common" || key.startsWith("personal:")) && allowed.has(String(color)))
+      .slice(0, 50),
+  );
+  const { error } = await supabase.auth.updateUser({ data: { dashboard_account_colors: safeColors } });
+  if (error) throw new Error(error.message);
+  revalidatePath("/aujourd-hui");
+  return { ok: true };
+}
+
 export async function createTodayPersonalMovement(fd: FormData) {
   const { supabase, user } = await session();
   const accountId = value(fd, "account_id");
