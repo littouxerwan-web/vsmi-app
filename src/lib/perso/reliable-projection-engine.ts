@@ -81,13 +81,37 @@ export function buildReliableProjection(input:Input){
   const amount=round(photoMonthAmount(shiftMonth(m,-1))*0.216),account=state?.account_id??input.urssafDefaultAccountId;if(amount>0&&account)ops.push({id:`urssaf-${m}`,projected:true,account_id:account,category_id:null,movement_type:'expense',label:`URSSAF · 21,6 % CA photo`,amount,movement_date:monthEnd(m),status:'planned',source:'urssaf'});
  }
 
- // Budgets : on réserve uniquement le reliquat net du mois (débits - crédits rattachés).
+ // Budgets : on réserve uniquement le VRAI reliquat du mois.
+ // Important : currentBalances contient déjà les mouvements pointés, donc ces mouvements
+ // sont exclus de la trajectoire de solde ci-dessus. En revanche ils doivent rester
+ // comptés dans le budget consommé du mois, sinon le moteur relisserait le budget nominal
+ // complet (ex. 1 190 €) au lieu du reste réellement disponible (ex. 686,38 €).
  for(let i=0;i<months;i++){
   const m=shiftMonth(startMonth,i);
   for(const b of input.categories.filter(c=>!c.parent_id&&Number(c.monthly_budget)>0&&isBudgetActiveForMonth(c,m))){
    const target=b.account_id??defaultChecking;if(!target)continue;
-   const linked=ops.filter(o=>o.movement_date.slice(0,7)===m&&root(o.category_id)===b.id&&o.source!=="budget");
-   const {remaining}=calculateBudgetUsage(Number(b.monthly_budget),linked);
+
+   // 1) Tous les mouvements réellement enregistrés du mois, y compris ceux déjà pointés.
+   // Ils ne seront PAS rejoués dans le solde : ils servent uniquement au calcul du reliquat budgétaire.
+   const recordedBudgetFlows=input.movements.filter(mv=>
+    mv.status!=="cancelled"&&
+    mv.movement_type!=="transfer_in"&&
+    mv.movement_date.slice(0,7)===m&&
+    root(mv.category_id)===b.id
+   );
+
+   // 2) Échéances récurrentes encore projetées et non matérialisées dans personal_movements.
+   // On les compte déjà dans l'enveloppe consommée afin de ne pas les doubler avec le reliquat lissé.
+   const projectedBudgetFlows=ops.filter(o=>
+    o.source==="recurrence"&&
+    o.movement_date.slice(0,7)===m&&
+    root(o.category_id)===b.id
+   );
+
+   const {remaining}=calculateBudgetUsage(
+    Number(b.monthly_budget),
+    [...recordedBudgetFlows,...projectedBudgetFlows],
+   );
    if(remaining>0){
     // Le reliquat budgétaire n'est pas débité artificiellement en bloc le dernier jour.
     // Il est réparti sur chaque jour restant du mois afin de produire une trajectoire
