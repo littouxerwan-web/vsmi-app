@@ -5,7 +5,7 @@ import { BarChart3, Bitcoin, Landmark, PiggyBank, X } from "lucide-react";
 
 type Account={id:string;name:string;account_type:"checking"|"savings"|"crypto";color?:string|null};
 type Audit={month:string;opening:Record<string,number>;credits:Record<string,number>;debits:Record<string,number>;closing:Record<string,number>};
-type Operation={id:string;account_id:string;movement_type:string;amount:number;movement_date:string;label:string;source?:string};
+type Operation={id:string;account_id:string;movement_type:string;amount:number;movement_date:string;label:string;source?:string;projected?:boolean};
 const money=(v:number)=>new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",minimumFractionDigits:2}).format(v);
 const compactMoney=(v:number)=>new Intl.NumberFormat("fr-FR",{maximumFractionDigits:0}).format(v)+" €";
 const monthLabel=(m:string)=>new Intl.DateTimeFormat("fr-FR",{month:"long",year:"numeric"}).format(new Date(`${m}-01T12:00:00`));
@@ -24,23 +24,38 @@ export function AccountBalanceCards({accounts,audits,operations,currentMonth}:{a
   const audit=auditByMonth.get(month);if(!audit)return null;
   const opening=Number(audit.opening[selected.id]??0);
   let balance=opening;
-  const rows=operations.filter(o=>o.account_id===selected.id&&o.movement_date.startsWith(month)).sort((a,b)=>a.movement_date.localeCompare(b.movement_date)||a.id.localeCompare(b.id));
-  const daily=new Map<string,{date:string;balance:number;label:string}>();
+  const rows=operations
+   .filter(o=>o.account_id===selected.id&&o.movement_date.startsWith(month))
+   .sort((a,b)=>a.movement_date.localeCompare(b.movement_date)||a.id.localeCompare(b.id));
+  type DayPoint={date:string;balance:number;change:number;labels:string[];sources:string[]};
+  const daily=new Map<string,DayPoint>();
   for(const o of rows){
-   balance+=isCredit(o.movement_type)?Number(o.amount):-Number(o.amount);
-   // Une seule valeur par date : le solde après la dernière opération de la journée.
-   // Cela évite les segments verticaux artificiels lorsque plusieurs mouvements
-   // partagent la même date (notamment le 1er et le dernier jour du mois).
-   daily.set(o.movement_date,{date:o.movement_date,balance,label:o.label});
+   const delta=isCredit(o.movement_type)?Number(o.amount):-Number(o.amount);
+   balance+=delta;
+   const previous=daily.get(o.movement_date);
+   daily.set(o.movement_date,{
+    date:o.movement_date,
+    balance,
+    change:Number((Number(previous?.change??0)+delta).toFixed(2)),
+    labels:[...(previous?.labels??[]),o.label],
+    sources:[...(previous?.sources??[]),String(o.source??"movement")],
+   });
   }
-  const closing=Number(audit.closing[selected.id]??balance);
+  const auditClosing=Number(audit.closing[selected.id]??balance);
+  const computedClosing=Number(balance.toFixed(2));
   const lastDay=daysInMonth(month);
   const firstDate=`${month}-01`;
   const lastDate=`${month}-${String(lastDay).padStart(2,"0")}`;
-  if(!daily.has(firstDate))daily.set(firstDate,{date:firstDate,balance:opening,label:"Ouverture"});
-  // La clôture du moteur fait foi pour le dernier point du mois.
-  daily.set(lastDate,{date:lastDate,balance:closing,label:"Clôture"});
+  // Le graphe représente le solde de fin de journée. L'ouverture reste une donnée
+  // séparée : une opération du 1er ne doit jamais être présentée comme l'ouverture.
+  if(!daily.has(firstDate))daily.set(firstDate,{date:firstDate,balance:opening,change:0,labels:["Ouverture"],sources:["opening"]});
+  // Si aucune opération n'a lieu le dernier jour, on prolonge simplement le dernier
+  // solde connu. On ne force jamais la courbe vers audit.closing : cela créait des
+  // baisses artificielles sans mouvement correspondant.
+  if(!daily.has(lastDate))daily.set(lastDate,{date:lastDate,balance:computedClosing,change:0,labels:["Clôture"],sources:["closing"]});
   const pts=[...daily.values()].sort((a,b)=>a.date.localeCompare(b.date));
+  const reconciliationGap=Number((auditClosing-computedClosing).toFixed(2));
+  const syntheticEvents=pts.filter(p=>p.sources.some(source=>["budget","savings","urssaf","photo"].includes(source))&&Math.abs(p.change)>=0.01);
 
   const rawMin=Math.min(...pts.map(p=>p.balance),0),rawMax=Math.max(...pts.map(p=>p.balance),0);
   let axisMin=Math.floor(rawMin/500)*500,axisMax=Math.ceil(rawMax/500)*500;
@@ -52,7 +67,7 @@ export function AccountBalanceCards({accounts,audits,operations,currentMonth}:{a
   const day=(date:string)=>Math.max(1,Math.min(lastDay,Number(date.slice(8,10))||1));
   const x=(date:string)=>left+((day(date)-1)/Math.max(1,lastDay-1))*plotW;
   const coords=pts.map(p=>({...p,x:x(p.date),y:y(p.balance)}));
-  return {pts,coords,axisMin,axisMax,ticks,dateTicks,lastDay,closing,W,H,left,right,top,bottom,plotW,plotH,y,x};
+  return {pts,coords,opening,axisMin,axisMax,ticks,dateTicks,lastDay,auditClosing,computedClosing,reconciliationGap,syntheticEvents,W,H,left,right,top,bottom,plotW,plotH,y,x};
  },[selected,month,operations,audits]);
  return <>
   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{accounts.map(a=>{const audit=currentAudit;const current=Number(audit?.opening[a.id]??0);const beforeSavings=current+Number(audit?.credits[a.id]??0)-Number(audit?.debits[a.id]??0);const afterSavings=Number(audit?.closing[a.id]??beforeSavings);const Icon=a.account_type==="savings"?PiggyBank:a.account_type==="crypto"?Bitcoin:Landmark;const type=a.account_type==="savings"?"Épargne":a.account_type==="crypto"?"Crypto":"Compte courant";return <div key={a.id} className="border-l-4 border-y border-r border-black/10 p-4" style={{backgroundColor:`${a.color??"#ffffff"}18`,borderLeftColor:a.color??"#d4d4d4"}}><div className="flex items-start justify-between gap-3"><span className="grid size-9 place-items-center bg-white/80"><Icon size={18}/></span><div className="flex items-center gap-2"><button type="button" onClick={()=>{setOpenAccount(a.id);setMonth(currentMonth)}} title="Voir l’évolution graphique" aria-label={`Voir l’évolution graphique de ${a.name}`} className="grid size-8 place-items-center rounded-lg bg-white/80 text-neutral-600 transition hover:bg-white hover:text-black"><BarChart3 size={16}/></button><span className="bg-white/80 px-2 py-1 text-xs font-medium text-neutral-600">{type}</span></div></div><p className="mt-3 font-semibold">{a.name}</p><div className="mt-3 grid grid-cols-3 gap-2"><div><p className="text-[11px] text-neutral-500">Aujourd’hui</p><p className={`mt-1 font-semibold ${current<0?"text-red-700":""}`}>{money(current)}</p></div><div><p className="text-[11px] text-neutral-500">Fin de mois</p><p className={`mt-1 font-semibold ${beforeSavings<0?"text-red-700":""}`}>{money(beforeSavings)}</p></div><div><p className="text-[11px] text-neutral-500">Après épargne</p><p className={`mt-1 font-semibold ${afterSavings<0?"text-red-700":"text-emerald-700"}`}>{money(afterSavings)}</p></div></div></div>})}</div>
@@ -60,6 +75,7 @@ export function AccountBalanceCards({accounts,audits,operations,currentMonth}:{a
    {chart.ticks.map(v=><g key={v}><line x1={chart.left} y1={chart.y(v)} x2={chart.W-chart.right} y2={chart.y(v)} stroke={v===0?"#dc2626":"currentColor"} strokeOpacity={v===0?0.65:0.12} strokeDasharray={v===0?undefined:"4 4"}/><text x={chart.left-10} y={chart.y(v)+4} textAnchor="end" fontSize="11" fill="currentColor" opacity=".62">{compactMoney(v)}</text></g>)}
    {chart.dateTicks.map(d=>{const date=`${month}-${String(d).padStart(2,"0")}`;return <g key={d}><line x1={chart.x(date)} y1={chart.top} x2={chart.x(date)} y2={chart.H-chart.bottom} stroke="currentColor" strokeOpacity=".07"/><text x={chart.x(date)} y={chart.H-16} textAnchor="middle" fontSize="11" fill="currentColor" opacity=".62">{d}</text></g>})}
    <polyline points={chart.coords.map(p=>`${p.x},${p.y}`).join(" ")} fill="none" stroke={selected.color??"currentColor"} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
-  </svg><div className="mt-1 flex items-center justify-between gap-3 px-2 text-xs text-neutral-500"><span>Ouverture {money(chart.pts[0]?.balance??0)}</span><span>Dates du mois</span><span>Clôture {money(chart.closing)}</span></div></div><p className="mt-3 text-xs text-neutral-500">Axe horizontal : dates du mois. Axe vertical : tranches de 500 €. Le tracé reprend les mêmes opérations et transferts d’épargne que Projection.</p></div></div>:null}
+   {chart.coords.filter(p=>Math.abs(p.change)>=0.01).map(p=><circle key={p.date} cx={p.x} cy={p.y} r="3.2" fill={selected.color??"currentColor"}><title>{`${p.date.slice(8,10)}/${p.date.slice(5,7)} · ${p.change>0?"+":""}${money(p.change)} · ${p.labels.join(" · ")}`}</title></circle>)}
+  </svg><div className="mt-1 flex items-center justify-between gap-3 px-2 text-xs text-neutral-500"><span>Ouverture {money(chart.opening)}</span><span>Dates du mois</span><span>Clôture {money(chart.auditClosing)}</span></div></div>{chart.syntheticEvents.length>0?<div className="mt-3 rounded-xl border border-black/10 bg-neutral-50 px-3 py-2"><p className="text-xs font-semibold text-neutral-700">Flux projetés intégrés au graphique</p><div className="mt-1 space-y-1">{chart.syntheticEvents.map(p=><p key={p.date} className="text-xs text-neutral-600"><span className="font-medium">{p.date.slice(8,10)}/{p.date.slice(5,7)}</span> · <span className={p.change<0?"text-red-700":"text-emerald-700"}>{p.change>0?"+":""}{money(p.change)}</span> · {p.labels.join(" · ")}</p>)}</div></div>:null}{Math.abs(chart.reconciliationGap)>=0.01?<div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">Écart de contrôle : la somme des flux visibles donne {money(chart.computedClosing)}, alors que Projection annonce {money(chart.auditClosing)}. Le graphique n’invente plus de mouvement pour masquer cet écart.</div>:null}<p className="mt-3 text-xs text-neutral-500">Axe horizontal : dates du mois. Axe vertical : tranches de 500 €. Chaque point représente le solde de fin de journée. Les budgets et transferts automatiques intégrés à Projection sont signalés ci-dessus lorsqu’ils existent.</p></div></div>:null}
  </>;
 }
