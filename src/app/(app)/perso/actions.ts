@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
 const PATH = "/perso";
@@ -15,7 +16,25 @@ async function auth() {
   if (!user) redirect("/connexion");
   return { supabase, user };
 }
-function refresh(message: string) { revalidatePath(PATH); redirect(`${PATH}?succes=${encodeURIComponent(message)}`); }
+async function refresh(message: string): Promise<never> {
+  revalidatePath(PATH);
+  const referer = (await headers()).get("referer");
+  let target = `${PATH}?vue=finances`;
+  if (referer) {
+    try {
+      const url = new URL(referer);
+      if (url.pathname === PATH) {
+        url.searchParams.delete("succes");
+        url.searchParams.delete("erreur");
+        url.searchParams.set("succes", message);
+        target = `${url.pathname}${url.search}${url.hash}`;
+      }
+    } catch {
+      // Repli sécurisé sur En cours si l’en-tête Referer n’est pas exploitable.
+    }
+  }
+  redirect(target);
+}
 
 export async function createAccount(fd: FormData) {
   const { supabase, user } = await auth();
@@ -28,7 +47,7 @@ export async function createAccount(fd: FormData) {
   ]);
   const nextDisplayOrder = Number((lastRows?.[0] as any)?.display_order ?? -1) + 1;
   const { error } = await supabase.from("personal_accounts").insert({ owner_id: user.id, name, account_type: accountType, color, display_order: nextDisplayOrder, is_default: (count ?? 0) === 0 });
-  if (error) fail(error.message); refresh("Compte ajouté.");
+  if (error) fail(error.message); await refresh("Compte ajouté.");
 }
 
 export async function createCategory(fd: FormData) {
@@ -61,7 +80,7 @@ export async function createCategory(fd: FormData) {
     budget_end_date: budgetEndDate,
     is_primary_income: isPrimaryIncome,
   });
-  if (error) fail(error.message); refresh(creationKind === "budget" ? "Budget ajouté." : parentId ? "Sous-catégorie ajoutée." : "Catégorie ajoutée.");
+  if (error) fail(error.message); await refresh(creationKind === "budget" ? "Budget ajouté." : parentId ? "Sous-catégorie ajoutée." : "Catégorie ajoutée.");
 }
 
 export async function createSnapshot(fd: FormData) {
@@ -69,7 +88,7 @@ export async function createSnapshot(fd: FormData) {
   const accountId = text(fd, "account_id"); const balance = number(fd, "balance"); const snapshotDate = text(fd, "snapshot_date");
   if (!accountId || !snapshotDate || !Number.isFinite(balance)) fail("Renseigne le compte, le solde et la date.");
   const { error } = await supabase.from("personal_balance_snapshots").upsert({ owner_id: user.id, account_id: accountId, balance, snapshot_date: snapshotDate, notes: optional(fd, "notes") }, { onConflict: "account_id,snapshot_date" });
-  if (error) fail(error.message); refresh("Solde de référence enregistré et projections recalculées.");
+  if (error) fail(error.message); await refresh("Solde de référence enregistré et projections recalculées.");
 }
 
 export async function createMovement(fd: FormData) {
@@ -84,7 +103,7 @@ export async function createMovement(fd: FormData) {
   if (!payload.account_id || !payload.label || !payload.movement_date || !Number.isFinite(amount) || amount <= 0) fail("Complète les informations du mouvement.");
   if (!["income", "expense"].includes(movementType)) fail("Type de mouvement incorrect.");
   const { error } = await supabase.from("personal_movements").insert(payload);
-  if (error) fail(error.message); refresh("Mouvement ajouté.");
+  if (error) fail(error.message); await refresh("Mouvement ajouté.");
 }
 
 export async function createTransfer(fd: FormData) {
@@ -106,7 +125,7 @@ export async function createTransfer(fd: FormData) {
     { owner_id: user.id, account_id: destination, movement_type: "transfer_in", label, amount, movement_date: date, status, completed_date: completedDate, completed_at: completedAt, transfer_group_id: group },
   ]);
   if (error) fail(error.message);
-  refresh(status === "completed" ? "Virement interne effectué." : "Virement interne ajouté aux prévisions.");
+  await refresh(status === "completed" ? "Virement interne effectué." : "Virement interne ajouté aux prévisions.");
 }
 
 export async function createRecurrence(fd: FormData) {
@@ -117,7 +136,7 @@ export async function createRecurrence(fd: FormData) {
   if (movementType === "transfer" && !payload.destination_account_id) fail("Choisis le compte d’épargne destinataire.");
   if (movementType === "transfer" && payload.destination_account_id === payload.account_id) fail("Le compte émetteur et le compte destinataire doivent être différents.");
   const { error } = await supabase.from("personal_recurrences").insert(payload);
-  if (error) fail(error.message); refresh("Récurrence ajoutée aux projections.");
+  if (error) fail(error.message); await refresh("Récurrence ajoutée aux projections.");
 }
 
 export async function deleteCategoryFromSettings(id: string) {
@@ -145,7 +164,7 @@ export async function deleteCategoryFromSettings(id: string) {
 export async function deleteItem(table: "personal_movements" | "personal_recurrences" | "personal_categories" | "personal_accounts" | "personal_savings_goals", id: string) {
   const { supabase, user } = await auth();
   const { error } = await supabase.from(table).delete().eq("id", id).eq("owner_id", user.id);
-  if (error) fail(error.message); refresh("Élément supprimé.");
+  if (error) fail(error.message); await refresh("Élément supprimé.");
 }
 
 export async function deleteMovement(id: string) {
@@ -162,7 +181,7 @@ export async function deleteMovement(id: string) {
     const { error: exclusionError } = await supabase.from("personal_recurrence_exclusions").upsert({ owner_id: user.id, recurrence_id: movement.recurrence_id, occurrence_date: movement.movement_date }, { onConflict: "recurrence_id,occurrence_date" });
     if (exclusionError) fail(exclusionError.message);
   }
-  refresh("Mouvement supprimé.");
+  await refresh("Mouvement supprimé.");
 }
 
 
@@ -215,7 +234,7 @@ export async function deleteMovementOccurrence(
     }
   }
 
-  refresh("Échéance supprimée pour ce mois.");
+  await refresh("Échéance supprimée pour ce mois.");
 }
 
 export async function deleteRecurrenceSeriesFrom(
@@ -326,7 +345,7 @@ export async function createSavingsGoal(fd: FormData) {
   const accountId = text(fd, "account_id"); const name = text(fd, "name"); const targetAmount = number(fd, "target_amount"); const targetDate = text(fd, "target_date");
   if (!accountId || !name || !targetDate || !Number.isFinite(targetAmount) || targetAmount <= 0) fail("Complète l’objectif d’épargne.");
   const { error } = await supabase.from("personal_savings_goals").insert({ owner_id: user.id, account_id: accountId, name, target_amount: targetAmount, target_date: targetDate, notes: optional(fd, "notes") });
-  if (error) fail(error.message); refresh("Objectif d’épargne ajouté.");
+  if (error) fail(error.message); await refresh("Objectif d’épargne ajouté.");
 }
 
 
@@ -336,7 +355,7 @@ export async function toggleMovement(id: string, completed: boolean, transferGro
   let query = supabase.from("personal_movements").update({ status: completed ? "completed" : "planned", completed_date: completedDate, completed_at: completed ? new Date().toISOString() : null }).eq("owner_id", user.id);
   query = transferGroupId ? query.eq("transfer_group_id", transferGroupId) : query.eq("id", id);
   const { error } = await query;
-  if (error) fail(error.message); refresh(completed ? "Mouvement pointé et intégré au solde à date." : "Mouvement replacé en prévision.");
+  if (error) fail(error.message); await refresh(completed ? "Mouvement pointé et intégré au solde à date." : "Mouvement replacé en prévision.");
 }
 
 export async function completeRecurrenceOccurrence(recurrenceId: string, occurrenceDate: string) {
@@ -365,7 +384,7 @@ export async function completeRecurrenceOccurrence(recurrenceId: string, occurre
     query = existing.transfer_group_id ? query.eq("transfer_group_id", existing.transfer_group_id) : query.eq("id", existing.id);
     const { error } = await query;
     if (error) fail(error.message);
-    refresh("Échéance pointée et intégrée au solde à date.");
+    await refresh("Échéance pointée et intégrée au solde à date.");
   }
 
   const month = `${occurrenceDate.slice(0, 7)}-01`;
@@ -402,7 +421,7 @@ export async function completeRecurrenceOccurrence(recurrenceId: string, occurre
     });
     if (error) fail(error.message);
   }
-  refresh("Échéance pointée et intégrée au solde à date.");
+  await refresh("Échéance pointée et intégrée au solde à date.");
 }
 
 
@@ -422,7 +441,7 @@ export async function moveAccount(fd: FormData) {
   const ordered = (rows ?? []).map((row: any, index: number) => ({ ...row, effective_order: Number(row.display_order ?? index) }));
   const currentIndex = ordered.findIndex((row: any) => row.id === id);
   const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
-  if (currentIndex < 0 || targetIndex < 0 || targetIndex >= ordered.length) refresh("Ordre des comptes inchangé.");
+  if (currentIndex < 0 || targetIndex < 0 || targetIndex >= ordered.length) await refresh("Ordre des comptes inchangé.");
   const current = ordered[currentIndex];
   const target = ordered[targetIndex];
   const currentOrder = Number(current.display_order ?? currentIndex);
@@ -431,7 +450,7 @@ export async function moveAccount(fd: FormData) {
   if (firstError) fail(firstError.message);
   const { error: secondError } = await supabase.from("personal_accounts").update({ display_order: currentOrder }).eq("id", target.id).eq("owner_id", user.id);
   if (secondError) fail(secondError.message);
-  refresh("Ordre des comptes modifié.");
+  await refresh("Ordre des comptes modifié.");
 }
 
 export async function updateAccount(fd: FormData) {
@@ -439,7 +458,7 @@ export async function updateAccount(fd: FormData) {
   const id = text(fd, "id"); const name = text(fd, "name"); const color = text(fd, "color") || "#dbeafe";
   if (!id || !name) fail("Compte incomplet.");
   const { error } = await supabase.from("personal_accounts").update({ name, color }).eq("id", id).eq("owner_id", user.id);
-  if (error) fail(error.message); refresh("Compte modifié.");
+  if (error) fail(error.message); await refresh("Compte modifié.");
 }
 
 export async function updateCategory(fd: FormData) {
@@ -464,13 +483,7 @@ const isBudget = monthlyBudget > 0;
   const { error } = await supabase.from("personal_categories").update({ name, monthly_budget: monthlyBudget, account_id: accountId, budget_period: budgetPeriod, budget_month: budgetMonth, budget_start_date: budgetStartDate, budget_end_date: budgetEndDate, is_primary_income: isPrimaryIncome, is_essential: isEssential, exclude_from_analysis: excludeFromAnalysis }).eq("id", id).eq("owner_id", user.id);
   if (error) fail(error.message);
 
-revalidatePath(PATH, "page");
-
-redirect(
-  `${PATH}?vue=parametres&section=categories-budgets&succes=${encodeURIComponent(
-    "Catégorie modifiée et soldes recalculés.",
-  )}`,
-);
+await refresh("Catégorie modifiée et soldes recalculés.");
 }
 
 export async function applyCategoryBudgetSimulation(fd: FormData) {
@@ -505,8 +518,7 @@ export async function applyCategoryBudgetSimulation(fd: FormData) {
     if (error) fail(error.message);
   }
 
-  revalidatePath(PATH, "page");
-  redirect(`${PATH}?vue=finances&succes=${encodeURIComponent(`${normalized.length} budget(s) mis à jour.`)}`);
+  await refresh(`${normalized.length} budget(s) mis à jour.`);
 }
 
 export async function updateRecurrence(fd: FormData) {
@@ -522,7 +534,7 @@ export async function updateRecurrence(fd: FormData) {
     category_id: categoryId, end_date: optional(fd, "end_date"), is_active: text(fd, "is_active") !== "false",
     is_essential: movementType === "expense" && text(fd, "is_essential") === "on", exclude_from_analysis: text(fd, "exclude_from_analysis") === "on"
   }).eq("id", id).eq("owner_id", user.id);
-  if (error) fail(error.message); refresh("Mouvement régulier modifié.");
+  if (error) fail(error.message); await refresh("Mouvement régulier modifié.");
 }
 
 export async function setRecurrenceOverride(fd: FormData) {
@@ -531,7 +543,7 @@ export async function setRecurrenceOverride(fd: FormData) {
   if (!recurrenceId || !/^\d{4}-\d{2}$/.test(month) || !Number.isFinite(amount) || amount <= 0) fail("Montant mensuel incorrect.");
   const occurrenceMonth = `${month}-01`;
   const { error } = await supabase.from("personal_recurrence_overrides").upsert({ owner_id: user.id, recurrence_id: recurrenceId, occurrence_month: occurrenceMonth, amount }, { onConflict: "recurrence_id,occurrence_month" });
-  if (error) fail(error.message); refresh("Montant exceptionnel du mois enregistré.");
+  if (error) fail(error.message); await refresh("Montant exceptionnel du mois enregistré.");
 }
 
 
@@ -551,7 +563,7 @@ export async function updateMovement(fd: FormData) {
     .eq("id", id)
     .eq("owner_id", user.id);
   if (error) fail(error.message);
-  refresh("Mouvement modifié.");
+  await refresh("Mouvement modifié.");
 }
 
 export async function updateMovementAnalysisEssential(fd: FormData) {
@@ -636,7 +648,7 @@ export async function excludeRecurrenceOccurrence(recurrenceId: string, occurren
     { onConflict: "recurrence_id,occurrence_date" }
   );
   if (error) fail(error.message);
-  refresh("Échéance supprimée uniquement pour ce mois.");
+  await refresh("Échéance supprimée uniquement pour ce mois.");
 }
 
 
@@ -655,8 +667,7 @@ export async function saveChildrenSyncSettings(fd: FormData) {
     children_sync_person: self,
   }, { onConflict: "owner_id" });
   if (error) fail(error.message);
-  revalidatePath(PATH, "page");
-  redirect(`${PATH}?vue=parametres&succes=${encodeURIComponent("Intégration ENFANTS mise à jour.")}`);
+  await refresh("Intégration ENFANTS mise à jour.");
 }
 
 export async function completeChildrenProjectedMovement(
@@ -676,7 +687,7 @@ export async function completeChildrenProjectedMovement(
     completed_at: new Date().toISOString(), source_type: "children", source_key: sourceKey,
   }, { onConflict: "owner_id,source_type,source_key" });
   if (error) fail(error.message);
-  refresh("Régularisation ENFANTS pointée. Son montant est désormais figé dans l'historique.");
+  await refresh("Régularisation ENFANTS pointée. Son montant est désormais figé dans l'historique.");
 }
 
 export async function resetChildrenMovement(id: string) {
@@ -685,7 +696,7 @@ export async function resetChildrenMovement(id: string) {
   const { error } = await supabase.from("personal_movements").delete()
     .eq("id", id).eq("owner_id", user.id).eq("source_type", "children");
   if (error) fail(error.message);
-  refresh("Régularisation ENFANTS replacée en prévision et resynchronisée.");
+  await refresh("Régularisation ENFANTS replacée en prévision et resynchronisée.");
 }
 
 export async function deleteRecurrenceFromSettings(id: string) {
@@ -740,8 +751,7 @@ async function saveDefaultAccountSetting(
 
   const { error } = await query;
   if (error) fail(error.message);
-  revalidatePath(PATH);
-  redirect(`${PATH}?vue=parametres&succes=${encodeURIComponent(successMessage)}`);
+  await refresh(successMessage);
 }
 
 export async function updatePhotoDefaultAccount(fd: FormData) {
@@ -822,8 +832,7 @@ async function saveSavingsProfile(fd: FormData, profile: 1 | 2) {
     .single();
   if (error) fail(error.message);
   if (!saved) fail("Le profil d’épargne n’a pas pu être relu après son enregistrement.");
-  revalidatePath(PATH);
-  redirect(`${PATH}?vue=parametres&succes=${encodeURIComponent(`Profil d’épargne ${profile} enregistré.`)}`);
+  await refresh(`Profil d’épargne ${profile} enregistré.`);
 }
 
 export async function updateSavingsProfile1(fd: FormData) {
@@ -848,7 +857,7 @@ export async function toggleUrssafContribution(month: string, completed: boolean
     { onConflict: "owner_id,contribution_month" }
   );
   if (error) fail(error.message);
-  refresh(completed ? "Cotisation URSSAF intégrée au disponible aujourd’hui." : "Cotisation URSSAF replacée en prévision.");
+  await refresh(completed ? "Cotisation URSSAF intégrée au disponible aujourd’hui." : "Cotisation URSSAF replacée en prévision.");
 }
 
 export async function toggleWeddingPayment(paymentId: string, completed: boolean, fallbackAccountId?: string | null) {
@@ -883,7 +892,7 @@ export async function toggleWeddingPayment(paymentId: string, completed: boolean
     { onConflict: "owner_id,payment_id" }
   );
   if (error) fail(error.message);
-  refresh(completed ? "Encaissement photo intégré au disponible aujourd’hui." : "Encaissement photo maintenu en prévision.");
+  await refresh(completed ? "Encaissement photo intégré au disponible aujourd’hui." : "Encaissement photo maintenu en prévision.");
 }
 
 function savingsReturnView(fd: FormData) { return text(fd, "return_view") === "projection" ? "projection" : "finances"; }
