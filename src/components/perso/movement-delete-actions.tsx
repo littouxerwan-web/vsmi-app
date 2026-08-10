@@ -2,7 +2,7 @@
 
 import { Trash2 } from "lucide-react";
 import {
-  deleteItem,
+  deleteMovement,
   deleteMovementOccurrence,
   deleteRecurrenceSeriesFrom,
 } from "@/app/(app)/perso/actions";
@@ -56,7 +56,7 @@ export function MovementDeleteChoices({
 
   return (
     <div className="border-t border-black/10 pt-3">
-      <form action={deleteItem.bind(null, "personal_movements", movementId)}>
+      <form action={deleteMovement.bind(null, movementId)}>
         <button className="flex items-center gap-2 rounded-xl border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50">
           <Trash2 size={14} />
           Supprimer ce mouvement
@@ -110,7 +110,7 @@ export function MovementDeleteActions({
   if (projected || !movementId) return null;
 
   return (
-    <form action={deleteItem.bind(null, "personal_movements", movementId)}>
+    <form action={deleteMovement.bind(null, movementId)}>
       <button
         title="Supprimer ce mouvement"
         className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"

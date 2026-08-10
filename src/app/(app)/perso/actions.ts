@@ -331,12 +331,7 @@ export async function deleteRecurrenceSeriesFrom(
 
   if (exclusionError) fail(exclusionError.message);
 
-  revalidatePath("/perso", "page");
-  redirect(
-    `/perso?vue=finances&succes=${encodeURIComponent(
-      "Série récurrente supprimée à partir de cette échéance.",
-    )}`,
-  );
+  await refresh("Série récurrente supprimée à partir de cette échéance.");
 }
 
 
@@ -557,12 +552,42 @@ export async function updateMovement(fd: FormData) {
   const categoryId = optional(fd, "category_id");
   const excludeFromAnalysis = text(fd, "exclude_from_analysis") === "on";
   if (!id || !label || !accountId || !movementDate || !Number.isFinite(amount) || amount <= 0) fail("Mouvement incomplet.");
-  const { error } = await supabase
+
+  const { data: current, error: readError } = await supabase
     .from("personal_movements")
-    .update({ label, amount, movement_date: movementDate, account_id: accountId, category_id: categoryId, exclude_from_analysis: excludeFromAnalysis })
+    .select("id,movement_type,transfer_group_id")
     .eq("id", id)
-    .eq("owner_id", user.id);
-  if (error) fail(error.message);
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (readError) fail(readError.message);
+  if (!current) fail("Mouvement introuvable.");
+
+  if (current.transfer_group_id) {
+    // Un virement interne est une paire débit/crédit. Les champs communs doivent
+    // toujours rester identiques sur les deux jambes du transfert.
+    const { error: pairError } = await supabase
+      .from("personal_movements")
+      .update({ label, amount, movement_date: movementDate, category_id: categoryId, exclude_from_analysis: excludeFromAnalysis })
+      .eq("owner_id", user.id)
+      .eq("transfer_group_id", current.transfer_group_id);
+    if (pairError) fail(pairError.message);
+
+    // Le compte édité ne concerne que la jambe affichée (normalement transfer_out).
+    const { error: accountError } = await supabase
+      .from("personal_movements")
+      .update({ account_id: accountId })
+      .eq("id", id)
+      .eq("owner_id", user.id);
+    if (accountError) fail(accountError.message);
+  } else {
+    const { error } = await supabase
+      .from("personal_movements")
+      .update({ label, amount, movement_date: movementDate, account_id: accountId, category_id: categoryId, exclude_from_analysis: excludeFromAnalysis })
+      .eq("id", id)
+      .eq("owner_id", user.id);
+    if (error) fail(error.message);
+  }
+
   await refresh("Mouvement modifié.");
 }
 

@@ -144,3 +144,33 @@ input[type="radio"]:not(:disabled) {
     filter: brightness(0.86);
   }
 }
+
+/* Responsive iPhone : évite les débordements natifs des contrôles WebKit et
+   garde les vues PERSO dans la largeur utile de l'écran. */
+@media (max-width: 639px) {
+  #app-private-content main,
+  #app-private-content main > div {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #app-private-content input,
+  #app-private-content select,
+  #app-private-content textarea {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #app-private-content input[type="date"],
+  #app-private-content input[type="month"],
+  #app-private-content input[type="datetime-local"],
+  #app-private-content input[type="time"] {
+    width: 100%;
+    min-width: 0;
+  }
+
+  #app-private-content details,
+  #app-private-content summary {
+    min-width: 0;
+  }
+}

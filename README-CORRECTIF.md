@@ -1,7 +1,9 @@
-# Correctif Projection — épargne mobilisable par compte
+# Correctif boutons Mouvements — 2026-08-10
 
-- Quand un compte épargne est sélectionné dans Projection, la courbe et la tuile « Épargne mobilisable » sont recalculées uniquement à partir du solde projeté de ce compte et de ses propres enveloppes.
-- Les enveloppes en pourcentage (ex. Réserve 60 %) sont donc revalorisées à chaque point temporel sur le solde projeté du compte.
-- En vue « Tous les comptes courants » ou lorsqu'un compte non-épargne est sélectionné, la courbe mobilisable reste globale.
-- « Épargne totale » est explicitement renommée « Épargne totale globale » pour éviter l'ambiguïté.
-- Aucun changement de base de données.
+- « Ce mois-ci uniquement » respecte désormais `personal_recurrence_exclusions` dans En cours : l'échéance disparaît réellement après suppression et n'est plus reconstruite côté client.
+- La suppression d'un virement interne supprime toujours les deux jambes du transfert, y compris depuis le menu détaillé.
+- La modification d'un virement interne synchronise libellé, montant, date, catégorie et exclusion d'analyse sur les deux jambes sans changer le compte destinataire.
+- Pointer/dépointer un virement reste groupé via `transfer_group_id`.
+- Pointer une échéance récurrente conserve la création correcte d'une paire débit/crédit pour les virements récurrents.
+- « Toute la série » conserve la page/vue active après l'action.
+- Aucun changement de schéma Supabase.

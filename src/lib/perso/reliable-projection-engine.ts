@@ -44,6 +44,9 @@ function photoLabel(p:RPPhoto){return `Mariage ${p.display_name} · ${p.payment_
 export function buildReliableProjection(input:Input){
  const months=Math.max(1,input.months??60);const startMonth=input.todayIso.slice(0,7);const horizonEnd=monthEnd(shiftMonth(startMonth,months-1));
  const accountById=new Map(input.accounts.map(a=>[a.id,a]));const categoryById=new Map(input.categories.map(c=>[c.id,c]));
+ const checkingAccounts=input.accounts.filter(a=>a.account_type==='checking');
+ const savingsAccounts=input.accounts.filter(a=>a.account_type==='savings');
+ const budgetCategories=input.categories.filter(c=>!c.parent_id&&Number(c.monthly_budget)>0);
  const root=(id:string|null)=>{let c=id?categoryById.get(id):undefined;const seen=new Set<string>();while(c?.parent_id&&!seen.has(c.id)){seen.add(c.id);c=categoryById.get(c.parent_id)}return c?.id??null};
  const defaultChecking=input.movementDefaultAccountId??input.accounts.find(a=>a.account_type==='checking'&&a.is_default)?.id??input.accounts.find(a=>a.account_type==='checking')?.id??null;
  const ops:RPOperation[]=[];
@@ -75,42 +78,45 @@ export function buildReliableProjection(input:Input){
   if(p.status!=='expected'||p.accounting_status==='received'||p.accounting_status==='cancelled')continue;const raw=photoDate(p);if(!raw)continue;const date=raw<input.todayIso?input.todayIso:raw;if(date>horizonEnd)continue;const account=p.personal_account_id??input.photoDefaultAccountId;if(!account)continue;
   ops.push({id:`photo-${p.id}`,projected:false,account_id:account,category_id:null,movement_type:'income',label:photoLabel(p),amount:Number(p.amount),movement_date:date,status:'planned',source:'photo',photo:true,photoPayment:p});
  }
- const photoMonthAmount=(m:string)=>input.photoPayments.filter(p=>p.status!=='cancelled'&&String((p.accounting_status==='received'?(p.received_date??p.expected_date):p.expected_date)??'').slice(0,7)===m).reduce((s,p)=>s+Number(p.amount),0);
+ const photoAmountByMonth=new Map<string,number>();
+ for(const p of input.photoPayments){
+  if(p.status==='cancelled')continue;
+  const m=String((p.accounting_status==='received'?(p.received_date??p.expected_date):p.expected_date)??'').slice(0,7);
+  if(m)photoAmountByMonth.set(m,(photoAmountByMonth.get(m)??0)+Number(p.amount));
+ }
+ const urssafStateByMonth=new Map(input.urssafStates.map(s=>[String(s.contribution_month).slice(0,7),s]));
  for(let i=0;i<months;i++){
-  const m=shiftMonth(startMonth,i),state=input.urssafStates.find(s=>String(s.contribution_month).slice(0,7)===m);if(state?.is_completed)continue;
-  const amount=round(photoMonthAmount(shiftMonth(m,-1))*0.216),account=state?.account_id??input.urssafDefaultAccountId;if(amount>0&&account)ops.push({id:`urssaf-${m}`,projected:true,account_id:account,category_id:null,movement_type:'expense',label:`URSSAF · 21,6 % CA photo`,amount,movement_date:monthEnd(m),status:'planned',source:'urssaf'});
+  const m=shiftMonth(startMonth,i),state=urssafStateByMonth.get(m);if(state?.is_completed)continue;
+  const amount=round(Number(photoAmountByMonth.get(shiftMonth(m,-1))??0)*0.216),account=state?.account_id??input.urssafDefaultAccountId;if(amount>0&&account)ops.push({id:`urssaf-${m}`,projected:true,account_id:account,category_id:null,movement_type:'expense',label:`URSSAF · 21,6 % CA photo`,amount,movement_date:monthEnd(m),status:'planned',source:'urssaf'});
  }
 
  // Budgets : on réserve uniquement le VRAI reliquat du mois.
- // Important : currentBalances contient déjà les mouvements pointés, donc ces mouvements
- // sont exclus de la trajectoire de solde ci-dessus. En revanche ils doivent rester
- // comptés dans le budget consommé du mois, sinon le moteur relisserait le budget nominal
- // complet (ex. 1 190 €) au lieu du reste réellement disponible (ex. 686,38 €).
+ // Les flux sont indexés une seule fois par mois + catégorie racine. Cela conserve
+ // strictement le même calcul tout en évitant de rescanner tous les mouvements pour
+ // chaque budget sur chacun des 60 mois.
+ const recordedBudgetFlowsByKey=new Map<string,RPMovement[]>();
+ for(const mv of input.movements){
+  if(mv.status==='cancelled'||mv.movement_type==='transfer_in')continue;
+  const rootId=root(mv.category_id);if(!rootId)continue;
+  const key=`${mv.movement_date.slice(0,7)}:${rootId}`;
+  const rows=recordedBudgetFlowsByKey.get(key);if(rows)rows.push(mv);else recordedBudgetFlowsByKey.set(key,[mv]);
+ }
+ const projectedBudgetFlowsByKey=new Map<string,RPOperation[]>();
+ for(const o of ops){
+  if(o.source!=='recurrence')continue;
+  const rootId=root(o.category_id);if(!rootId)continue;
+  const key=`${o.movement_date.slice(0,7)}:${rootId}`;
+  const rows=projectedBudgetFlowsByKey.get(key);if(rows)rows.push(o);else projectedBudgetFlowsByKey.set(key,[o]);
+ }
  for(let i=0;i<months;i++){
   const m=shiftMonth(startMonth,i);
-  for(const b of input.categories.filter(c=>!c.parent_id&&Number(c.monthly_budget)>0&&isBudgetActiveForMonth(c,m))){
+  for(const b of budgetCategories){
+   if(!isBudgetActiveForMonth(b,m))continue;
    const target=b.account_id??defaultChecking;if(!target)continue;
-
-   // 1) Tous les mouvements réellement enregistrés du mois, y compris ceux déjà pointés.
-   // Ils ne seront PAS rejoués dans le solde : ils servent uniquement au calcul du reliquat budgétaire.
-   const recordedBudgetFlows=input.movements.filter(mv=>
-    mv.status!=="cancelled"&&
-    mv.movement_type!=="transfer_in"&&
-    mv.movement_date.slice(0,7)===m&&
-    root(mv.category_id)===b.id
-   );
-
-   // 2) Échéances récurrentes encore projetées et non matérialisées dans personal_movements.
-   // On les compte déjà dans l'enveloppe consommée afin de ne pas les doubler avec le reliquat lissé.
-   const projectedBudgetFlows=ops.filter(o=>
-    o.source==="recurrence"&&
-    o.movement_date.slice(0,7)===m&&
-    root(o.category_id)===b.id
-   );
-
+   const key=`${m}:${b.id}`;
    const {remaining}=calculateBudgetUsage(
     Number(b.monthly_budget),
-    [...recordedBudgetFlows,...projectedBudgetFlows],
+    [...(recordedBudgetFlowsByKey.get(key)??[]),...(projectedBudgetFlowsByKey.get(key)??[])],
    );
    if(remaining>0){
     // Le reliquat budgétaire n'est pas débité artificiellement en bloc le dernier jour.
@@ -141,7 +147,8 @@ export function buildReliableProjection(input:Input){
  const allOps:RPOperation[]=[...baseOps];const points:RPPoint[]=[];const audits:RPMonthAudit[]=[];
  const monthOps=new Map<string,RPOperation[]>();for(const o of baseOps){const m=o.movement_date.slice(0,7);monthOps.set(m,[...(monthOps.get(m)??[]),o])}
  const profileByChecking=new Map(input.profiles.filter(p=>p.sourceAccountId&&p.destinationAccountId).map(p=>[p.sourceAccountId!,p]));
- const pendingProposal=(source:string,dest:string,m:string)=>input.savingsProposals.find(p=>p.source_account_id===source&&p.destination_account_id===dest&&String(p.source_month).slice(0,7)===m&&p.status==='pending');
+ const pendingProposalByKey=new Map(input.savingsProposals.filter(p=>p.status==='pending').map(p=>[`${p.source_account_id}:${p.destination_account_id}:${String(p.source_month).slice(0,7)}`,p]));
+ const pendingProposal=(source:string,dest:string,m:string)=>pendingProposalByKey.get(`${source}:${dest}:${m}`);
 
  const transferCaps=new Map<string,number>();
  const apply=(o:RPOperation,audit?:RPMonthAudit)=>{
@@ -178,9 +185,11 @@ export function buildReliableProjection(input:Input){
   return amount;
  };
  const delta=(o:RPOperation)=>['income','transfer_in'].includes(o.movement_type)?Number(o.amount):-Number(o.amount);
+ const baseOpsByAccount=new Map<string,RPOperation[]>();
+ for(const o of baseOps){const rows=baseOpsByAccount.get(o.account_id);if(rows)rows.push(o);else baseOpsByAccount.set(o.account_id,[o]);}
  const safeSurplus45=(checkingId:string,threshold:number,fromMonth:string)=>{
   let simulated=Number(balances.get(checkingId)??0);let minimum=simulated;const from=monthEnd(fromMonth);const through=addDays(from,45);
-  for(const o of baseOps.filter(o=>o.account_id===checkingId&&o.movement_date>from&&o.movement_date<=through).sort((a,b)=>a.movement_date.localeCompare(b.movement_date))){simulated=round(simulated+delta(o));minimum=Math.min(minimum,simulated);}
+  for(const o of baseOpsByAccount.get(checkingId)??[]){if(o.movement_date<=from||o.movement_date>through)continue;simulated=round(simulated+delta(o));minimum=Math.min(minimum,simulated);}
   return round(Math.max(0,minimum-threshold));
  };
 
@@ -188,9 +197,10 @@ export function buildReliableProjection(input:Input){
   const m=shiftMonth(startMonth,mi),rows=(monthOps.get(m)??[]).filter(o=>o.source!=='savings').sort((a,b)=>a.movement_date.localeCompare(b.movement_date)||a.id.localeCompare(b.id));
   const audit:RPMonthAudit={month:m,opening:Object.fromEntries([...balances].map(([k,v])=>[k,round(v)])),credits:{},debits:{},budgetDebits:{},savingsUsed:{},savingsDeposited:{},closing:{}};
   const opening=new Map(balances);
+  const rowsByAccount=new Map<string,RPOperation[]>();for(const o of rows){const accountRows=rowsByAccount.get(o.account_id);if(accountRows)accountRows.push(o);else rowsByAccount.set(o.account_id,[o]);}
   const needInfo=(checkingId:string,threshold:number)=>{
    let bal=Number(opening.get(checkingId)??0),minimum=bal,first:string|null=bal<threshold-0.009?`${m}-01`:null;
-   for(const o of rows.filter(o=>o.account_id===checkingId).sort((a,b)=>a.movement_date.localeCompare(b.movement_date))){bal=round(bal+delta(o));if(bal<minimum)minimum=bal;if(first===null&&bal<threshold-0.009)first=o.movement_date;}
+   for(const o of rowsByAccount.get(checkingId)??[]){bal=round(bal+delta(o));if(bal<minimum)minimum=bal;if(first===null&&bal<threshold-0.009)first=o.movement_date;}
    return {minimum,first,required:round(Math.max(0,threshold-minimum))};
   };
 
@@ -198,7 +208,7 @@ export function buildReliableProjection(input:Input){
   for(const o of rows)apply(o,audit);
 
   // 2. Protection du seuil : besoin calculé sur le minimum intramensuel, pas uniquement sur la clôture.
-  for(const checking of input.accounts.filter(a=>a.account_type==='checking')){
+  for(const checking of checkingAccounts){
    const p=profileByChecking.get(checking.id);if(!p?.destinationAccountId)continue;const threshold=Math.max(0,Number(p.threshold||0));const info=needInfo(checking.id,threshold);if(info.required<=0.009)continue;
    const savings=p.destinationAccountId;const avail=mobilizableSavingsForAccount(Number(balances.get(savings)??0),savings,input.savingsBudgets,SAVINGS_FLOOR);if(avail<=0.009)continue;
    let needDate=info.first??monthEnd(m);let useDate=addDays(needDate,-2);if(useDate<`${m}-01`)useDate=`${m}-01`;if(m===startMonth&&useDate<input.todayIso)useDate=input.todayIso;
@@ -206,16 +216,16 @@ export function buildReliableProjection(input:Input){
   }
 
   // 3. Mise de côté prudente : seulement l'excédent qui reste sûr sur les 45 jours suivants.
-  for(const checking of input.accounts.filter(a=>a.account_type==='checking')){
+  for(const checking of checkingAccounts){
    const p=profileByChecking.get(checking.id);if(!p?.destinationAccountId)continue;const threshold=Math.max(0,Number(p.threshold||0));const balance=Number(balances.get(checking.id)??0);if(balance<=threshold+0.009)continue;
    const safe45=safeSurplus45(checking.id,threshold,m);const surplus=round(Math.min(balance-threshold,safe45));
    if(surplus>0.009)synthetic(m,monthEnd(m),checking.id,p.destinationAccountId,surplus,'deposit',`Versement épargne proposé · ${p.label}`,audit);
   }
 
   // 4. Invariants physiques : l'épargne ne peut jamais être négative.
-  for(const a of input.accounts.filter(a=>a.account_type==='savings'))if(Number(balances.get(a.id)??0)<0)balances.set(a.id,0);
+  for(const a of savingsAccounts)if(Number(balances.get(a.id)??0)<0)balances.set(a.id,0);
   const copy=Object.fromEntries([...balances].map(([k,v])=>[k,round(v)]));audit.closing=copy;audits.push(audit);
-  const checking=input.accounts.filter(a=>a.account_type==='checking').reduce((s,a)=>s+Number(copy[a.id]??0),0);const savings=input.accounts.filter(a=>a.account_type==='savings').reduce((s,a)=>s+Number(copy[a.id]??0),0);const crypto=input.accounts.filter(a=>a.account_type==='crypto').reduce((s,a)=>s+Number(copy[a.id]??0),0);
+  const checking=checkingAccounts.reduce((s,a)=>s+Number(copy[a.id]??0),0);const savings=savingsAccounts.reduce((s,a)=>s+Number(copy[a.id]??0),0);const crypto=input.accounts.filter(a=>a.account_type==='crypto').reduce((s,a)=>s+Number(copy[a.id]??0),0);
   points.push({date:monthEnd(m),balances:copy,checking:round(checking),savings:round(savings),crypto:round(crypto),total:round(checking+savings+crypto)});
  }
  return {points,operations:allOps.sort((a,b)=>a.movement_date.localeCompare(b.movement_date)||a.id.localeCompare(b.id)),operationsByMonth:monthOps,audits};
