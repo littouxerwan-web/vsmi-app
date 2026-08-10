@@ -51,6 +51,7 @@ type Recurrence = {
   exclude_from_analysis?: boolean | null;
 };
 type Account = { id: string; name: string; account_type: string };
+type SavingsProfile = { id:string; sourceAccountId:string|null; destinationAccountId:string|null };
 type ProjectionPoint = {
   date: string;
   balances: Record<string, number>;
@@ -117,6 +118,7 @@ export function AnalysisView({
   categories,
   accounts,
   recurrences,
+  profiles = [],
 }: {
   movements: Movement[];
   projectedOperations: Movement[];
@@ -125,6 +127,7 @@ export function AnalysisView({
   categories: Category[];
   accounts: Account[];
   recurrences: Recurrence[];
+  profiles?: SavingsProfile[];
 }) {
   const [period, setPeriod] = useState<Period>("month");
   const [accountId, setAccountId] = useState("all");
@@ -310,7 +313,13 @@ export function AnalysisView({
   }, [period, accountId, movements, projectedOperations, projectionPoints, categories, recurrences, accounts]);
 
   const savingsAnalysis = useMemo(() => {
-    const savingsIds = new Set(accounts.filter((a) => a.account_type === "savings").map((a) => a.id));
+    const scopedSavingsIds =
+      accountId === "all"
+        ? accounts.filter((a) => a.account_type === "savings").map((a) => a.id)
+        : profiles
+            .filter((profile) => profile.sourceAccountId === accountId && profile.destinationAccountId)
+            .map((profile) => String(profile.destinationAccountId));
+    const savingsIds = new Set(scopedSavingsIds);
     const accountType = new Map(accounts.map((a) => [a.id, a.account_type]));
     const byGroup = new Map<string, Movement[]>();
     for (const op of projectedOperations) {
@@ -325,7 +334,8 @@ export function AnalysisView({
       if (op.movement_type !== "transfer_in") return false;
       const pair = op.transfer_group_id ? byGroup.get(op.transfer_group_id) ?? [] : [];
       const source = pair.find((x) => x.movement_type === "transfer_out");
-      return !source || accountType.get(source.account_id) !== "savings";
+      if (source && accountType.get(source.account_id) === "savings") return false;
+      return accountId === "all" || !source || source.account_id === accountId;
     };
     const externalOutgoing = (op: Movement) => {
       if (!savingsIds.has(op.account_id)) return false;
@@ -333,7 +343,8 @@ export function AnalysisView({
       if (op.movement_type !== "transfer_out") return false;
       const pair = op.transfer_group_id ? byGroup.get(op.transfer_group_id) ?? [] : [];
       const destination = pair.find((x) => x.movement_type === "transfer_in");
-      return !destination || accountType.get(destination.account_id) !== "savings";
+      if (destination && accountType.get(destination.account_id) === "savings") return false;
+      return accountId === "all" || !destination || destination.account_id === accountId;
     };
     const rows = projectionAudits.slice(0, 60).map((audit) => {
       const opening = [...savingsIds].reduce((sum, id) => sum + Number(audit.opening?.[id] ?? 0), 0);
@@ -354,7 +365,7 @@ export function AnalysisView({
       };
     });
     return { rows, years };
-  }, [accounts, projectedOperations, projectionAudits]);
+  }, [accountId, accounts, profiles, projectedOperations, projectionAudits]);
 
   const top = context.ranked[0];
   const savingsPotential = context.nonEssential * 0.1;
@@ -503,7 +514,7 @@ export function AnalysisView({
             <span className="grid size-9 shrink-0 place-items-center rounded-full bg-neutral-100"><PiggyBank size={17} /></span>
             <div>
               <h3 className="font-semibold">Analyse de l’épargne · 5 ans</h3>
-              <p className="mt-1 text-xs text-neutral-500">60 mois issus du même moteur que Projection. « Épargne prévue » regroupe les versements conseillés et les autres entrées prévues vers les comptes d’épargne. « Épargne utilisée » regroupe les sorties vers la trésorerie ou dépenses depuis l’épargne.</p>
+              <p className="mt-1 text-xs text-neutral-500">60 mois issus du même moteur que Projection. Le tableau suit uniquement l’épargne liée au compte courant sélectionné en haut ; « Tous les comptes courants » agrège toute l’épargne. « Épargne prévue » regroupe les versements conseillés et les autres entrées prévues vers le compte d’épargne lié. « Épargne utilisée » regroupe les sorties vers la trésorerie ou dépenses depuis cette épargne.</p>
             </div>
           </div>
           <div className="mt-4 space-y-3">
