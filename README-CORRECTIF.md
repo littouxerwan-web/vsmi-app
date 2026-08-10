@@ -1,7 +1,14 @@
-# Correctif reliquat budgets — 2026-08-10
+# Correctif hiérarchie Budgets Épargne — 10/08/2026
 
-Le moteur de projection calcule désormais le budget restant à lisser à partir de tous les mouvements du mois, y compris les mouvements déjà pointés qui sont déjà intégrés au solde actuel.
+Règle unique appliquée dans Budgets Épargne, Projection et moteur d'utilisation d'épargne :
 
-Il ajoute aussi les échéances récurrentes encore projetées afin d'éviter de les compter une seconde fois dans le reliquat lissé.
+- Réserve : mobilisable immédiatement.
+- Épargne non affectée : mobilisable immédiatement.
+- Projet Libre : disponible en second rang, après épuisement de la réserve mobilisable.
+- Projet Intouchable : jamais mobilisé automatiquement.
+- Plancher physique de 30 € par compte d'épargne conservé.
+- Priorité manuelle non utilisée.
 
-Conséquence attendue : si l'écran Budgets indique 686,38 € restant à débiter, Projection lisse 686,38 € et non le budget nominal complet de 1 190 €.
+Le correctif inclut aussi le sélecteur propre de compte épargne dans Analyse et conserve la courbe « Épargne mobilisable » dans Projection.
+
+Une migration Supabase normalise les anciennes lignes de type Réserve pour éviter qu'un ancien champ protection/allow_recovery ne les rende artificiellement non mobilisables.

@@ -131,6 +131,7 @@ export function AnalysisView({
 }) {
   const [period, setPeriod] = useState<Period>("month");
   const [accountId, setAccountId] = useState("all");
+  const [savingsAccountId, setSavingsAccountId] = useState("all");
   const [monthlyOpen, setMonthlyOpen] = useState(false);
   const [uncatOpen, setUncatOpen] = useState(false);
 
@@ -313,12 +314,11 @@ export function AnalysisView({
   }, [period, accountId, movements, projectedOperations, projectionPoints, categories, recurrences, accounts]);
 
   const savingsAnalysis = useMemo(() => {
+    const savingsAccounts = accounts.filter((a) => a.account_type === "savings");
     const scopedSavingsIds =
-      accountId === "all"
-        ? accounts.filter((a) => a.account_type === "savings").map((a) => a.id)
-        : profiles
-            .filter((profile) => profile.sourceAccountId === accountId && profile.destinationAccountId)
-            .map((profile) => String(profile.destinationAccountId));
+      savingsAccountId === "all"
+        ? savingsAccounts.map((a) => a.id)
+        : savingsAccounts.filter((a) => a.id === savingsAccountId).map((a) => a.id);
     const savingsIds = new Set(scopedSavingsIds);
     const accountType = new Map(accounts.map((a) => [a.id, a.account_type]));
     const byGroup = new Map<string, Movement[]>();
@@ -334,8 +334,7 @@ export function AnalysisView({
       if (op.movement_type !== "transfer_in") return false;
       const pair = op.transfer_group_id ? byGroup.get(op.transfer_group_id) ?? [] : [];
       const source = pair.find((x) => x.movement_type === "transfer_out");
-      if (source && accountType.get(source.account_id) === "savings") return false;
-      return accountId === "all" || !source || source.account_id === accountId;
+      return !source || accountType.get(source.account_id) !== "savings";
     };
     const externalOutgoing = (op: Movement) => {
       if (!savingsIds.has(op.account_id)) return false;
@@ -343,8 +342,7 @@ export function AnalysisView({
       if (op.movement_type !== "transfer_out") return false;
       const pair = op.transfer_group_id ? byGroup.get(op.transfer_group_id) ?? [] : [];
       const destination = pair.find((x) => x.movement_type === "transfer_in");
-      if (destination && accountType.get(destination.account_id) === "savings") return false;
-      return accountId === "all" || !destination || destination.account_id === accountId;
+      return !destination || accountType.get(destination.account_id) !== "savings";
     };
     const rows = projectionAudits.slice(0, 60).map((audit) => {
       const opening = [...savingsIds].reduce((sum, id) => sum + Number(audit.opening?.[id] ?? 0), 0);
@@ -359,13 +357,13 @@ export function AnalysisView({
       return {
         year, months,
         opening: months[0]?.opening ?? 0,
-        planned: months.reduce((s, r) => s + r.planned, 0),
-        used: months.reduce((s, r) => s + r.used, 0),
+        planned: months.reduce((sum, row) => sum + row.planned, 0),
+        used: months.reduce((sum, row) => sum + row.used, 0),
         closing: months.at(-1)?.closing ?? 0,
       };
     });
     return { rows, years };
-  }, [accountId, accounts, profiles, projectedOperations, projectionAudits]);
+  }, [savingsAccountId, accounts, projectedOperations, projectionAudits]);
 
   const top = context.ranked[0];
   const savingsPotential = context.nonEssential * 0.1;
@@ -514,9 +512,16 @@ export function AnalysisView({
             <span className="grid size-9 shrink-0 place-items-center rounded-full bg-neutral-100"><PiggyBank size={17} /></span>
             <div>
               <h3 className="font-semibold">Analyse de l’épargne · 5 ans</h3>
-              <p className="mt-1 text-xs text-neutral-500">60 mois issus du même moteur que Projection. Le tableau suit uniquement l’épargne liée au compte courant sélectionné en haut ; « Tous les comptes courants » agrège toute l’épargne. « Épargne prévue » regroupe les versements conseillés et les autres entrées prévues vers le compte d’épargne lié. « Épargne utilisée » regroupe les sorties vers la trésorerie ou dépenses depuis cette épargne.</p>
+              <p className="mt-1 text-xs text-neutral-500">60 mois issus du même moteur que Projection. Cette analyse est indépendante du filtre de compte courant situé en haut de la page. Choisis ici un compte d’épargne précis ou « Tous les comptes épargne ». « Épargne prévue » regroupe les entrées prévues vers l’épargne ; « Épargne utilisée » regroupe les sorties vers la trésorerie ou les dépenses depuis cette épargne.</p>
             </div>
           </div>
+          <label className="mt-4 block max-w-xl">
+            <span className="text-sm font-medium">Compte épargne analysé</span>
+            <select value={savingsAccountId} onChange={(e) => setSavingsAccountId(e.target.value)} className="mt-2 min-h-11 w-full rounded-xl border border-black/10 bg-white px-3 text-sm">
+              <option value="all">Tous les comptes épargne</option>
+              {accounts.filter((account) => account.account_type === "savings").map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+            </select>
+          </label>
           <div className="mt-4 space-y-3">
             {savingsAnalysis.years.map((year, index) => (
               <details key={year.year} open={index === 0} className="rounded-xl border border-black/10">

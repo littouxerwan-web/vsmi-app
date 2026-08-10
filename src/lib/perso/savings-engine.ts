@@ -23,19 +23,30 @@ export function savingsAvailabilityForAccount(savingsBalance:number,accountId:st
  const physical=Math.max(0,balance-floor);
  const rows=(budgets??[]).filter(b=>b.account_id===accountId);
  const amount=(b:SavingsBudgetAllocation)=>savingsBudgetAmount(b,balance);
- // Compatibilité avec les anciennes données : "À préserver" reste libre uniquement
- // lorsqu'il était déjà explicitement autorisé à la récupération. Sinon il est traité
- // comme intouchable jusqu'à la migration.
- const freeAllocated=rows.filter(b=>b.protection==="free"||(b.protection==="preserve"&&b.allow_recovery)).reduce((sum,b)=>sum+amount(b),0);
- const untouchableAllocated=rows.filter(b=>b.protection==="untouchable"||(b.protection==="preserve"&&!b.allow_recovery)).reduce((sum,b)=>sum+amount(b),0);
- const untouchable=Math.min(physical,Math.max(0,untouchableAllocated));
- const afterUntouchable=Math.max(0,physical-untouchable);
- const free=Math.min(afterUntouchable,Math.max(0,freeAllocated));
- // L'épargne non affectée est la réserve mobilisable de premier rang. Les enveloppes
- // "Libre" ne sont utilisées qu'ensuite. L'intouchable n'entre jamais dans le calcul.
- const mobilizable=Math.max(0,afterUntouchable-free);
+ if(!rows.length)return {physical,mobilizable:physical,reserve:0,unallocated:physical,free:0,untouchable:0,totalUsable:physical};
+
+ // Hiérarchie métier unique :
+ // 1) Réserve = mobilisable immédiatement, quelle que soit une ancienne valeur de protection.
+ // 2) Projet libre = utilisable uniquement après épuisement de la réserve mobilisable.
+ // 3) Projet intouchable = jamais utilisable automatiquement.
+ // L'épargne non affectée reste mobilisable immédiatement afin de ne pas immobiliser
+ // artificiellement une partie du compte lorsqu'aucune enveloppe ne la couvre.
+ const reserveNominal=rows.filter(b=>b.kind==="reserve").reduce((sum,b)=>sum+amount(b),0);
+ const projectFreeNominal=rows.filter(b=>b.kind==="project"&&(b.protection==="free"||(b.protection==="preserve"&&b.allow_recovery))).reduce((sum,b)=>sum+amount(b),0);
+ const projectUntouchableNominal=rows.filter(b=>b.kind==="project"&&(b.protection==="untouchable"||(b.protection==="preserve"&&!b.allow_recovery))).reduce((sum,b)=>sum+amount(b),0);
+
+ // En cas de sur-affectation, on reste conservateur : l'intouchable est sanctuarisé
+ // en premier, puis la réserve, puis les projets libres. L'écran Budgets Épargne
+ // continue par ailleurs à signaler la sur-affectation à l'utilisateur.
+ const untouchable=Math.min(physical,Math.max(0,projectUntouchableNominal));
+ let remaining=Math.max(0,physical-untouchable);
+ const reserve=Math.min(remaining,Math.max(0,reserveNominal));
+ remaining=Math.max(0,remaining-reserve);
+ const free=Math.min(remaining,Math.max(0,projectFreeNominal));
+ const unallocated=Math.max(0,remaining-free);
+ const mobilizable=Math.max(0,reserve+unallocated);
  const totalUsable=Math.max(0,mobilizable+free);
- return {physical,mobilizable,free,untouchable,totalUsable};
+ return {physical,mobilizable,reserve,unallocated,free,untouchable,totalUsable};
 }
 
 export function mobilizableSavingsForAccount(savingsBalance:number,accountId:string,budgets:SavingsBudgetAllocation[]|undefined,floor=30){

@@ -1039,13 +1039,13 @@ export async function createSavingsBudget(fd: FormData) {
   const kind=text(fd,"kind")==="reserve"?"reserve":"project";
   const allocationMode=text(fd,"allocation_mode")==="percent"?"percent":"amount";
   const allocationValue=Math.max(0,number(fd,"allocation_value")||0);
-  const protection=["free","untouchable"].includes(text(fd,"protection"))?text(fd,"protection"):"free";
-  const allowRecovery=protection==="free";
+  const protection=kind==="reserve"?"free":(["free","untouchable"].includes(text(fd,"protection"))?text(fd,"protection"):"free");
+  const allowRecovery=kind==="reserve"||protection==="free";
   const criticalThreshold=Math.max(0,number(fd,"critical_threshold")||0);
   const targetAmount=number(fd,"target_amount");
   if(!accountId||!name||allocationValue<=0) fail("Complète le budget d’épargne.");
   if(allocationMode==="percent"&&allocationValue>100) fail("Un pourcentage ne peut pas dépasser 100 %.");
-  const {error}=await supabase.from("personal_savings_budgets").insert({owner_id:user.id,account_id:accountId,name,kind,allocation_mode:allocationMode,allocation_value:allocationValue,protection,allow_recovery:allowRecovery,critical_threshold:criticalThreshold,target_amount:Number.isFinite(targetAmount)&&targetAmount>0?targetAmount:null,target_date:optional(fd,"target_date"),priority:protection==="free"?10:100});
+  const {error}=await supabase.from("personal_savings_budgets").insert({owner_id:user.id,account_id:accountId,name,kind,allocation_mode:allocationMode,allocation_value:allocationValue,protection,allow_recovery:allowRecovery,critical_threshold:criticalThreshold,target_amount:Number.isFinite(targetAmount)&&targetAmount>0?targetAmount:null,target_date:optional(fd,"target_date"),priority:0});
   if(error) fail(error.message); savingsBudgetRedirect("Budget d’épargne ajouté.");
 }
 
@@ -1055,13 +1055,13 @@ export async function updateSavingsBudget(fd: FormData) {
   const kind=text(fd,"kind")==="reserve"?"reserve":"project";
   const allocationMode=text(fd,"allocation_mode")==="percent"?"percent":"amount";
   const allocationValue=Math.max(0,number(fd,"allocation_value")||0);
-  const protection=["free","untouchable"].includes(text(fd,"protection"))?text(fd,"protection"):"free";
-  const allowRecovery=protection==="free";
+  const protection=kind==="reserve"?"free":(["free","untouchable"].includes(text(fd,"protection"))?text(fd,"protection"):"free");
+  const allowRecovery=kind==="reserve"||protection==="free";
   const criticalThreshold=Math.max(0,number(fd,"critical_threshold")||0);
   const targetAmount=number(fd,"target_amount");
   if(!id||!accountId||!name||allocationValue<=0) fail("Budget d’épargne incomplet.");
   if(allocationMode==="percent"&&allocationValue>100) fail("Un pourcentage ne peut pas dépasser 100 %.");
-  const {error}=await supabase.from("personal_savings_budgets").update({account_id:accountId,name,kind,allocation_mode:allocationMode,allocation_value:allocationValue,protection,allow_recovery:allowRecovery,critical_threshold:criticalThreshold,target_amount:Number.isFinite(targetAmount)&&targetAmount>0?targetAmount:null,target_date:optional(fd,"target_date"),priority:protection==="free"?10:100}).eq("id",id).eq("owner_id",user.id);
+  const {error}=await supabase.from("personal_savings_budgets").update({account_id:accountId,name,kind,allocation_mode:allocationMode,allocation_value:allocationValue,protection,allow_recovery:allowRecovery,critical_threshold:criticalThreshold,target_amount:Number.isFinite(targetAmount)&&targetAmount>0?targetAmount:null,target_date:optional(fd,"target_date"),priority:0}).eq("id",id).eq("owner_id",user.id);
   if(error) fail(error.message); savingsBudgetRedirect("Budget d’épargne modifié.");
 }
 
