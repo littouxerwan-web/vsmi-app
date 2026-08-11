@@ -40,16 +40,48 @@ export async function saveDashboardOrder(order: string[]) {
 
 
 export async function saveDashboardColors(colors: Record<string, string>) {
-  const { supabase } = await session();
-  const allowed = new Set(["black", "gold", "silver"]);
+  const { supabase, user } = await session();
+  const allowed = new Set(["black", "gold", "silver", "blue", "green", "purple", "pink"]);
+  const toneHex: Record<string, string> = {
+    black: "#111111",
+    gold: "#D2AE57",
+    silver: "#D7D9DD",
+    blue: "#A8CBE5",
+    green: "#ADD5B8",
+    purple: "#C8B5DF",
+    pink: "#E7B8C8",
+  };
   const safeColors = Object.fromEntries(
     Object.entries(colors ?? {})
       .filter(([key, color]) => (key === "common" || key.startsWith("personal:")) && allowed.has(String(color)))
       .slice(0, 50),
   );
-  const { error } = await supabase.auth.updateUser({ data: { dashboard_account_colors: safeColors } });
+
+  // On fusionne avec les couleurs déjà enregistrées afin qu'un réglage depuis
+  // En cours ne supprime jamais la couleur du compte commun (et inversement).
+  const previous = user.user_metadata?.dashboard_account_colors;
+  const merged = {
+    ...(previous && typeof previous === "object" && !Array.isArray(previous) ? previous : {}),
+    ...safeColors,
+  };
+
+  const personalUpdates = Object.entries(safeColors)
+    .filter(([key]) => key.startsWith("personal:"))
+    .map(async ([key, tone]) => {
+      const id = key.slice("personal:".length);
+      const { error } = await supabase
+        .from("personal_accounts")
+        .update({ color: toneHex[String(tone)] })
+        .eq("id", id)
+        .eq("owner_id", user.id);
+      if (error) throw new Error(error.message);
+    });
+  await Promise.all(personalUpdates);
+
+  const { error } = await supabase.auth.updateUser({ data: { dashboard_account_colors: merged } });
   if (error) throw new Error(error.message);
   revalidatePath("/aujourd-hui");
+  revalidatePath("/perso");
   return { ok: true };
 }
 

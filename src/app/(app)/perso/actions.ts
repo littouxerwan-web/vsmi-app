@@ -450,9 +450,9 @@ export async function moveAccount(fd: FormData) {
 
 export async function updateAccount(fd: FormData) {
   const { supabase, user } = await auth();
-  const id = text(fd, "id"); const name = text(fd, "name"); const color = text(fd, "color") || "#dbeafe";
+  const id = text(fd, "id"); const name = text(fd, "name");
   if (!id || !name) fail("Compte incomplet.");
-  const { error } = await supabase.from("personal_accounts").update({ name, color }).eq("id", id).eq("owner_id", user.id);
+  const { error } = await supabase.from("personal_accounts").update({ name }).eq("id", id).eq("owner_id", user.id);
   if (error) fail(error.message); await refresh("Compte modifié.");
 }
 

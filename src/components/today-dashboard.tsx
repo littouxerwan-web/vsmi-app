@@ -32,7 +32,7 @@ type Tile = {
   href: string;
 };
 type Wedding = { id: string; name: string; date: string; city: string | null };
-type TileColor = "black" | "gold" | "silver";
+type TileColor = "black" | "gold" | "silver" | "blue" | "green" | "purple" | "pink";
 
 type Props = {
   tiles: Tile[];
@@ -71,6 +71,24 @@ const toneClasses: Record<TileColor, string> = {
   black: "border-[#4B4B4B] bg-[#111111] text-white",
   gold: "border-[#D2AE57] bg-[#D2AE57] text-black",
   silver: "border-[#BFC2C7] bg-[#D7D9DD] text-black",
+  blue: "border-[#78A9CF] bg-[#A8CBE5] text-[#14212B]",
+  green: "border-[#78B28A] bg-[#ADD5B8] text-[#183021]",
+  purple: "border-[#A58AC6] bg-[#C8B5DF] text-[#2B1D3A]",
+  pink: "border-[#C98EA5] bg-[#E7B8C8] text-[#40202C]",
+};
+
+const toneDots: Record<TileColor, string> = {
+  black: "bg-black",
+  gold: "bg-[#D2AE57]",
+  silver: "bg-[#D7D9DD]",
+  blue: "bg-[#A8CBE5]",
+  green: "bg-[#ADD5B8]",
+  purple: "bg-[#C8B5DF]",
+  pink: "bg-[#E7B8C8]",
+};
+
+const toneLabels: Record<TileColor, string> = {
+  black: "Noir", gold: "Or", silver: "Argent", blue: "Bleu", green: "Vert", purple: "Violet", pink: "Rose",
 };
 
 const typeLabel = (type: Tile["type"]) => type === "common" ? "Commun" : type === "checking" ? "Courant" : type === "savings" ? "Épargne" : "Crypto";
@@ -211,14 +229,14 @@ export function TodayDashboard({
                     <div className="pointer-events-auto mt-3 border-t border-current/10 pt-2.5">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex gap-1.5" aria-label={`Couleur de ${tile.name}`}>
-                          {(["black", "gold", "silver"] as TileColor[]).map((color) => (
+                          {(["black", "gold", "silver", "blue", "green", "purple", "pink"] as TileColor[]).map((color) => (
                             <button
                               key={color}
                               type="button"
                               onClick={() => setTileColor(tile.key, color)}
                               disabled={pending}
-                              className={`size-6 rounded-full border-2 ${color === "black" ? "bg-black" : color === "gold" ? "bg-[#D2AE57]" : "bg-[#D7D9DD]"} ${(colors[tile.key] ?? defaultTone(tile.type, index)) === color ? "border-white ring-1 ring-black/40" : "border-black/15"}`}
-                              aria-label={color === "black" ? "Noir" : color === "gold" ? "Or" : "Argent"}
+                              className={`size-6 rounded-full border-2 ${toneDots[color]} ${(colors[tile.key] ?? defaultTone(tile.type, index)) === color ? "border-white ring-1 ring-black/40" : "border-black/15"}`}
+                              aria-label={toneLabels[color]}
                             />
                           ))}
                         </div>

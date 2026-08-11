@@ -6,6 +6,7 @@ import { logout } from "@/app/connexion/actions";
 import { AppNavigation } from "@/components/app-navigation";
 import { MobileNavigation } from "@/components/mobile-navigation";
 import { PrivacyModeToggle } from "@/components/privacy-mode-toggle";
+import { ThemeModeToggle } from "@/components/theme-mode-toggle";
 import { InteractionFeedback } from "@/components/interaction-feedback";
 import { createClient } from "@/lib/supabase/server";
 
@@ -52,8 +53,9 @@ export default async function AppLayout({ children }: AppLayoutProps) {
         <div className="min-w-0 flex-1">
           <header className="sticky top-0 z-30 border-b border-white/10 bg-[#101010]/95 text-white shadow-[0_8px_28px_rgba(0,0,0,.18)] backdrop-blur">
             <div className="relative grid h-18 grid-cols-[1fr_auto_1fr] items-center px-4 sm:px-5 lg:px-8">
-              <div className="flex items-center justify-start">
+              <div className="flex items-center justify-start gap-2">
                 <PrivacyModeToggle />
+                <ThemeModeToggle />
               </div>
 
               <Link

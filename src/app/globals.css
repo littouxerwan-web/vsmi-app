@@ -589,3 +589,82 @@ input[type="radio"]:not(:disabled) {
     border-radius: .9rem;
   }
 }
+
+
+/* --------------------------------------------------------------------------
+   Mode clair global — bascule depuis la barre supérieure, à côté du mode privé.
+   Le choix est conservé localement sur l'appareil.
+   -------------------------------------------------------------------------- */
+.vsmi-light-mode .vsmi-lux-theme {
+  background: #f4f1ea !important;
+  color: #20211e !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme > .flex,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content main {
+  background-color: #f4f1ea !important;
+  color: #20211e !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme header {
+  background: rgba(255,253,248,.96) !important;
+  color: #20211e !important;
+  border-color: rgba(32,33,30,.12) !important;
+  box-shadow: 0 8px 28px rgba(40,35,25,.08) !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme header [class*="text-[#C8C8C8]"],
+.vsmi-light-mode .vsmi-lux-theme header [class*="text-[#E7E7E7]"] {
+  color: #4f504b !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme aside {
+  background: #f8f5ee !important;
+  color: #20211e !important;
+  border-right: 1px solid rgba(32,33,30,.10);
+}
+
+.vsmi-light-mode .vsmi-lux-theme aside a,
+.vsmi-light-mode .vsmi-lux-theme aside summary {
+  color: #343530 !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme aside a[href="/aujourd-hui"],
+.vsmi-light-mode .vsmi-lux-theme aside details:first-of-type summary {
+  color: #7a5b19 !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme nav.fixed {
+  background: rgba(255,253,248,.97) !important;
+  border-color: rgba(32,33,30,.12) !important;
+  box-shadow: 0 -8px 30px rgba(40,35,25,.10) !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme nav.fixed > div > a:not([aria-current="page"]),
+.vsmi-light-mode .vsmi-lux-theme nav.fixed > div > button {
+  color: #6b6c66 !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content h2.text-white {
+  color: #20211e !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme > div > div.bg-white,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme > div > section.bg-white,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme > div > div > section.bg-white,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme nav {
+  background-color: #fffdf8 !important;
+  color: #20211e !important;
+  border-color: rgba(32,33,30,.10) !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme nav a:not(.bg-black) {
+  color: #666760 !important;
+}
+
+/* Les cartes de compte conservent leur couleur choisie dans Organiser dans les
+   deux modes. Les surfaces de données restent volontairement claires. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme article[style*="border-color"] {
+  color: #20211e !important;
+}
