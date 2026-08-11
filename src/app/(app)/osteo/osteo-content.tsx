@@ -29,7 +29,19 @@ export async function OsteoContent({params,ownerId}:{params:SP;ownerId:string}){
  const monthlyQuery=view==="2035"
   ? supabase.from("osteo_monthly_settings").select("month,sublease_income,km_per_day,benefit_previous_year").eq("owner_id",user.id).gte("month",`${year}-01-01`).lte("month",`${year}-12-01`).order("month")
   : supabase.from("osteo_monthly_settings").select("month,sublease_income,km_per_day,benefit_previous_year").eq("owner_id",user.id).eq("month",monthStart);
- const [accountsResult,settingsResult,feesResult,chargesResult,monthlyResult]=await Promise.all([accountsQuery,settingsQuery,feesQuery,chargesQuery,monthlyQuery]);
+ const timed = async (name:string, q:any) => {
+   const started = Date.now();
+   const result = await q;
+   console.log(`[OSTEO PERF] ${name}: ${Date.now()-started} ms`, result.error?.message ?? "OK");
+   return result;
+ };
+ const [accountsResult,settingsResult,feesResult,chargesResult,monthlyResult]=await Promise.all([
+   timed("accounts", accountsQuery),
+   timed("settings", settingsQuery),
+   timed("fees", feesQuery),
+   timed("charges", chargesQuery),
+   timed("monthly", monthlyQuery),
+ ]);
  const loadError=accountsResult.error??settingsResult.error??feesResult.error??chargesResult.error??monthlyResult.error;
  if(loadError){
   return <main className="osteo-page mx-auto max-w-[900px] p-4 sm:p-6"><section className="rounded-3xl border border-red-400/30 bg-[#1B1D1B] p-5"><div className="flex items-center gap-2 text-[#D2AE57]"><Stethoscope size={21}/><span className="text-xs font-semibold uppercase tracking-[.18em]">OSTEO</span></div><h1 className="mt-3 text-xl font-semibold text-white">Impossible de charger les données OSTEO</h1><p className="mt-2 text-sm text-white/65">La page répond, mais une requête Supabase a échoué : {loadError.message}</p><p className="mt-2 text-xs text-white/45">Vérifie que la migration OSTEO est bien appliquée au projet Supabase utilisé par VSMI.</p></section></main>;
