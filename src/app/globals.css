@@ -1355,3 +1355,93 @@ html.vsmi-light-mode .osteo-2035-table .osteo-2035-benefit td:first-child { back
 html.vsmi-light-mode .osteo-2035-table .osteo-2035-stats td:first-child,
 html.vsmi-light-mode .osteo-2035-table .osteo-2035-previous td:first-child { background: #fff1a0 !important; }
 html.vsmi-light-mode .osteo-analysis-future { background: #fbf7eb !important; }
+
+
+/* ==========================================================================
+   OSTEO 2026-08-11 — correction white mode + navigation 12 mois
+   ========================================================================== */
+
+/* Les sélecteurs sont volontairement plus spécifiques que les anciennes
+   règles graphite afin que les contrôles OSTEO soient réellement clairs. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page .osteo-input,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page .osteo-input,
+.vsmi-light-mode #app-private-content .osteo-page .osteo-input,
+html.vsmi-light-mode #app-private-content .osteo-page .osteo-input {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #242421 !important;
+  -webkit-text-fill-color: #242421 !important;
+  border-color: #cbc9c2 !important;
+  color-scheme: light !important;
+  box-shadow: none !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page select.osteo-input,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page input.osteo-input,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page select.osteo-input,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page input.osteo-input {
+  background-color: #ffffff !important;
+  color: #242421 !important;
+  -webkit-text-fill-color: #242421 !important;
+}
+
+.vsmi-light-mode .osteo-page .osteo-input::placeholder,
+html.vsmi-light-mode .osteo-page .osteo-input::placeholder {
+  color: #92918a !important;
+  -webkit-text-fill-color: #92918a !important;
+  opacity: 1 !important;
+}
+
+.vsmi-light-mode .osteo-page input[type="date"].osteo-input::-webkit-calendar-picker-indicator,
+html.vsmi-light-mode .osteo-page input[type="date"].osteo-input::-webkit-calendar-picker-indicator {
+  filter: none !important;
+  opacity: .72;
+}
+
+/* Navigation mensuelle : les 12 mois restent visibles dans les deux thèmes. */
+.osteo-month-grid {
+  width: 100%;
+}
+.osteo-month-link {
+  min-width: 0;
+  text-decoration: none;
+}
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page .osteo-month-link:not(.is-active),
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page .osteo-month-link:not(.is-active),
+.vsmi-light-mode #app-private-content .osteo-page .osteo-month-link:not(.is-active),
+html.vsmi-light-mode #app-private-content .osteo-page .osteo-month-link:not(.is-active) {
+  background: #f7f5ef !important;
+  border-color: #d8d4c9 !important;
+  color: #55554f !important;
+  -webkit-text-fill-color: #55554f !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page .osteo-month-link:not(.is-active):hover,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page .osteo-month-link:not(.is-active):hover {
+  background: #fffaf0 !important;
+  border-color: #c9ad68 !important;
+  color: #5c471b !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page .osteo-month-link.is-active,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page .osteo-month-link.is-active {
+  background: #d2ae57 !important;
+  border-color: #d2ae57 !important;
+  color: #171714 !important;
+  -webkit-text-fill-color: #171714 !important;
+}
+
+/* Les cases OSTEO restent blanches en mode clair, y compris sous Safari. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page input.osteo-check,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page input.osteo-check:checked,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page input.osteo-check,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page input.osteo-check:checked {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border-color: #b89235 !important;
+  color: #171814 !important;
+  color-scheme: light !important;
+}
