@@ -74,7 +74,7 @@ export function SavingsBudgetView({accounts,budgets,currentBalances,forecastRows
   return out;
  },[accountId,forecastRows,budgets,currentBalances,accounts]);
 
- return <div className="mt-5 space-y-5">
+ return <div className="perso-savings-budget-view mt-5 space-y-5">
   <section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6">
    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
     <div><p className="text-xs font-semibold uppercase tracking-[.18em] text-neutral-500">Organisation de l’épargne</p><h2 className="mt-2 text-xl font-semibold">Budgets Épargne</h2><p className="mt-1 max-w-3xl text-sm text-neutral-500">Les enveloppes de type « Réserve » et l’épargne non affectée sont mobilisables immédiatement. Quand elles sont épuisées, les projets « Libre » peuvent prendre le relais. Les projets « Intouchable » ne sont jamais utilisés. Le plancher de {money(FLOOR)} par compte reste protégé.</p></div>

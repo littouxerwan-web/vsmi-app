@@ -456,14 +456,14 @@ export function AnalysisView({
         <Panel title="Postes les plus coûteux" subtitle="Clique sur un poste pour voir toutes les opérations qui composent son montant.">
           <div className="space-y-3">
             {context.ranked.slice(0, 10).map((x, i) => (
-              <details key={x.key} className="analysis-rank-card rounded-xl border">
+              <details key={x.key} className="analysis-rank-row rounded-xl border border-black/10 bg-neutral-50/60">
                 <summary className="cursor-pointer list-none p-3">
                   <div className="mb-1 flex items-center justify-between gap-3 text-sm">
                     <span><b>{i + 1}.</b> {x.name}</span>
                     <span className="text-right font-semibold">{euro(x.amount)} <span className="font-normal text-neutral-400">· {context.totalExp ? pct(x.amount / context.totalExp) : "0 %"}</span></span>
                   </div>
                   <div className="mb-1 text-[11px] text-neutral-400">{euro(x.realized)} réalisé · {euro(x.forecast)} prévu</div>
-                  <div className="analysis-progress-track h-2 overflow-hidden rounded-full"><div className="analysis-progress-fill h-full rounded-full" style={{ width: `${context.totalExp ? Math.max(2, (x.amount / context.totalExp) * 100) : 0}%` }} /></div>
+                  <div className="h-2 overflow-hidden rounded-full bg-neutral-100"><div className="h-full rounded-full bg-black" style={{ width: `${context.totalExp ? Math.max(2, (x.amount / context.totalExp) * 100) : 0}%` }} /></div>
                 </summary>
                 <div className="border-t border-black/10 px-3">
                   <OperationRows rows={x.rows} accounts={accounts} editableEssential />
@@ -622,10 +622,10 @@ function OperationRows({ rows, accounts, editableEssential = false }: { rows: An
 
 function EssentialGroup({ label, amount, total, rows, accounts }: { label: string; amount: number; total: number; rows: AnalysisRow[]; accounts: Account[] }) {
   return (
-    <details className="analysis-essential-card rounded-xl border">
+    <details className="analysis-rank-row rounded-xl border border-black/10 bg-neutral-50/60">
       <summary className="cursor-pointer list-none p-3">
         <div className="flex justify-between gap-3 text-sm"><span>{label}</span><b>{euro(amount)} · {total ? pct(amount / total) : "0 %"}</b></div>
-        <div className="analysis-progress-track mt-2 h-2 overflow-hidden rounded-full"><div className="analysis-progress-fill h-full rounded-full" style={{ width: `${total ? (amount / total) * 100 : 0}%` }} /></div>
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-neutral-100"><div className="h-full rounded-full bg-black" style={{ width: `${total ? (amount / total) * 100 : 0}%` }} /></div>
         <p className="mt-2 text-[11px] text-neutral-400">Cliquer pour détailler et reclasser les mouvements réalisés.</p>
       </summary>
       <div className="border-t border-black/10 px-3"><OperationRows rows={rows} accounts={accounts} editableEssential /></div>
@@ -640,8 +640,8 @@ function sourceLabel(m: AnalysisRow) {
   if (m.recurrence_id) return "Mouvement régulier";
   return m.analysisKind === "realized" ? "Mouvement réel" : "Mouvement prévu";
 }
-function Metric({ icon: Icon, label, value, detail }: { icon: any; label: string; value: string; detail: string }) { return <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm"><div className="flex items-center gap-2 text-neutral-500"><Icon size={16} /><span className="text-xs font-medium">{label}</span></div><p className="mt-3 text-xl font-semibold">{value}</p><p className="mt-1 text-xs text-neutral-400">{detail}</p></div>; }
-function Panel({ title, subtitle, children }: { title: string; subtitle: string; children: any }) { return <section className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm"><h3 className="font-semibold">{title}</h3><p className="mb-5 mt-1 text-xs text-neutral-500">{subtitle}</p>{children}</section>; }
+function Metric({ icon: Icon, label, value, detail }: { icon: any; label: string; value: string; detail: string }) { return <div className="analysis-metric rounded-2xl border border-black/10 bg-white p-4 shadow-sm"><div className="flex items-center gap-2 text-neutral-500"><Icon size={16} /><span className="text-xs font-medium">{label}</span></div><p className="mt-3 text-xl font-semibold">{value}</p><p className="mt-1 text-xs text-neutral-400">{detail}</p></div>; }
+function Panel({ title, subtitle, children }: { title: string; subtitle: string; children: any }) { return <section className="analysis-panel rounded-2xl border border-black/10 bg-white p-5 shadow-sm"><h3 className="font-semibold">{title}</h3><p className="mb-5 mt-1 text-xs text-neutral-500">{subtitle}</p>{children}</section>; }
 function Info({ icon: Icon, label, value }: { icon: any; label: string; value: string }) { return <div className="flex items-center justify-between gap-3 border-t border-black/10 pt-3 text-sm"><span className="flex items-center gap-2 text-neutral-500"><Icon size={15} />{label}</span><b>{value}</b></div>; }
 function Insight({ icon: Icon, title, text }: { icon: any; title: string; text: string }) { return <div className="rounded-xl bg-neutral-50 p-4"><div className="flex items-center gap-2 font-medium"><Icon size={16} />{title}</div><p className="mt-1.5 leading-5 text-neutral-600">{text}</p></div>; }
 function Empty({ text = "Pas encore assez de données sur cette période." }: { text?: string }) { return <p className="text-sm text-neutral-500">{text}</p>; }

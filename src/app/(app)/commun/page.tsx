@@ -125,7 +125,7 @@ export default async function Page({searchParams}:{searchParams:Promise<any>}){
  const cafAllocated=caf1+caf2,cafUnallocated=Math.max(0,caf-cafAllocated);
  const a1=Math.max(0,baseA1-caf1);
  const a2=Math.max(0,baseA2-caf2);
- return <main className="py-4 lg:py-6"><div>{p.erreur?<Notice danger text={p.erreur}/>:p.succes?<Notice text={p.succes}/>:null}
+ return <main className="commun-ledger-theme py-4 lg:py-6"><div>{p.erreur?<Notice danger text={p.erreur}/>:p.succes?<Notice text={p.succes}/>:null}
  <header className="border-b border-black/10 bg-white px-3 py-4 sm:px-5 lg:px-6"><p className="text-xs font-semibold uppercase tracking-[.18em] text-neutral-400">Espace partagé</p><h1 className="mt-1 text-2xl font-semibold">COMMUN</h1><p className="text-sm text-neutral-500">Indépendant des espaces PERSO.</p></header>
  <nav className="flex gap-2 border-b bg-neutral-100 px-3 py-1 sm:px-5 lg:px-6">{[["encours","En cours"],["budget","Budget"]].map(([id,l])=><Link key={id} href={`/commun?vue=${id}`} className={`px-4 py-2.5 text-sm font-medium ${vue===id?"bg-black text-white":"text-neutral-600"}`}>{l}</Link>)}</nav>
  {vue==="encours"?<div className="space-y-5 px-3 py-5 sm:px-5 lg:px-6">

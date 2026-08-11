@@ -62,7 +62,7 @@ export default async function WeddingsPage({
   });
 
   return (
-    <main className="px-4 py-5 sm:px-5 sm:py-8 lg:px-8">
+    <main className="mariages-ledger-theme px-4 py-5 sm:px-5 sm:py-8 lg:px-8">
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>

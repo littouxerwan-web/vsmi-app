@@ -669,126 +669,298 @@ input[type="radio"]:not(:disabled) {
   color: #20211e !important;
 }
 
+/* ========================================================================== 
+   VSMI 2026-08-11 — Graphite dark mode + vrai mode clair
+   PERSO / COMMUN / MARIAGES
+   ========================================================================== */
 
-/* --------------------------------------------------------------------------
-   PERSO V2.2 — lisibilité des mouvements, modes clair/sombre et analyse.
-   -------------------------------------------------------------------------- */
-.perso-account-card .perso-account-label { color: currentColor !important; opacity: .58; }
-.perso-account-card .perso-account-icon {
-  color: currentColor !important;
-  border-color: color-mix(in srgb, currentColor 22%, transparent) !important;
-  background: color-mix(in srgb, currentColor 8%, transparent) !important;
-}
-
-/* En cours / opérations : même surface pour recherche, synthèse et budgets. */
-.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-surface,
-.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-summary,
-.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-metric,
-.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-budget-card {
-  background: #2a2a28 !important;
-  color: #f5f3ed !important;
-  border-color: rgba(255,255,255,.16) !important;
-}
-.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-summary > * + * {
-  border-left: 1px solid rgba(255,255,255,.12);
-}
-.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-budget-card .text-neutral-600,
-.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-surface .text-neutral-500 {
-  color: #bcb8ae !important;
+/* ---------- DARK MODE : graphite cohérent, sans grands aplats blanc/noir ---------- */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme {
+  --graphite-page: #121312;
+  --graphite-panel: #1b1d1b;
+  --graphite-card: #292b28;
+  --graphite-card-2: #30322f;
+  --graphite-control: #343632;
+  --graphite-border: #4a4c47;
+  --graphite-text: #f3f1ea;
+  --graphite-muted: #b8b7b0;
 }
 
-/* Les mouvements sont gris en sombre. La couleur du compte n'agit QUE sur la bordure. */
-.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-row {
-  background: #30302e !important;
-  color: #f5f3ed !important;
-  border-width: 1px !important;
-  border-style: solid !important;
+.vsmi-lux-theme #app-private-content .perso-ledger-theme,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme > div {
+  background: var(--graphite-page) !important;
+  color: var(--graphite-text) !important;
+}
+
+.vsmi-lux-theme #app-private-content .perso-ledger-theme > div > div.bg-white,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme > div > section.bg-white,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme > div > div > section.bg-white,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme nav,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view > section,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view > section {
+  background: var(--graphite-panel) !important;
+  color: var(--graphite-text) !important;
+  border-color: var(--graphite-border) !important;
+}
+
+/* En cours : recherche, synthèses et budgets parlent le même langage visuel. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations {
+  background: var(--graphite-panel) !important;
+  color: var(--graphite-text) !important;
+  border-color: var(--graphite-border) !important;
+  border-radius: 1rem !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations input:not([type="checkbox"]),
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations select,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations textarea {
+  background: var(--graphite-control) !important;
+  color: var(--graphite-text) !important;
+  border-color: var(--graphite-border) !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .bg-neutral-100,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .bg-neutral-50,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .bg-black,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .bg-amber-50 {
+  background: var(--graphite-card) !important;
+  color: var(--graphite-text) !important;
+  border-color: var(--graphite-border) !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .mt-5 > div,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations > div > div.border-b {
+  background: var(--graphite-card-2) !important;
+  color: var(--graphite-text) !important;
+  border-top-color: var(--graphite-border) !important;
+  border-right-color: var(--graphite-border) !important;
+  border-bottom-color: var(--graphite-border) !important;
   border-radius: .9rem !important;
+  margin-bottom: .45rem;
 }
-.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-row .text-neutral-500,
-.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-row .text-neutral-600 {
-  color: #bbb8b0 !important;
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .text-neutral-400,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .text-neutral-500,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .text-neutral-600 {
+  color: var(--graphite-muted) !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations button[aria-label*="Pointer"],
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations button[aria-label*="Décocher"] {
+  background: #f4f1ea !important;
+  color: #161714 !important;
+  border-color: #8b8d86 !important;
 }
 
-/* Cases de pointage : jamais noires en clair, coche sombre sur fond blanc. */
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme :is(button, input)[aria-label*="Pointer"],
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme button[aria-label*="Décocher"],
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme input[type="checkbox"] {
-  background: #fff !important;
-  color: #111 !important;
-  border-color: #292a27 !important;
+/* Projection : toutes les surfaces deviennent graphite ; le graphique reste lisible. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view section,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view details,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .bg-white,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .bg-neutral-50,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .bg-neutral-100,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .bg-black {
+  background: var(--graphite-card) !important;
+  color: var(--graphite-text) !important;
+  border-color: var(--graphite-border) !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view input,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view select,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view textarea {
+  background: var(--graphite-control) !important;
+  color: var(--graphite-text) !important;
+  border-color: var(--graphite-border) !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-chart-surface {
+  background: #252724 !important;
+  color: var(--graphite-muted) !important;
+  border-top: 1px solid var(--graphite-border);
+  border-right: 1px solid var(--graphite-border);
+  border-bottom: 1px solid var(--graphite-border);
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .text-neutral-400,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .text-neutral-500,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .text-neutral-600,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .text-neutral-700 {
+  color: var(--graphite-muted) !important;
 }
 
-/* Mode clair : opérations entièrement blanches et surfaces harmonisées. */
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-surface,
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-summary,
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-metric,
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-budget-card,
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-row {
-  background: #fff !important;
+/* Budgets Épargne : gris graphite, couleurs seulement en accent. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view > section,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view details,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view .bg-white,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view .bg-neutral-50,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view .bg-neutral-100,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view .bg-black {
+  background: var(--graphite-card) !important;
+  color: var(--graphite-text) !important;
+  border-color: var(--graphite-border) !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view input,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view select,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view textarea {
+  background: var(--graphite-control) !important;
+  color: var(--graphite-text) !important;
+  border-color: var(--graphite-border) !important;
+}
+
+/* Analyse : corrige en particulier Postes les plus coûteux / Structure. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view .analysis-metric,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view .analysis-panel,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view details,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view .analysis-rank-row,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view .bg-neutral-50,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view .bg-neutral-100 {
+  background: var(--graphite-card) !important;
+  color: var(--graphite-text) !important;
+  border-color: var(--graphite-border) !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view .analysis-rank-row {
+  background: var(--graphite-card-2) !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view .analysis-rank-row .bg-black {
+  background: #d6b65f !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view .text-neutral-400,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view .text-neutral-500,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view .text-neutral-600,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view .text-neutral-700 {
+  color: var(--graphite-muted) !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view input,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view select {
+  background: var(--graphite-control) !important;
+  color: var(--graphite-text) !important;
+  border-color: var(--graphite-border) !important;
+}
+
+/* ---------- LIGHT MODE : aucun grand fond noir dans PERSO, COMMUN, MARIAGES ---------- */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme {
+  background: #f6f3ec !important;
   color: #20211e !important;
-  border-color: #d8d2c7;
-}
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-row {
-  /* border-color inline = couleur du compte et reste prioritaire */
-  box-shadow: 0 1px 0 rgba(0,0,0,.025);
-}
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-summary > * + * {
-  border-left: 1px solid #e3ded4;
-}
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-budget-card .text-neutral-600,
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-surface .text-neutral-500,
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-row .text-neutral-500,
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-row .text-neutral-600 {
-  color: #6f706a !important;
 }
 
-/* Projection / Budgets / Analyse : aucune grande surface noire en mode clair. */
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-projection-view :is(section,div,details)[class*="bg-black"],
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-savings-view :is(section,div,details)[class*="bg-black"],
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view :is(section,div,details)[class*="bg-black"] {
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme :is(section,article,details,div)[class*="bg-black"],
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme :is(section,article,details,div)[class*="bg-black"],
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme :is(section,article,details,div)[class*="bg-black"] {
   background: #fffdf8 !important;
   color: #20211e !important;
-  border-color: #d8d2c7 !important;
+  border-color: #d9d4c9 !important;
 }
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-projection-view :is(.bg-white,.bg-neutral-50,.bg-neutral-100,.bg-neutral-200),
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-savings-view :is(.bg-white,.bg-neutral-50,.bg-neutral-100,.bg-neutral-200),
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view :is(.bg-white,.bg-neutral-50,.bg-neutral-100,.bg-neutral-200) {
-  background-color: #fffdf8 !important;
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme :is(section,article,details,div)[class*="bg-white"],
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme :is(section,article,details,div)[class*="bg-white"],
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme :is(section,article,details,div)[class*="bg-white"] {
+  background: #fffdf8 !important;
+  color: #20211e !important;
+  border-color: #ddd7cc !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme :is(.bg-neutral-50,.bg-neutral-100),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme :is(.bg-neutral-50,.bg-neutral-100),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme :is(.bg-neutral-50,.bg-neutral-100) {
+  background: #f2efe8 !important;
   color: #20211e !important;
 }
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-projection-view :is(.text-neutral-950,.text-neutral-900,.text-neutral-800,.text-neutral-700),
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-savings-view :is(.text-neutral-950,.text-neutral-900,.text-neutral-800,.text-neutral-700),
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view :is(.text-neutral-950,.text-neutral-900,.text-neutral-800,.text-neutral-700) { color:#20211e !important; }
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-projection-view :is(.text-neutral-600,.text-neutral-500,.text-neutral-400),
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-savings-view :is(.text-neutral-600,.text-neutral-500,.text-neutral-400),
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view :is(.text-neutral-600,.text-neutral-500,.text-neutral-400) { color:#6f706a !important; }
 
-/* Analyse : contraste explicite des blocs les plus coûteux / structure. */
-.vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-rank-card,
-.vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-essential-card {
-  background: #343432 !important;
-  color: #f7f5ef !important;
-  border-color: rgba(255,255,255,.18) !important;
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme input:not([type="checkbox"]),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme select,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme textarea,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme input:not([type="checkbox"]),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme select,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme textarea,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme input:not([type="checkbox"]),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme select,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme textarea {
+  background: #fff !important;
+  color: #20211e !important;
+  border-color: #cfc9bd !important;
 }
-.vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-rank-card .text-neutral-400,
-.vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-essential-card .text-neutral-400 { color:#c5c1b8 !important; }
-.vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-progress-track { background:#171817 !important; }
-.vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-progress-fill { background:#d2ae57 !important; }
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-rank-card,
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-essential-card {
-  background:#fff !important;
-  color:#20211e !important;
-  border-color:#d8d2c7 !important;
-}
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-rank-card .text-neutral-400,
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-essential-card .text-neutral-400 { color:#777871 !important; }
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-progress-track { background:#e6e2da !important; }
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-progress-fill { background:#b88b28 !important; }
 
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-checkbox-button {
-  background:#fff !important;
-  color:#111 !important;
-  border-color:#292a27 !important;
-  box-shadow:none !important;
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme input[type="checkbox"],
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme input[type="checkbox"],
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme input[type="checkbox"] {
+  background: #fff !important;
+  color: #20211e !important;
+  border-color: #33342f !important;
+}
+
+/* Les boutons d'action anciennement noirs deviennent graphite clair/or en mode clair. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme button.bg-black,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme a.bg-black,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme button.bg-black,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme a.bg-black,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme button.bg-black,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme a.bg-black {
+  background: #d6b65f !important;
+  color: #171814 !important;
+  border-color: #c7a44a !important;
+}
+
+/* En cours en mode clair : lignes blanches, couleur du compte seulement en bordure. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations {
+  background: #fffdf8 !important;
+  color: #20211e !important;
+  border-color: #ddd7cc !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .mt-5 > div,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations > div > div.border-b {
+  background: #fff !important;
+  color: #20211e !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .bg-neutral-100,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .bg-neutral-50,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .bg-black,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .bg-amber-50 {
+  background: #f4f1ea !important;
+  color: #20211e !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations button[aria-label*="Pointer"],
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations button[aria-label*="Décocher"] {
+  background: #fff !important;
+  color: #20211e !important;
+  border-color: #33342f !important;
+}
+
+/* Projection / Budgets / Analyse sont réellement clairs lorsque le dark mode est coupé. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view :is(section,details,.bg-white,.bg-neutral-50,.bg-neutral-100,.bg-black),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view :is(section,details,.bg-white,.bg-neutral-50,.bg-neutral-100,.bg-black),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view :is(section,details,.analysis-panel,.analysis-metric,.analysis-rank-row,.bg-white,.bg-neutral-50,.bg-neutral-100,.bg-black) {
+  background: #fffdf8 !important;
+  color: #20211e !important;
+  border-color: #ddd7cc !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-chart-surface {
+  background: #fff !important;
+  color: #565750 !important;
+  border-color: #ddd7cc !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view .analysis-rank-row {
+  background: #f7f5ef !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view .analysis-rank-row .bg-black {
+  background: #d6b65f !important;
+}
+
+/* COMMUN : mode clair complet, y compris navigation et mouvements. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme > div > header,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme > div > nav {
+  background: #fffdf8 !important;
+  color: #20211e !important;
+  border-color: #ddd7cc !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme > div > nav a.bg-black {
+  background: #d6b65f !important;
+  color: #171814 !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme section .border-b,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme details .border-b {
+  border-color: #e1ddd4 !important;
+}
+
+/* MARIAGES : aucune grande carte noire en mode clair. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme [class*="bg-neutral-9"],
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme [class*="bg-neutral-8"] {
+  background: #fffdf8 !important;
+  color: #20211e !important;
+  border-color: #ddd7cc !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme .text-white {
+  color: #20211e !important;
 }
