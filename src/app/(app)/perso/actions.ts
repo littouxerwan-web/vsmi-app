@@ -55,7 +55,7 @@ export async function createCategory(fd: FormData) {
   const creationKind = text(fd, "creation_kind") === "budget" ? "budget" : "category";
   const name = text(fd, "name");
   const requestedMovementType = text(fd, "movement_type");
-  const movementType = creationKind === "budget" ? "expense" : requestedMovementType;
+  const movementType = requestedMovementType || "expense";
   const parentId = optional(fd, "parent_id");
   const accountId = creationKind === "budget" ? optional(fd, "account_id") : null;
   const monthlyBudget = creationKind === "budget" ? Math.max(0, number(fd, "monthly_budget") || 0) : 0;

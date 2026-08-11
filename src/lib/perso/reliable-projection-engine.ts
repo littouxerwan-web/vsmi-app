@@ -2,7 +2,7 @@ import { calculateBudgetUsage, isBudgetActiveForMonth } from './budget-engine';
 import { mobilizableSavingsForAccount, type SavingsBudgetAllocation, type SavingsProposalDecision } from './savings-engine';
 
 export type RPAccount={id:string;name:string;account_type:'checking'|'savings'|'crypto';is_default?:boolean};
-export type RPCategory={id:string;name?:string;parent_id:string|null;monthly_budget:number;account_id?:string|null;budget_period?:'monthly'|'specific_month';budget_month?:string|null;budget_start_date?:string|null;budget_end_date?:string|null};
+export type RPCategory={id:string;name?:string;parent_id:string|null;monthly_budget:number;movement_type?:string;account_id?:string|null;budget_period?:'monthly'|'specific_month';budget_month?:string|null;budget_start_date?:string|null;budget_end_date?:string|null};
 export type RPMovement={id:string;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;completed_date?:string|null;recurrence_id?:string|null;transfer_group_id?:string|null;source_type?:string|null;source_key?:string|null;virtual_source?:boolean};
 export type RPRecurrence={id:string;account_id:string;destination_account_id:string|null;category_id:string|null;movement_type:'income'|'expense'|'transfer';label:string;amount:number;frequency:'weekly'|'monthly'|'quarterly'|'yearly';interval_count:number;start_date:string;end_date:string|null;annual_change_percent:number};
 export type RPOverride={recurrence_id:string;occurrence_month:string;amount:number};
@@ -117,6 +117,7 @@ export function buildReliableProjection(input:Input){
    const {remaining}=calculateBudgetUsage(
     Number(b.monthly_budget),
     [...(recordedBudgetFlowsByKey.get(key)??[]),...(projectedBudgetFlowsByKey.get(key)??[])],
+    b.movement_type??"expense",
    );
    if(remaining>0){
     // Le reliquat budgétaire n'est pas débité artificiellement en bloc le dernier jour.
@@ -135,7 +136,7 @@ export function buildReliableProjection(input:Input){
       const dayCents=base+(remainder>0?1:0);
       if(remainder>0)remainder--;
       if(dayCents<=0)return;
-      ops.push({id:`budget-${b.id}-${m}-${index}`,projected:true,account_id:target,category_id:b.id,movement_type:'expense',label:`Budget restant · ${b.name??'Budget'}`,amount:dayCents/100,movement_date:date,status:'planned',source:'budget'});
+      ops.push({id:`budget-${b.id}-${m}-${index}`,projected:true,account_id:target,category_id:b.id,movement_type:b.movement_type==='income'?'income':'expense',label:`Budget ${b.movement_type==='income'?'à créditer':'restant'} · ${b.name??'Budget'}`,amount:dayCents/100,movement_date:date,status:'planned',source:'budget'});
      });
     }
    }

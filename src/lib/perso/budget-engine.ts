@@ -75,8 +75,10 @@ export function budgetFlowImpact(flow: BudgetFlow): number {
 export function calculateBudgetUsage(
   monthlyBudget: number,
   flows: BudgetFlow[],
+  budgetMovementType: "expense" | "income" | string = "expense",
 ): { netUsed: number; spent: number; remaining: number } {
-  const netUsed = flows.reduce((sum, flow) => sum + budgetFlowImpact(flow), 0);
+  const direction = budgetMovementType === "income" ? -1 : 1;
+  const netUsed = flows.reduce((sum, flow) => sum + budgetFlowImpact(flow) * direction, 0);
   const spent = Math.max(0, netUsed);
   return {
     netUsed,

@@ -106,9 +106,10 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
  const pairedGroups=new Set([...deposits,...uses].map(t=>t.group));
 
  const flows=new Map<string,DayFlow>(),spent=new Map<string,number>();
+ const budgetTypeByRoot=new Map(budgetRoots.map(b=>[b.id,b.movement_type??"expense"]));
  const flow=(date:string)=>{const f=flows.get(date)??{income:0,expense:0,primaryIncome:0,budget:0};flows.set(date,f);return f};
  const income=(date:string,amount:number,primary=false)=>{const f=flow(date);f.income+=amount;if(primary)f.primaryIncome+=amount};
- const registerSpent=(date:string,movementType:string,amount:number,categoryId?:string|null)=>{const r=root(categoryId??null);if(r){const k=`${date.slice(0,7)}:${r}`;spent.set(k,(spent.get(k)??0)+budgetFlowImpact({movement_type:movementType,amount}))}};
+ const registerSpent=(date:string,movementType:string,amount:number,categoryId?:string|null)=>{const r=root(categoryId??null);if(r){const k=`${date.slice(0,7)}:${r}`;const direction=budgetTypeByRoot.get(r)==="income"?-1:1;spent.set(k,(spent.get(k)??0)+budgetFlowImpact({movement_type:movementType,amount})*direction)}};
  const expense=(date:string,amount:number,categoryId?:string|null,budget=false)=>{const f=flow(date);f.expense+=amount;if(budget)f.budget+=amount;else registerSpent(date,"expense",amount,categoryId)};
 
  // Les opérations pointées sont déjà incluses dans initialChecking. Les non pointées
@@ -156,7 +157,7 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
   if(photoRevenue>0&&!state?.is_completed&&(state?.account_id??input.urssafDefaultAccountId)===input.sourceAccountId&&last>=simulationStart)expense(last,roundMoney(photoRevenue*.216));
   for(const b of budgetRoots)if(isBudgetActiveForMonth(b,month)){
    const remaining=calculateBudgetRemaining(Number(b.monthly_budget),spent.get(`${month}:${b.id}`)??0);
-   if(remaining>0&&last>=simulationStart)expense(last,remaining,b.id,true);
+   if(remaining>0&&last>=simulationStart){if(b.movement_type==="income")income(last,remaining);else expense(last,remaining,b.id,true);}
   }
  }
 
