@@ -1,0 +1,757 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f5f3ef;
+  --foreground: #171717;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--background);
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Mobile ergonomics */
+@media (max-width: 1023px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+button:disabled,
+input:disabled {
+  cursor: not-allowed;
+}
+
+/* Mode privé : les pages restent visibles, seuls les chiffres sont masqués. */
+.vsmi-private-mode #app-private-content input[type="number"],
+.vsmi-private-mode #app-private-content input[inputmode="numeric"],
+.vsmi-private-mode #app-private-content input[inputmode="decimal"] {
+  -webkit-text-security: disc;
+}
+
+/* Neutralise définitivement l'ancien mode privé qui floutait toute la page. */
+.private-mode-shield {
+  display: none !important;
+}
+
+.vsmi-private-mode #app-private-content,
+.vsmi-private-mode #app-private-content > * {
+  filter: none !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  user-select: auto !important;
+}
+
+/* Refonte 2026-08 : mise en page plus dense, large et structurée comme Navylo. */
+#app-private-content main > div[class*="max-w-"] {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+#app-private-content .rounded-3xl,
+#app-private-content .rounded-2xl {
+  border-radius: 0.5rem !important;
+}
+
+@media (min-width: 1024px) {
+  #app-private-content main {
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+  }
+}
+
+
+/* Feedback d'interaction VSMI
+   Le clic/tap est perceptible immédiatement, avant navigation ou action serveur. */
+:where(button, a, summary, [role="button"], input[type="checkbox"], input[type="radio"]) {
+  transition:
+    transform 90ms ease,
+    filter 90ms ease,
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease;
+}
+
+:where(button, a, summary, [role="button"]):active,
+.vsmi-press:active {
+  transform: scale(0.965);
+  filter: brightness(0.90);
+}
+
+:where(button, summary, [role="button"]):active {
+  box-shadow: inset 0 0 0 999px rgb(0 0 0 / 0.035);
+}
+
+:where(input[type="checkbox"], input[type="radio"]):active {
+  transform: scale(0.84);
+}
+
+:where(button, a, summary, input, select, textarea):focus-visible {
+  outline: 2px solid rgb(23 23 23 / 0.72);
+  outline-offset: 2px;
+}
+
+button:not(:disabled),
+summary,
+a[href],
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled) {
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  :where(button, a, summary, [role="button"]):hover {
+    filter: brightness(0.97);
+  }
+}
+
+/* Sur écran tactile on renforce légèrement le retour visuel au tap. */
+@media (hover: none) and (pointer: coarse) {
+  :where(button, a, summary, [role="button"]):active,
+  .vsmi-press:active {
+    transform: scale(0.95);
+    filter: brightness(0.86);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   VSMI V2 — thème Noir / Or / Argent
+   Couche strictement visuelle : aucune règle métier ni donnée n'est modifiée.
+   -------------------------------------------------------------------------- */
+.vsmi-lux-theme {
+  --vsmi-bg: #0b0b0b;
+  --vsmi-panel: #141414;
+  --vsmi-panel-2: #1a1a1a;
+  --vsmi-border: rgba(255,255,255,.10);
+  --vsmi-border-strong: rgba(210,174,87,.30);
+  --vsmi-gold: #d2ae57;
+  --vsmi-gold-soft: #e3c97e;
+  --vsmi-silver: #d7d9dd;
+  --vsmi-text: #f4f4f2;
+  --vsmi-muted: #9d9d9a;
+  background: var(--vsmi-bg);
+  color: var(--vsmi-text);
+}
+
+.vsmi-lux-theme #app-private-content {
+  background:
+    radial-gradient(circle at 88% -10%, rgba(210,174,87,.08), transparent 26rem),
+    var(--vsmi-bg);
+  color: var(--vsmi-text);
+}
+
+.vsmi-lux-theme #app-private-content > main,
+.vsmi-lux-theme #app-private-content > div,
+.vsmi-lux-theme #app-private-content main {
+  background-color: transparent;
+}
+
+/* Surfaces neutres existantes : passage au graphite sans toucher aux alertes colorées. */
+.vsmi-lux-theme #app-private-content .bg-white,
+.vsmi-lux-theme #app-private-content .bg-neutral-50,
+.vsmi-lux-theme #app-private-content .bg-neutral-100,
+.vsmi-lux-theme #app-private-content .bg-neutral-200 {
+  background-color: var(--vsmi-panel) !important;
+  color: var(--vsmi-text) !important;
+}
+
+.vsmi-lux-theme #app-private-content [class*="border-black/"],
+.vsmi-lux-theme #app-private-content [class*="border-neutral-"] {
+  border-color: var(--vsmi-border) !important;
+}
+
+.vsmi-lux-theme #app-private-content .text-neutral-950,
+.vsmi-lux-theme #app-private-content .text-neutral-900,
+.vsmi-lux-theme #app-private-content .text-neutral-800,
+.vsmi-lux-theme #app-private-content .text-neutral-700 {
+  color: var(--vsmi-text) !important;
+}
+
+.vsmi-lux-theme #app-private-content .text-neutral-600,
+.vsmi-lux-theme #app-private-content .text-neutral-500,
+.vsmi-lux-theme #app-private-content .text-neutral-400 {
+  color: var(--vsmi-muted) !important;
+}
+
+/* Titres et repères de section. */
+.vsmi-lux-theme #app-private-content h1,
+.vsmi-lux-theme #app-private-content h2,
+.vsmi-lux-theme #app-private-content h3 {
+  letter-spacing: -.025em;
+}
+
+.vsmi-lux-theme #app-private-content :is(section, article, details)[class*="shadow"] {
+  box-shadow: 0 14px 40px rgba(0,0,0,.22) !important;
+}
+
+/* Formulaires — contraste homogène iPhone / iPad / desktop. */
+.vsmi-lux-theme #app-private-content input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.vsmi-lux-theme #app-private-content select,
+.vsmi-lux-theme #app-private-content textarea {
+  background-color: #101010 !important;
+  color: var(--vsmi-text) !important;
+  border-color: rgba(255,255,255,.14) !important;
+  color-scheme: dark;
+}
+
+.vsmi-lux-theme #app-private-content input::placeholder,
+.vsmi-lux-theme #app-private-content textarea::placeholder {
+  color: rgba(244,244,242,.38) !important;
+}
+
+.vsmi-lux-theme #app-private-content select option {
+  background: #101010;
+  color: var(--vsmi-text);
+}
+
+/* Boutons principaux existants : noir profond + liseré or discret. */
+.vsmi-lux-theme #app-private-content button.bg-black,
+.vsmi-lux-theme #app-private-content a.bg-black {
+  background-color: #111 !important;
+  border-color: rgba(210,174,87,.35) !important;
+  box-shadow: inset 0 0 0 1px rgba(210,174,87,.12);
+}
+
+.vsmi-lux-theme #app-private-content button.bg-black:hover,
+.vsmi-lux-theme #app-private-content a.bg-black:hover {
+  background-color: #181818 !important;
+}
+
+/* Tables et listes : séparateurs argentés doux. */
+.vsmi-lux-theme #app-private-content table {
+  color: var(--vsmi-text);
+}
+
+.vsmi-lux-theme #app-private-content tr[class*="border-"],
+.vsmi-lux-theme #app-private-content div[class*="divide-"] > * + * {
+  border-color: var(--vsmi-border) !important;
+}
+
+/* Les cartes modernes gagnent un rayon plus premium, sans changer leur taille. */
+.vsmi-lux-theme #app-private-content .rounded-2xl,
+.vsmi-lux-theme #app-private-content .rounded-3xl {
+  border-radius: 1rem !important;
+}
+
+/* Les panneaux informatifs colorés conservent leur sémantique et gagnent un léger contraste. */
+.vsmi-lux-theme #app-private-content [class*="bg-sky-50"],
+.vsmi-lux-theme #app-private-content [class*="bg-emerald-50"],
+.vsmi-lux-theme #app-private-content [class*="bg-amber-50"],
+.vsmi-lux-theme #app-private-content [class*="bg-red-50"] {
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+}
+
+/* Accent de focus unique. */
+.vsmi-lux-theme :where(button, a, summary, input, select, textarea):focus-visible {
+  outline-color: var(--vsmi-gold) !important;
+}
+
+/* iPhone : densité légèrement accrue, sans écraser les contrôles tactiles. */
+@media (max-width: 639px) {
+  .vsmi-lux-theme #app-private-content main {
+    padding-left: .75rem;
+    padding-right: .75rem;
+  }
+
+  .vsmi-lux-theme #app-private-content .rounded-2xl,
+  .vsmi-lux-theme #app-private-content .rounded-3xl {
+    border-radius: .9rem !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   VSMI V2.1 — lisibilité Noir / Or / Argent
+   Visuel uniquement. Ne modifie ni les données ni les calculs.
+   Les couleurs personnalisées des cartes de comptes restent prioritaires.
+   -------------------------------------------------------------------------- */
+.vsmi-lux-theme {
+  --vsmi-bg: #0d0d0d;
+  --vsmi-panel: #232220;
+  --vsmi-panel-2: #2b2926;
+  --vsmi-panel-soft: #34312d;
+  --vsmi-silver-panel: #d7d9dd;
+  --vsmi-cream-panel: #f1eadc;
+  --vsmi-border: rgba(255,255,255,.14);
+  --vsmi-border-strong: rgba(210,174,87,.46);
+  --vsmi-gold: #d2ae57;
+  --vsmi-gold-deep: #b88b28;
+  --vsmi-gold-soft: #eed68d;
+  --vsmi-silver: #d7d9dd;
+  --vsmi-text: #f7f5ef;
+  --vsmi-muted: #b9b5ac;
+}
+
+/* Moins de noir dans les blocs génériques : graphite chaud et argent doux. */
+.vsmi-lux-theme #app-private-content .bg-white,
+.vsmi-lux-theme #app-private-content .bg-neutral-50,
+.vsmi-lux-theme #app-private-content .bg-neutral-100 {
+  background-color: var(--vsmi-panel) !important;
+  color: var(--vsmi-text) !important;
+}
+
+.vsmi-lux-theme #app-private-content .bg-neutral-200,
+.vsmi-lux-theme #app-private-content .bg-neutral-300 {
+  background-color: var(--vsmi-panel-2) !important;
+  color: var(--vsmi-text) !important;
+}
+
+/* Les fonds sémantiques restent colorés, mais en version plus dense et lisible. */
+.vsmi-lux-theme #app-private-content [class*="bg-emerald-50"] {
+  background-color: #dff2e9 !important;
+  color: #153e31 !important;
+  border-color: #8fc8ae !important;
+}
+
+.vsmi-lux-theme #app-private-content [class*="bg-red-50"] {
+  background-color: #f6e4e2 !important;
+  color: #641f1c !important;
+  border-color: #d9a19c !important;
+}
+
+.vsmi-lux-theme #app-private-content [class*="bg-amber-50"],
+.vsmi-lux-theme #app-private-content [class*="bg-yellow-50"] {
+  background-color: #efe5cb !important;
+  color: #55400f !important;
+  border-color: #cfb76f !important;
+}
+
+.vsmi-lux-theme #app-private-content [class*="bg-sky-50"],
+.vsmi-lux-theme #app-private-content [class*="bg-blue-50"] {
+  background-color: #dfe9eb !important;
+  color: #183d44 !important;
+  border-color: #9cbac0 !important;
+}
+
+.vsmi-lux-theme #app-private-content [class*="bg-violet-50"],
+.vsmi-lux-theme #app-private-content [class*="bg-purple-50"] {
+  background-color: #e8e1f1 !important;
+  color: #3f285d !important;
+  border-color: #bba7d1 !important;
+}
+
+/* Boutons : l'action principale est dorée, plutôt que noire sur noire. */
+.vsmi-lux-theme #app-private-content button.bg-black,
+.vsmi-lux-theme #app-private-content a.bg-black,
+.vsmi-lux-theme #app-private-content button[class*="bg-neutral-950"],
+.vsmi-lux-theme #app-private-content a[class*="bg-neutral-950"] {
+  background: linear-gradient(180deg, #d8b65d 0%, #be902d 100%) !important;
+  color: #111 !important;
+  border-color: #e5ca7d !important;
+  box-shadow: 0 5px 16px rgba(184,139,40,.18), inset 0 1px 0 rgba(255,255,255,.28) !important;
+  font-weight: 700;
+}
+
+.vsmi-lux-theme #app-private-content button.bg-black:hover,
+.vsmi-lux-theme #app-private-content a.bg-black:hover,
+.vsmi-lux-theme #app-private-content button[class*="bg-neutral-950"]:hover,
+.vsmi-lux-theme #app-private-content a[class*="bg-neutral-950"]:hover {
+  background: linear-gradient(180deg, #e0c06c 0%, #c79a36 100%) !important;
+}
+
+/* Boutons secondaires : graphite lisible avec bordure argent/or. */
+.vsmi-lux-theme #app-private-content button.bg-white,
+.vsmi-lux-theme #app-private-content a.bg-white,
+.vsmi-lux-theme #app-private-content button[class*="bg-neutral-100"],
+.vsmi-lux-theme #app-private-content button[class*="bg-neutral-200"] {
+  background-color: #302e2a !important;
+  color: var(--vsmi-text) !important;
+  border-color: rgba(210,174,87,.30) !important;
+}
+
+/* Champs : légèrement plus clairs que le fond pour mieux délimiter les zones de saisie. */
+.vsmi-lux-theme #app-private-content input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.vsmi-lux-theme #app-private-content select,
+.vsmi-lux-theme #app-private-content textarea {
+  background-color: #292825 !important;
+  color: var(--vsmi-text) !important;
+  border-color: rgba(255,255,255,.20) !important;
+}
+
+/* Cases à cocher : blanches, cerclées de noir comme demandé. */
+.vsmi-lux-theme #app-private-content input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 1.25rem;
+  border: 2px solid #111 !important;
+  border-radius: .28rem;
+  background: #fff !important;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.28);
+  display: inline-grid;
+  place-content: center;
+  vertical-align: middle;
+}
+
+.vsmi-lux-theme #app-private-content input[type="checkbox"]::before {
+  content: "";
+  width: .62rem;
+  height: .38rem;
+  border-left: 2px solid #111;
+  border-bottom: 2px solid #111;
+  transform: rotate(-45deg) scale(0);
+  transform-origin: center;
+  transition: transform 90ms ease;
+  margin-top: -.08rem;
+}
+
+.vsmi-lux-theme #app-private-content input[type="checkbox"]:checked::before {
+  transform: rotate(-45deg) scale(1);
+}
+
+.vsmi-lux-theme #app-private-content input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--vsmi-gold) !important;
+  outline-offset: 2px;
+}
+
+/* Conserve impérativement les couleurs de compte choisies dans Paramètres.
+   Les cartes qui portent une couleur inline ne sont jamais recolorées ici. */
+.vsmi-lux-theme #app-private-content [style*="background-color"],
+.vsmi-lux-theme #app-private-content [style*="background:"] {
+  --vsmi-account-color-preserved: 1;
+}
+
+/* Cartes/résumés neutres : moins de noir et davantage de séparation visuelle. */
+.vsmi-lux-theme #app-private-content :is(section, article, details, div)[class*="border"][class*="bg-neutral"] {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+}
+
+/* Les zones de résultats claires restent lisibles : texte sombre si le fond est clair. */
+.vsmi-lux-theme #app-private-content [class*="bg-emerald-50"] :is(.text-neutral-950,.text-neutral-900,.text-neutral-800,.text-neutral-700),
+.vsmi-lux-theme #app-private-content [class*="bg-red-50"] :is(.text-neutral-950,.text-neutral-900,.text-neutral-800,.text-neutral-700),
+.vsmi-lux-theme #app-private-content [class*="bg-amber-50"] :is(.text-neutral-950,.text-neutral-900,.text-neutral-800,.text-neutral-700),
+.vsmi-lux-theme #app-private-content [class*="bg-yellow-50"] :is(.text-neutral-950,.text-neutral-900,.text-neutral-800,.text-neutral-700),
+.vsmi-lux-theme #app-private-content [class*="bg-sky-50"] :is(.text-neutral-950,.text-neutral-900,.text-neutral-800,.text-neutral-700),
+.vsmi-lux-theme #app-private-content [class*="bg-blue-50"] :is(.text-neutral-950,.text-neutral-900,.text-neutral-800,.text-neutral-700),
+.vsmi-lux-theme #app-private-content [class*="bg-violet-50"] :is(.text-neutral-950,.text-neutral-900,.text-neutral-800,.text-neutral-700),
+.vsmi-lux-theme #app-private-content [class*="bg-purple-50"] :is(.text-neutral-950,.text-neutral-900,.text-neutral-800,.text-neutral-700) {
+  color: inherit !important;
+}
+
+/* --------------------------------------------------------------------------
+   PERSO — thème lisible clair sur coque sombre (2026-08-11)
+   Portée volontairement limitée à /perso via .perso-ledger-theme.
+   La page /aujourd-hui n'est donc pas modifiée.
+   -------------------------------------------------------------------------- */
+.perso-ledger-theme {
+  --perso-cream: #f7f4ed;
+  --perso-cream-2: #fffaf0;
+  --perso-gold: #d6b65f;
+  --perso-gold-deep: #66501a;
+  --perso-ink: #20211e;
+  --perso-muted: #6f706a;
+  --perso-line: #d8d2c7;
+}
+
+/* Les grandes zones PERSO restent intégrées à la coque sombre, mais les données
+   passent sur des surfaces claires comme dans la maquette validée. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme > div > div.bg-white,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme > div > section.bg-white,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme > div > div > section.bg-white {
+  background-color: #1d1e1b !important;
+  color: #f5f3ed !important;
+  border-color: rgba(255,255,255,.12) !important;
+}
+
+/* En-tête et onglets : graphite + or, sans gros aplats noirs. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme nav {
+  background-color: #1d1e1b !important;
+  border-color: rgba(255,255,255,.12) !important;
+  padding-top: .45rem;
+  padding-bottom: .45rem;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme nav a {
+  border-radius: .7rem;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme nav a.bg-black {
+  background: linear-gradient(180deg,#dfc36f 0%,#cda446 100%) !important;
+  color: #151515 !important;
+  box-shadow: none !important;
+  font-weight: 600 !important;
+}
+
+/* Cartes de soldes : la teinte choisie dans Paramètres est conservée par le
+   style inline du composant, mais mélangée avec du blanc pour rester lisible. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section:has(.grid) [style*="color-mix"] {
+  color: var(--perso-ink) !important;
+  border-top-color: var(--perso-line) !important;
+  border-right-color: var(--perso-line) !important;
+  border-bottom-color: var(--perso-line) !important;
+  border-radius: 1rem;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme [style*="color-mix"] .text-neutral-500,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme [style*="color-mix"] .text-neutral-600 {
+  color: var(--perso-muted) !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme [style*="color-mix"] .bg-white\/80 {
+  background-color: rgba(255,255,255,.72) !important;
+  color: var(--perso-ink) !important;
+}
+
+/* Opérations du mois : panneau clair, champs blancs et texte sombre. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style*="color-mix"],
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style*="#f7f4ed"] {
+  color: var(--perso-ink) !important;
+  border-radius: 1rem;
+  padding: 1rem !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .bg-neutral-50,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .bg-neutral-100 {
+  background-color: #f1eee7 !important;
+  color: var(--perso-ink) !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] select,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] textarea {
+  background-color: #fff !important;
+  color: var(--perso-ink) !important;
+  border-color: #cfc9bd !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .text-neutral-400 { color:#8b8b84 !important; }
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .text-neutral-500 { color:#74756f !important; }
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .text-neutral-600 { color:#62635e !important; }
+
+/* Résumés et budgets : crème chaude, hiérarchie nette, sans texte délavé. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .bg-amber-50 {
+  background-color: #f2e8cb !important;
+  color: #55400f !important;
+  border-color: #d9c17b !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .bg-amber-50 .text-neutral-600 {
+  color: #71684f !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .bg-black {
+  background-color: #262724 !important;
+  color: #f7f4ed !important;
+}
+
+/* Transactions : teintes très légères, montants sémantiques conservés. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] > .mt-5 > div[style*="color-mix"] {
+  border-radius: .85rem;
+  color: var(--perso-ink) !important;
+}
+
+/* Typographie moins lourde que la version précédente. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme h1,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme h2,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme h3 {
+  font-weight: 600 !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .font-semibold {
+  font-weight: 600 !important;
+}
+
+/* Cases : blanches cerclées de noir, y compris dans les listes claires. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme input[type="checkbox"] {
+  background: #fff !important;
+  border-color: #292a27 !important;
+  box-shadow: none;
+}
+
+@media (max-width: 639px) {
+  .vsmi-lux-theme #app-private-content .perso-ledger-theme {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .vsmi-lux-theme #app-private-content .perso-ledger-theme section[style*="color-mix"],
+  .vsmi-lux-theme #app-private-content .perso-ledger-theme section[style*="#f7f4ed"] {
+    border-radius: .9rem;
+  }
+}
+
+
+/* --------------------------------------------------------------------------
+   Mode clair global — bascule depuis la barre supérieure, à côté du mode privé.
+   Le choix est conservé localement sur l'appareil.
+   -------------------------------------------------------------------------- */
+.vsmi-light-mode .vsmi-lux-theme {
+  background: #f4f1ea !important;
+  color: #20211e !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme > .flex,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content main {
+  background-color: #f4f1ea !important;
+  color: #20211e !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme header {
+  background: rgba(255,253,248,.96) !important;
+  color: #20211e !important;
+  border-color: rgba(32,33,30,.12) !important;
+  box-shadow: 0 8px 28px rgba(40,35,25,.08) !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme header [class*="text-[#C8C8C8]"],
+.vsmi-light-mode .vsmi-lux-theme header [class*="text-[#E7E7E7]"] {
+  color: #4f504b !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme aside {
+  background: #f8f5ee !important;
+  color: #20211e !important;
+  border-right: 1px solid rgba(32,33,30,.10);
+}
+
+.vsmi-light-mode .vsmi-lux-theme aside a,
+.vsmi-light-mode .vsmi-lux-theme aside summary {
+  color: #343530 !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme aside a[href="/aujourd-hui"],
+.vsmi-light-mode .vsmi-lux-theme aside details:first-of-type summary {
+  color: #7a5b19 !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme nav.fixed {
+  background: rgba(255,253,248,.97) !important;
+  border-color: rgba(32,33,30,.12) !important;
+  box-shadow: 0 -8px 30px rgba(40,35,25,.10) !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme nav.fixed > div > a:not([aria-current="page"]),
+.vsmi-light-mode .vsmi-lux-theme nav.fixed > div > button {
+  color: #6b6c66 !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content h2.text-white {
+  color: #20211e !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme > div > div.bg-white,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme > div > section.bg-white,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme > div > div > section.bg-white,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme nav {
+  background-color: #fffdf8 !important;
+  color: #20211e !important;
+  border-color: rgba(32,33,30,.10) !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme nav a:not(.bg-black) {
+  color: #666760 !important;
+}
+
+/* Les cartes de compte conservent leur couleur choisie dans Organiser dans les
+   deux modes. Les surfaces de données restent volontairement claires. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme article[style*="border-color"] {
+  color: #20211e !important;
+}
+
+/* --------------------------------------------------------------------------
+   Correctif PERSO 2026-08-11 — couleurs de compte + mouvements
+   - Les cartes En cours utilisent exactement l'aplat choisi dans Organiser.
+   - Opérations du mois retrouve un conteneur arrondi.
+   - Mode clair : mouvements blancs.
+   - Mode sombre : mouvements teintés uniquement par la couleur du compte.
+   -------------------------------------------------------------------------- */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-account-tile {
+  /* L'aplat inline est la source de vérité, comme sur Aujourd'hui. */
+  background-image: none !important;
+}
+
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations {
+  background: #1d1e1b !important;
+  color: #f5f3ed !important;
+  border-color: color-mix(in srgb, var(--perso-selected-account) 55%, rgba(255,255,255,.16)) !important;
+  border-radius: 1.5rem !important;
+  overflow: hidden;
+}
+
+/* Chaque mouvement possède sa propre surface arrondie. Aucun bg-white/bg-neutral
+   générique ne doit pouvoir écraser la teinte du compte en mode sombre. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-card {
+  background-color: color-mix(in srgb, var(--movement-account-color) 18%, #171816) !important;
+  border-color: color-mix(in srgb, var(--movement-account-color) 58%, rgba(255,255,255,.18)) !important;
+  color: #f5f3ed !important;
+  border-radius: .9rem !important;
+  box-shadow: none !important;
+}
+
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-card.is-completed {
+  background-color: color-mix(in srgb, var(--movement-account-color) 12%, #20211e) !important;
+}
+
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-card .text-neutral-500,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-card .text-neutral-600 {
+  color: #c9c6be !important;
+}
+
+/* Les contrôles internes restent lisibles et ne contaminent pas le fond du mouvement. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-card input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-card select,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-card textarea {
+  background-color: #282925 !important;
+  color: #f5f3ed !important;
+  border-color: rgba(255,255,255,.18) !important;
+}
+
+/* Mode clair : conteneur clair et tous les mouvements strictement blancs. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations {
+  background: #fffdf8 !important;
+  color: #20211e !important;
+  border-color: color-mix(in srgb, var(--perso-selected-account) 55%, #d8d2c7) !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-card,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-card.is-completed {
+  background: #ffffff !important;
+  color: #20211e !important;
+  border-color: color-mix(in srgb, var(--movement-account-color) 52%, #d8d2c7) !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-card .text-neutral-500,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-card .text-neutral-600 {
+  color: #6f706a !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-card input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-card select,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-card textarea {
+  background-color: #fff !important;
+  color: #20211e !important;
+  border-color: #cfc9bd !important;
+}
+
+@media (max-width: 639px) {
+  .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations {
+    border-radius: 1.2rem !important;
+    padding: .8rem !important;
+  }
+}
+
+/* Le mode clair global ne doit jamais rendre le texte noir sur une carte de compte noire. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-account-tile.text-white {
+  color: #ffffff !important;
+}
