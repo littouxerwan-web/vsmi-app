@@ -1280,3 +1280,78 @@ html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .p
 .vsmi-light-mode .osteo-panel table th { background: #f0eee8 !important; color: #242421 !important; border-color: #d8d6cf !important; }
 .vsmi-light-mode .osteo-panel table td { background: #ffffff; border-color: #e5e2da !important; }
 .vsmi-light-mode .osteo-panel table td.sticky { background: #ffffff !important; }
+
+/* OSTEO - correctifs ciblés 2035 / analyse / cases */
+.osteo-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .35rem;
+  border: 1px solid rgba(210,174,87,.38);
+  border-radius: .75rem;
+  padding: .5rem .75rem;
+  color: #e0c27e;
+  font-size: .875rem;
+  line-height: 1.25rem;
+}
+.osteo-check {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 1.25rem;
+  border: 2px solid #b89235 !important;
+  border-radius: .32rem;
+  background: #171814 !important;
+  display: inline-grid;
+  place-items: center;
+}
+.osteo-check:checked::after {
+  content: "✓";
+  color: #d2ae57;
+  font-size: .9rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.osteo-2035-table td,
+.osteo-2035-table th { min-width: 76px; }
+.osteo-2035-table td:first-child,
+.osteo-2035-table th:first-child { min-width: 175px; }
+.osteo-2035-income td:first-child,
+.osteo-2035-income-total td:first-child { background: rgba(222,193,80,.22); }
+.osteo-2035-expense td:first-child,
+.osteo-2035-expense-total td:first-child { background: rgba(208,81,81,.25); }
+.osteo-2035-benefit td:first-child { background: rgba(146,178,80,.24); }
+.osteo-2035-stats td:first-child,
+.osteo-2035-previous td:first-child { background: rgba(222,193,80,.18); }
+.osteo-analysis-future { background: rgba(210,174,87,.055); }
+
+html.vsmi-light-mode .osteo-check,
+html.vsmi-light-mode .osteo-check:checked {
+  background: #ffffff !important;
+  border-color: #b89235 !important;
+  color: #171814 !important;
+}
+html.vsmi-light-mode .osteo-check:checked::after { color: #8b6929 !important; }
+html.vsmi-light-mode .osteo-secondary-button {
+  background: #ffffff;
+  border-color: #c9ad68;
+  color: #6d531f;
+}
+html.vsmi-light-mode .osteo-2035-table th {
+  background: #f4f1e9 !important;
+  color: #22221f !important;
+}
+html.vsmi-light-mode .osteo-2035-table td {
+  background: #ffffff;
+  color: #2b2a26 !important;
+  border-color: #e2ddd1 !important;
+}
+html.vsmi-light-mode .osteo-2035-table .osteo-2035-income td:first-child,
+html.vsmi-light-mode .osteo-2035-table .osteo-2035-income-total td:first-child { background: #fff3a9 !important; }
+html.vsmi-light-mode .osteo-2035-table .osteo-2035-expense td:first-child,
+html.vsmi-light-mode .osteo-2035-table .osteo-2035-expense-total td:first-child { background: #f6abab !important; }
+html.vsmi-light-mode .osteo-2035-table .osteo-2035-benefit td:first-child { background: #dce9b9 !important; }
+html.vsmi-light-mode .osteo-2035-table .osteo-2035-stats td:first-child,
+html.vsmi-light-mode .osteo-2035-table .osteo-2035-previous td:first-child { background: #fff1a0 !important; }
+html.vsmi-light-mode .osteo-analysis-future { background: #fbf7eb !important; }
