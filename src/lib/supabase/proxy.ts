@@ -82,17 +82,23 @@ export async function updateSession(request: NextRequest) {
 
     const appMetadata = claims?.app_metadata ?? {};
 
-    // Un compte personnel peut naviguer dans PERSO et COMMUN uniquement.
-    if (
-      appMetadata.role === "personal" &&
-      !pathname.startsWith("/perso") &&
-      !pathname.startsWith("/commun")
-    ) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/perso";
-      url.search = "?vue=finances";
-      return copyAuthCookies(response, NextResponse.redirect(url));
-    }
+    const LAURE_USER_ID = "791eda92-4159-4db2-b132-1be129f56027";
+const isLaure = claims?.sub === LAURE_USER_ID;
+
+const personalRouteAllowed =
+  pathname.startsWith("/perso") ||
+  pathname.startsWith("/commun") ||
+  (isLaure && pathname.startsWith("/osteo"));
+
+if (
+  appMetadata.role === "personal" &&
+  !personalRouteAllowed
+) {
+  const url = request.nextUrl.clone();
+  url.pathname = "/perso";
+  url.search = "?vue=finances";
+  return copyAuthCookies(response, NextResponse.redirect(url));
+}
 
     return response;
   } catch (error) {
