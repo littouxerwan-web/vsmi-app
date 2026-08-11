@@ -88,7 +88,7 @@ export default async function AccountingPage({
   });
 
   return (
-    <main className="px-4 py-5 sm:px-5 sm:py-8 lg:px-8">
+    <main className="mariages-ledger-theme px-4 py-5 sm:px-5 sm:py-8 lg:px-8">
       <div className="mx-auto max-w-7xl">
         <div>
           <p className="text-sm font-medium text-neutral-500">Pilotage financier</p>

@@ -1109,3 +1109,125 @@ input[type="radio"]:not(:disabled) {
   color: #20211e !important;
   border-color: #ddd7cc !important;
 }
+
+
+/* ========================================================================== 
+   VSMI 2026-08-11 — Correctif lisibilité dark/light v2
+   ========================================================================== */
+
+/* EN COURS : conteneur principal propre et arrondi, sans double cadre. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations {
+  border-radius: 1.4rem !important;
+  overflow: hidden !important;
+  background: #1f211f !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations > div:first-of-type {
+  border-radius: 1rem !important;
+  overflow: hidden !important;
+}
+
+/* Dark : lignes plus claires, texte systématiquement lisible. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-row,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-movement-row {
+  background: #454844 !important;
+  color: #f7f5ef !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-row :is(.text-black,.text-neutral-900,.text-neutral-800,.text-neutral-700,.text-neutral-600,.text-neutral-500,.text-neutral-400),
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-movement-row :is(.text-black,.text-neutral-900,.text-neutral-800,.text-neutral-700,.text-neutral-600,.text-neutral-500,.text-neutral-400) {
+  color: #d9d8d2 !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-row details summary,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-movement-row details summary {
+  color: #e9e7e1 !important;
+}
+
+/* Epargne : un seul lavande plus clair pour l'annonce et les mouvements liés. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-zone,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-card,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-movement,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-movement {
+  background: #554864 !important;
+  color: #fffaff !important;
+  border-color: #9f89b9 !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-zone *,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-card *,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-movement *,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-movement * {
+  color: inherit;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-zone :is(.text-red-700,.text-red-600,.text-red-500),
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-card :is(.text-red-700,.text-red-600,.text-red-500),
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-movement :is(.text-red-700,.text-red-600,.text-red-500),
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-movement :is(.text-red-700,.text-red-600,.text-red-500) {
+  color: #ffd0d0 !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-zone :is(.text-emerald-700,.text-emerald-600,.text-emerald-500),
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-card :is(.text-emerald-700,.text-emerald-600,.text-emerald-500),
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-movement :is(.text-emerald-700,.text-emerald-600,.text-emerald-500),
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-movement :is(.text-emerald-700,.text-emerald-600,.text-emerald-500) {
+  color: #bff3d4 !important;
+}
+
+/* Cases PERSO dark : toutes identiques, noir + contour or, coche or. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ledger-check,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ledger-check[data-checked="true"],
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ledger-check[data-checked="false"] {
+  background: #252621 !important;
+  border-color: #b89a4a !important;
+  color: #e1c36e !important;
+  box-shadow: inset 0 0 0 1px rgba(214,182,95,.14) !important;
+}
+
+/* Mode clair : opérations blanches, lavande très clair et cases blanches. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations {
+  background: #fffdf8 !important;
+  border-color: #ddd7cc !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-row,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-movement-row {
+  background: #ffffff !important;
+  color: #20211e !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-zone,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-card,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-movement,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-movement {
+  background: #eee5f7 !important;
+  color: #352a42 !important;
+  border-color: #cdbbe0 !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-zone *,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-card *,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .projection-savings-movement *,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-movement * {
+  color: inherit;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ledger-check,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ledger-check[data-checked="true"],
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ledger-check[data-checked="false"] {
+  background: #ffffff !important;
+  border-color: #b89a4a !important;
+  color: #171814 !important;
+}
+
+/* COMPTABILITE MARIAGE + ENFANTS : aucune grande surface noire en white mode. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .enfants-ledger-theme {
+  background: #f6f3ed !important;
+  color: #20211e !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme :is(section,article,details,[class*="bg-black"],[class*="bg-neutral-950"],[class*="bg-neutral-900"],[class*="bg-neutral-800"],[class*="bg-zinc-950"],[class*="bg-zinc-900"],[class*="bg-stone-950"],[class*="bg-stone-900"]),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .enfants-ledger-theme :is(section,article,details,[class*="bg-black"],[class*="bg-neutral-950"],[class*="bg-neutral-900"],[class*="bg-neutral-800"],[class*="bg-zinc-950"],[class*="bg-zinc-900"],[class*="bg-stone-950"],[class*="bg-stone-900"]) {
+  background: #fffdf8 !important;
+  color: #20211e !important;
+  border-color: #ddd7cc !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme :is(.text-white,.text-neutral-100,.text-neutral-200,.text-neutral-300),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .enfants-ledger-theme :is(.text-white,.text-neutral-100,.text-neutral-200,.text-neutral-300) {
+  color: #20211e !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme :is(.text-neutral-400,.text-neutral-500),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .enfants-ledger-theme :is(.text-neutral-400,.text-neutral-500) {
+  color: #6f706a !important;
+}

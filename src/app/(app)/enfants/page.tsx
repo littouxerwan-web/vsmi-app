@@ -93,7 +93,7 @@ export default async function ChildrenPage({searchParams}:{searchParams:Promise<
  const transferFrom=balance1<-.005?person1:balance1>.005?person2:null;
  const transferTo=balance1<-.005?person2:balance1>.005?person1:null;
 
- return <main className="mx-auto max-w-7xl space-y-5 p-4 sm:p-6 lg:p-8">
+ return <main className="enfants-ledger-theme mx-auto max-w-7xl space-y-5 p-4 sm:p-6 lg:p-8">
   <header className="flex flex-wrap items-center justify-between gap-4">
    <div className="flex items-center gap-3">
     <div className="grid size-11 place-items-center rounded-2xl bg-[#C7A45A]/15 text-[#8B6929]"><Baby size={22}/></div>
