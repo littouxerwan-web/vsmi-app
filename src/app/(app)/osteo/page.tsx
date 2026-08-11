@@ -10,6 +10,7 @@ const today=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Paris",year:"n
 const monthName=(iso:string)=>{const s=new Intl.DateTimeFormat("fr-FR",{month:"long",year:"numeric"}).format(new Date(`${iso.slice(0,7)}-01T12:00:00`));return s.charAt(0).toUpperCase()+s.slice(1)};
 const methodLabel=(m:string)=>m==="cb"?"Carte bleue":m==="cash"?"Espèces":"Chèque";
 const monthsOf=(year:number)=>Array.from({length:12},(_,i)=>`${year}-${String(i+1).padStart(2,"0")}`);
+const nextMonthStart=(month:string)=>{const [y,m]=month.split("-").map(Number);const d=new Date(Date.UTC(y,m,1));return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-01`;};
 const CORE_ORDER=["loyer","assurance_local","frais_bancaires","cotisations_trimestrielles","urssaf","care","agipi","rcp","cfe","doctolib","formation","gants_masques_blouse","restauration","frais_de_transport","materiel_de_bureau","blanchisserie","comptable","per","telephone"];
 const CORE_LABELS:Record<string,string>={loyer:"Loyer saint père",assurance_local:"Assurance local",frais_bancaires:"Frais bancaires",cotisations_trimestrielles:"Cotisations trimestrielles",urssaf:"URSSAF",care:"CARE",agipi:"AGIPI",rcp:"RCP",cfe:"CFE",doctolib:"Doctolib Pro",formation:"Formation",gants_masques_blouse:"Gants, masques, blouse",restauration:"Restauration",frais_de_transport:"Frais de transport",materiel_de_bureau:"Matériel de bureau",blanchisserie:"Blanchisserie",comptable:"Comptable",per:"PER",telephone:"Téléphone"};
 
@@ -18,20 +19,31 @@ export default async function OsteoPage({searchParams}:{searchParams:Promise<SP>
  const p=await searchParams; const supabase=await createClient(); const {data:{user}}=await supabase.auth.getUser();
  if(!user) redirect("/connexion"); if(user.app_metadata?.osteo_access!==true) redirect("/aujourd-hui");
  const current=today(); const year=Math.max(2020,Math.min(2100,Number(p.year)||Number(current.slice(0,4)))); const selected=(p.month&&/^\d{4}-\d{2}$/.test(p.month)?p.month:current.slice(0,7)); const view=p.view==="2035"?"2035":"mensuel";
- const [{data:accounts=[]},{data:settings},{data:fees=[]},{data:charges=[]},{data:monthly=[]}]=await Promise.all([
-  supabase.from("personal_accounts").select("id,name,account_type,is_active").eq("owner_id",user.id).eq("is_active",true).order("name"),
-  supabase.from("osteo_settings").select("bank_account_id").eq("owner_id",user.id).maybeSingle(),
-  supabase.from("osteo_fees").select("*").eq("owner_id",user.id).gte("fee_date",`${year}-01-01`).lte("fee_date",`${year}-12-31`).order("fee_date").order("created_at"),
-  supabase.from("osteo_charges").select("*").eq("owner_id",user.id).gte("month",`${year}-01-01`).lte("month",`${year}-12-01`).order("month").order("sort_order"),
-  supabase.from("osteo_monthly_settings").select("*").eq("owner_id",user.id).gte("month",`${year}-01-01`).lte("month",`${year}-12-01`).order("month"),
- ]);
- const selectedFees=(fees as any[]).filter(f=>f.fee_date.startsWith(selected)); const selectedCharges=(charges as any[]).filter(c=>c.month.startsWith(selected)); const ms=(monthly as any[]).find(m=>m.month.startsWith(selected))??{sublease_income:250,km_per_day:12,benefit_previous_year:0};
+ const monthStart=`${selected}-01`; const monthEnd=nextMonthStart(selected);
+ const accountsQuery=supabase.from("personal_accounts").select("id,name,account_type,is_active").eq("owner_id",user.id).eq("is_active",true).order("name");
+ const settingsQuery=supabase.from("osteo_settings").select("bank_account_id").eq("owner_id",user.id).maybeSingle();
+ const feesQuery=view==="2035"
+  ? supabase.from("osteo_fees").select("id,fee_date,payment_method,amount").eq("owner_id",user.id).gte("fee_date",`${year}-01-01`).lte("fee_date",`${year}-12-31`).order("fee_date")
+  : supabase.from("osteo_fees").select("id,fee_date,payment_method,amount").eq("owner_id",user.id).gte("fee_date",monthStart).lt("fee_date",monthEnd).order("fee_date");
+ const chargesQuery=view==="2035"
+  ? supabase.from("osteo_charges").select("id,month,due_day,category_key,label,amount,paid,project_to_personal,sort_order").eq("owner_id",user.id).gte("month",`${year}-01-01`).lte("month",`${year}-12-01`).order("month").order("sort_order")
+  : supabase.from("osteo_charges").select("id,month,due_day,category_key,label,amount,paid,project_to_personal,sort_order").eq("owner_id",user.id).eq("month",monthStart).order("sort_order");
+ const monthlyQuery=view==="2035"
+  ? supabase.from("osteo_monthly_settings").select("month,sublease_income,km_per_day,benefit_previous_year").eq("owner_id",user.id).gte("month",`${year}-01-01`).lte("month",`${year}-12-01`).order("month")
+  : supabase.from("osteo_monthly_settings").select("month,sublease_income,km_per_day,benefit_previous_year").eq("owner_id",user.id).eq("month",monthStart);
+ const [accountsResult,settingsResult,feesResult,chargesResult,monthlyResult]=await Promise.all([accountsQuery,settingsQuery,feesQuery,chargesQuery,monthlyQuery]);
+ const loadError=accountsResult.error??settingsResult.error??feesResult.error??chargesResult.error??monthlyResult.error;
+ if(loadError){
+  return <main className="osteo-page mx-auto max-w-[900px] p-4 sm:p-6"><section className="rounded-3xl border border-red-400/30 bg-[#1B1D1B] p-5"><div className="flex items-center gap-2 text-[#D2AE57]"><Stethoscope size={21}/><span className="text-xs font-semibold uppercase tracking-[.18em]">OSTEO</span></div><h1 className="mt-3 text-xl font-semibold text-white">Impossible de charger les données OSTEO</h1><p className="mt-2 text-sm text-white/65">La page répond, mais une requête Supabase a échoué : {loadError.message}</p><p className="mt-2 text-xs text-white/45">Vérifie que la migration OSTEO est bien appliquée au projet Supabase utilisé par VSMI.</p></section></main>;
+ }
+ const accounts=accountsResult.data??[]; const settings=settingsResult.data; const fees=feesResult.data??[]; const charges=chargesResult.data??[]; const monthly=monthlyResult.data??[];
+ const selectedFees=view==="mensuel"?(fees as any[]):(fees as any[]).filter(f=>f.fee_date.startsWith(selected)); const selectedCharges=view==="mensuel"?(charges as any[]):(charges as any[]).filter(c=>c.month.startsWith(selected)); const ms=(monthly as any[]).find(m=>m.month.startsWith(selected))??{sublease_income:250,km_per_day:12,benefit_previous_year:0};
  const feeTotals={cb:0,cash:0,cheque:0}; for(const f of selectedFees) feeTotals[f.payment_method as keyof typeof feeTotals]+=Number(f.amount)||0;
  const receipts=feeTotals.cb+feeTotals.cash+feeTotals.cheque; const expenses=selectedCharges.reduce((s,c)=>s+(Number(c.amount)||0),0); const sublet=Number(ms.sublease_income)||0; const benefit=receipts+sublet-expenses; const days=new Set(selectedFees.map(f=>f.fee_date)).size; const patients=selectedFees.length; const km=days*(Number(ms.km_per_day)||0);
- const monthKeys=monthsOf(year); const monthlyByKey=new Map((monthly as any[]).map(m=>[m.month.slice(0,7),m]));
- const feesByMonth=new Map<string,any[]>(); for(const f of fees as any[]){const k=f.fee_date.slice(0,7);feesByMonth.set(k,[...(feesByMonth.get(k)??[]),f]);}
- const chargesByMonth=new Map<string,any[]>(); for(const c of charges as any[]){const k=c.month.slice(0,7);chargesByMonth.set(k,[...(chargesByMonth.get(k)??[]),c]);}
- const annual=monthKeys.map(k=>{const fs=feesByMonth.get(k)??[],cs=chargesByMonth.get(k)??[],set=monthlyByKey.get(k)??{sublease_income:250,km_per_day:12,benefit_previous_year:0};const cb=fs.filter(f=>f.payment_method==="cb").reduce((s,f)=>s+Number(f.amount||0),0);const ch=fs.filter(f=>f.payment_method==="cheque").reduce((s,f)=>s+Number(f.amount||0),0);const cash=fs.filter(f=>f.payment_method==="cash").reduce((s,f)=>s+Number(f.amount||0),0);const exp=cs.reduce((s,c)=>s+Number(c.amount||0),0);const distinct=new Set(fs.map(f=>f.fee_date)).size;return{k,cbCheque:cb+ch,cash,sublet:Number(set.sublease_income||0),total:cb+ch+cash+Number(set.sublease_income||0),expenses:exp,benefit:cb+ch+cash+Number(set.sublease_income||0)-exp,patients:fs.length,days:distinct,km:distinct*Number(set.km_per_day||0),prev:Number(set.benefit_previous_year||0),charges:cs};});
+ const monthKeys=view==="2035"?monthsOf(year):[]; const monthlyByKey=new Map((monthly as any[]).map(m=>[m.month.slice(0,7),m]));
+ const feesByMonth=new Map<string,any[]>(); if(view==="2035") for(const f of fees as any[]){const k=f.fee_date.slice(0,7);feesByMonth.set(k,[...(feesByMonth.get(k)??[]),f]);}
+ const chargesByMonth=new Map<string,any[]>(); if(view==="2035") for(const c of charges as any[]){const k=c.month.slice(0,7);chargesByMonth.set(k,[...(chargesByMonth.get(k)??[]),c]);}
+ const annual=view==="2035"?monthKeys.map(k=>{const fs=feesByMonth.get(k)??[],cs=chargesByMonth.get(k)??[],set=monthlyByKey.get(k)??{sublease_income:250,km_per_day:12,benefit_previous_year:0};let cb=0,ch=0,cash=0;for(const f of fs){const amount=Number(f.amount)||0;if(f.payment_method==="cb")cb+=amount;else if(f.payment_method==="cheque")ch+=amount;else if(f.payment_method==="cash")cash+=amount;}const exp=cs.reduce((sum,c)=>sum+(Number(c.amount)||0),0);const distinct=new Set(fs.map(f=>f.fee_date)).size;const sublet=Number(set.sublease_income)||0;return{k,cbCheque:cb+ch,cash,sublet,total:cb+ch+cash+sublet,expenses:exp,benefit:cb+ch+cash+sublet-exp,patients:fs.length,days:distinct,km:distinct*(Number(set.km_per_day)||0),prev:Number(set.benefit_previous_year)||0,charges:cs};}):[];
  return <main className="osteo-page mx-auto max-w-[1500px] space-y-5 p-4 sm:p-6 lg:p-8">
   <section className="osteo-panel flex flex-col gap-4 rounded-3xl border border-white/10 bg-[#1B1D1B] p-5 sm:flex-row sm:items-center sm:justify-between">
    <div><div className="flex items-center gap-2 text-[#D2AE57]"><Stethoscope size={21}/><span className="text-xs font-semibold uppercase tracking-[.18em]">OSTEO</span></div><h1 className="mt-2 text-2xl font-semibold text-white">Activité de Laure</h1><p className="mt-1 text-sm text-white/55">Honoraires, charges, projection bancaire et vue 2035.</p></div>
