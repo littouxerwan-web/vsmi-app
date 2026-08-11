@@ -25,7 +25,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
     | {
         sub?: string;
         email?: string;
-        app_metadata?: { role?: string; photo_access?: boolean };
+        app_metadata?: { role?: string; photo_access?: boolean; osteo_access?: boolean };
         user_metadata?: { first_name?: string };
       }
     | undefined;
@@ -37,6 +37,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
   const personalOnly = claims.app_metadata?.role === "personal";
   const photoAccess = claims.app_metadata?.photo_access === true;
   const childrenAccess = photoAccess && !personalOnly;
+  const osteoAccess = claims.app_metadata?.osteo_access === true;
 
   const firstName =
     typeof claims.user_metadata?.first_name === "string"
@@ -48,7 +49,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
       <InteractionFeedback />
       <div className="vsmi-lux-theme min-h-screen bg-[#0B0B0B] text-[#F4F4F2]">
       <div className="flex min-h-screen">
-        <AppNavigation photoAccess={photoAccess} childrenAccess={childrenAccess} />
+        <AppNavigation photoAccess={photoAccess} childrenAccess={childrenAccess} osteoAccess={osteoAccess} />
 
         <div className="min-w-0 flex-1">
           <header className="sticky top-0 z-30 border-b border-white/10 bg-[#101010]/95 text-white shadow-[0_8px_28px_rgba(0,0,0,.18)] backdrop-blur">
@@ -106,7 +107,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
           <div id="app-private-content" className="relative pb-24 lg:pb-0">
             {children}
           </div>
-          <MobileNavigation photoAccess={photoAccess} />
+          <MobileNavigation photoAccess={photoAccess} osteoAccess={osteoAccess} />
         </div>
       </div>
     </div>

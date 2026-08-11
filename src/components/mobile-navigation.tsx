@@ -13,6 +13,7 @@ import {
   TrendingUp,
   UsersRound,
   WalletCards,
+  Stethoscope,
   X,
 } from "lucide-react";
 
@@ -31,7 +32,7 @@ const photoItems = [
 
 type Panel = "common" | "photo" | null;
 
-export function MobileNavigation({ photoAccess = false }: { photoAccess?: boolean }) {
+export function MobileNavigation({ photoAccess = false, osteoAccess = false }: { photoAccess?: boolean; osteoAccess?: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const view = searchParams.get("vue") ?? "finances";
@@ -67,7 +68,9 @@ export function MobileNavigation({ photoAccess = false }: { photoAccess?: boolea
     </Link>
   );
 
-  const panelItems = panel === "common" ? commonItems : photoItems;
+  const panelItems = panel === "common"
+    ? (osteoAccess ? [...commonItems, { href: "/osteo", label: "OSTEO", icon: Stethoscope }] : commonItems)
+    : photoItems;
   const panelTitle = panel === "common" ? "COMMUN" : "PHOTO";
   const panelColor = panel === "common" ? "text-[#D9DADD]" : "text-[#D2AE57]";
 
@@ -195,6 +198,16 @@ export function MobileNavigation({ photoAccess = false }: { photoAccess?: boolea
               <Camera size={ICON_SIZE} strokeWidth={1.9} />
               <span className="text-[10px] font-medium leading-none">Photo</span>
             </button>
+          ) : osteoAccess ? (
+            <Link
+              href="/osteo"
+              className={`vsmi-press flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-medium leading-none transition ${
+                pathname === "/osteo" ? "bg-[#9B7CC1] text-black" : "text-white/55"
+              }`}
+            >
+              <Stethoscope size={ICON_SIZE} strokeWidth={1.9} />
+              <span className="text-[10px] font-medium leading-none">Osteo</span>
+            </Link>
           ) : (
             <div aria-hidden="true" />
           )}

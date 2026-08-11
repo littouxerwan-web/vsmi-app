@@ -1263,3 +1263,20 @@ html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .p
   border-color: #b89a4a !important;
   color: #171814 !important;
 }
+
+/* OSTEO — surfaces dark/light cohérentes avec VSMI */
+.vsmi-light-mode .osteo-page { color: #242421; }
+.vsmi-light-mode .osteo-panel { background: #ffffff !important; border-color: #deddd7 !important; color: #242421 !important; }
+.vsmi-light-mode .osteo-panel h1,
+.vsmi-light-mode .osteo-panel h2,
+.vsmi-light-mode .osteo-panel strong,
+.vsmi-light-mode .osteo-panel td { color: #242421 !important; }
+.vsmi-light-mode .osteo-panel p,
+.vsmi-light-mode .osteo-panel label,
+.vsmi-light-mode .osteo-panel span { color: #686862; }
+.vsmi-light-mode .osteo-input { background: #ffffff !important; color: #242421 !important; border-color: #cbc9c2 !important; }
+.vsmi-light-mode .osteo-row,
+.vsmi-light-mode .osteo-metric { background: #f6f4ef !important; border-color: #dcd9d1 !important; }
+.vsmi-light-mode .osteo-panel table th { background: #f0eee8 !important; color: #242421 !important; border-color: #d8d6cf !important; }
+.vsmi-light-mode .osteo-panel table td { background: #ffffff; border-color: #e5e2da !important; }
+.vsmi-light-mode .osteo-panel table td.sticky { background: #ffffff !important; }

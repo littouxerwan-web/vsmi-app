@@ -11,6 +11,7 @@ import {
   UserRound,
   UsersRound,
   WalletCards,
+  Stethoscope,
 } from "lucide-react";
 
 const basePersoNavigation = [
@@ -62,7 +63,7 @@ function NavLink({
   );
 }
 
-export function AppNavigation({ photoAccess = false, childrenAccess = false }: { photoAccess?: boolean; childrenAccess?: boolean }) {
+export function AppNavigation({ photoAccess = false, childrenAccess = false, osteoAccess = false }: { photoAccess?: boolean; childrenAccess?: boolean; osteoAccess?: boolean }) {
   const persoNavigation = childrenAccess
     ? [...basePersoNavigation, { href: "/enfants", label: "Enfants", icon: Baby }]
     : basePersoNavigation;
@@ -93,6 +94,16 @@ export function AppNavigation({ photoAccess = false, childrenAccess = false }: {
             ))}
           </div>
         </details>
+
+        {osteoAccess ? (
+          <Link
+            href="/osteo"
+            className="vsmi-press mt-4 flex items-center gap-3 rounded-2xl border border-[#9B7CC1]/40 bg-[#9B7CC1]/12 px-4 py-3 text-sm font-semibold text-[#D9C7EF] transition hover:bg-[#9B7CC1]/20"
+          >
+            <Stethoscope size={19} strokeWidth={1.8} />
+            OSTEO
+          </Link>
+        ) : null}
 
         <details className="group mt-4" open>
           <summary className="vsmi-press flex cursor-pointer list-none items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-[#D9DADD] transition hover:bg-white/10">
