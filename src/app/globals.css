@@ -458,3 +458,134 @@ input[type="radio"]:not(:disabled) {
 .vsmi-lux-theme #app-private-content [class*="bg-purple-50"] :is(.text-neutral-950,.text-neutral-900,.text-neutral-800,.text-neutral-700) {
   color: inherit !important;
 }
+
+/* --------------------------------------------------------------------------
+   PERSO — thème lisible clair sur coque sombre (2026-08-11)
+   Portée volontairement limitée à /perso via .perso-ledger-theme.
+   La page /aujourd-hui n'est donc pas modifiée.
+   -------------------------------------------------------------------------- */
+.perso-ledger-theme {
+  --perso-cream: #f7f4ed;
+  --perso-cream-2: #fffaf0;
+  --perso-gold: #d6b65f;
+  --perso-gold-deep: #66501a;
+  --perso-ink: #20211e;
+  --perso-muted: #6f706a;
+  --perso-line: #d8d2c7;
+}
+
+/* Les grandes zones PERSO restent intégrées à la coque sombre, mais les données
+   passent sur des surfaces claires comme dans la maquette validée. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme > div > div.bg-white,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme > div > section.bg-white,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme > div > div > section.bg-white {
+  background-color: #1d1e1b !important;
+  color: #f5f3ed !important;
+  border-color: rgba(255,255,255,.12) !important;
+}
+
+/* En-tête et onglets : graphite + or, sans gros aplats noirs. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme nav {
+  background-color: #1d1e1b !important;
+  border-color: rgba(255,255,255,.12) !important;
+  padding-top: .45rem;
+  padding-bottom: .45rem;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme nav a {
+  border-radius: .7rem;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme nav a.bg-black {
+  background: linear-gradient(180deg,#dfc36f 0%,#cda446 100%) !important;
+  color: #151515 !important;
+  box-shadow: none !important;
+  font-weight: 600 !important;
+}
+
+/* Cartes de soldes : la teinte choisie dans Paramètres est conservée par le
+   style inline du composant, mais mélangée avec du blanc pour rester lisible. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section:has(.grid) [style*="color-mix"] {
+  color: var(--perso-ink) !important;
+  border-top-color: var(--perso-line) !important;
+  border-right-color: var(--perso-line) !important;
+  border-bottom-color: var(--perso-line) !important;
+  border-radius: 1rem;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme [style*="color-mix"] .text-neutral-500,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme [style*="color-mix"] .text-neutral-600 {
+  color: var(--perso-muted) !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme [style*="color-mix"] .bg-white\/80 {
+  background-color: rgba(255,255,255,.72) !important;
+  color: var(--perso-ink) !important;
+}
+
+/* Opérations du mois : panneau clair, champs blancs et texte sombre. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style*="color-mix"],
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style*="#f7f4ed"] {
+  color: var(--perso-ink) !important;
+  border-radius: 1rem;
+  padding: 1rem !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .bg-neutral-50,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .bg-neutral-100 {
+  background-color: #f1eee7 !important;
+  color: var(--perso-ink) !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] select,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] textarea {
+  background-color: #fff !important;
+  color: var(--perso-ink) !important;
+  border-color: #cfc9bd !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .text-neutral-400 { color:#8b8b84 !important; }
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .text-neutral-500 { color:#74756f !important; }
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .text-neutral-600 { color:#62635e !important; }
+
+/* Résumés et budgets : crème chaude, hiérarchie nette, sans texte délavé. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .bg-amber-50 {
+  background-color: #f2e8cb !important;
+  color: #55400f !important;
+  border-color: #d9c17b !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .bg-amber-50 .text-neutral-600 {
+  color: #71684f !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .bg-black {
+  background-color: #262724 !important;
+  color: #f7f4ed !important;
+}
+
+/* Transactions : teintes très légères, montants sémantiques conservés. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] > .mt-5 > div[style*="color-mix"] {
+  border-radius: .85rem;
+  color: var(--perso-ink) !important;
+}
+
+/* Typographie moins lourde que la version précédente. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme h1,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme h2,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme h3 {
+  font-weight: 600 !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .font-semibold {
+  font-weight: 600 !important;
+}
+
+/* Cases : blanches cerclées de noir, y compris dans les listes claires. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme input[type="checkbox"] {
+  background: #fff !important;
+  border-color: #292a27 !important;
+  box-shadow: none;
+}
+
+@media (max-width: 639px) {
+  .vsmi-lux-theme #app-private-content .perso-ledger-theme {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .vsmi-lux-theme #app-private-content .perso-ledger-theme section[style*="color-mix"],
+  .vsmi-lux-theme #app-private-content .perso-ledger-theme section[style*="#f7f4ed"] {
+    border-radius: .9rem;
+  }
+}
