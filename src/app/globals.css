@@ -501,22 +501,10 @@ input[type="radio"]:not(:disabled) {
   font-weight: 600 !important;
 }
 
-/* Cartes de soldes : la teinte choisie dans Paramètres est conservée par le
-   style inline du composant, mais mélangée avec du blanc pour rester lisible. */
-.vsmi-lux-theme #app-private-content .perso-ledger-theme section:has(.grid) [style*="color-mix"] {
-  color: var(--perso-ink) !important;
-  border-top-color: var(--perso-line) !important;
-  border-right-color: var(--perso-line) !important;
-  border-bottom-color: var(--perso-line) !important;
-  border-radius: 1rem;
-}
-.vsmi-lux-theme #app-private-content .perso-ledger-theme [style*="color-mix"] .text-neutral-500,
-.vsmi-lux-theme #app-private-content .perso-ledger-theme [style*="color-mix"] .text-neutral-600 {
-  color: var(--perso-muted) !important;
-}
-.vsmi-lux-theme #app-private-content .perso-ledger-theme [style*="color-mix"] .bg-white\/80 {
-  background-color: rgba(255,255,255,.72) !important;
-  color: var(--perso-ink) !important;
+/* Cartes de soldes : même rendu que la page Aujourd’hui. La couleur choisie
+   est le fond réel de la carte, sans mélange ni aplat intermédiaire. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme article[style*="background-color"] {
+  isolation: isolate;
 }
 
 /* Opérations du mois : panneau clair, champs blancs et texte sombre. */
@@ -554,12 +542,6 @@ input[type="radio"]:not(:disabled) {
 .vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .bg-black {
   background-color: #262724 !important;
   color: #f7f4ed !important;
-}
-
-/* Transactions : teintes très légères, montants sémantiques conservés. */
-.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] > .mt-5 > div[style*="color-mix"] {
-  border-radius: .85rem;
-  color: var(--perso-ink) !important;
 }
 
 /* Typographie moins lourde que la version précédente. */
@@ -663,8 +645,43 @@ input[type="radio"]:not(:disabled) {
   color: #666760 !important;
 }
 
-/* Les cartes de compte conservent leur couleur choisie dans Organiser dans les
-   deux modes. Les surfaces de données restent volontairement claires. */
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme article[style*="border-color"] {
+
+
+/* --------------------------------------------------------------------------
+   PERSO — Opérations du mois : panneaux arrondis et mouvements cohérents
+   avec la couleur du compte. Aucun fond intermédiaire ne modifie la teinte.
+   -------------------------------------------------------------------------- */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-panel {
+  background-color: #1d1e1b !important;
+  color: #f5f3ed !important;
+  border-color: color-mix(in srgb, var(--perso-account-color) 55%, #4a4b47) !important;
+}
+
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-card {
+  background-color: color-mix(in srgb, var(--perso-account-color) 22%, #1d1e1b) !important;
+  border-color: color-mix(in srgb, var(--perso-account-color) 58%, #555650) !important;
+  color: #f5f3ed !important;
+  box-shadow: none !important;
+}
+
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-card .text-neutral-500,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-card .text-neutral-600 {
+  color: #c3c1ba !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-panel {
+  background-color: #fffdf8 !important;
   color: #20211e !important;
+  border-color: color-mix(in srgb, var(--perso-account-color) 55%, #d8d2c7) !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-card {
+  background-color: #ffffff !important;
+  border-color: color-mix(in srgb, var(--perso-account-color) 70%, #d8d2c7) !important;
+  color: #20211e !important;
+}
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-card .text-neutral-500,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-card .text-neutral-600 {
+  color: #6f706a !important;
 }
