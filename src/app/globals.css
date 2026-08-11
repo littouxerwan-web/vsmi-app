@@ -1445,3 +1445,37 @@ html.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page input.oste
   color: #171814 !important;
   color-scheme: light !important;
 }
+
+
+/* OSTEO : navigation principale toujours visible comme la navigation mensuelle. */
+.osteo-view-grid { width: 100%; }
+.osteo-view-link { text-decoration: none; }
+.osteo-analysis-result.is-positive { color: #6ee7b7 !important; -webkit-text-fill-color: #6ee7b7 !important; }
+.osteo-analysis-result.is-negative { color: #fca5a5 !important; -webkit-text-fill-color: #fca5a5 !important; }
+
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page .osteo-view-link:not(.is-active),
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page .osteo-view-link:not(.is-active),
+.vsmi-light-mode #app-private-content .osteo-page .osteo-view-link:not(.is-active),
+html.vsmi-light-mode #app-private-content .osteo-page .osteo-view-link:not(.is-active) {
+  background: #f7f5ef !important;
+  border-color: #d8d4c9 !important;
+  color: #55554f !important;
+  -webkit-text-fill-color: #55554f !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page .osteo-view-link.is-active,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page .osteo-view-link.is-active {
+  background: #d2ae57 !important;
+  border-color: #d2ae57 !important;
+  color: #171714 !important;
+  -webkit-text-fill-color: #171714 !important;
+}
+.vsmi-light-mode .osteo-page .osteo-analysis-result.is-positive,
+html.vsmi-light-mode .osteo-page .osteo-analysis-result.is-positive {
+  color: #15803d !important;
+  -webkit-text-fill-color: #15803d !important;
+}
+.vsmi-light-mode .osteo-page .osteo-analysis-result.is-negative,
+html.vsmi-light-mode .osteo-page .osteo-analysis-result.is-negative {
+  color: #dc2626 !important;
+  -webkit-text-fill-color: #dc2626 !important;
+}
