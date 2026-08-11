@@ -34,15 +34,14 @@ function OsteoSkeleton() {
 export default async function OsteoPage({ searchParams }: { searchParams: Promise<SP> }) {
   const params = await searchParams;
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.getClaims();
-  const claims = data?.claims as { sub?: string } | undefined;
+  const { data: { user }, error } = await supabase.auth.getUser();
 
-  if (error || !claims?.sub) redirect("/connexion");
-  if (claims.sub !== LAURE_USER_ID) redirect("/aujourd-hui");
+  if (error || !user) redirect("/connexion");
+  if (user.id !== LAURE_USER_ID) redirect("/aujourd-hui");
 
   return (
     <Suspense fallback={<OsteoSkeleton />}>
-      <OsteoContent params={params} ownerId={claims.sub} />
+      <OsteoContent params={params} ownerId={user.id} />
     </Suspense>
   );
 }
