@@ -38,3 +38,12 @@ VSMI-*/
 /vsmi/
 .vercel
 .env*
+
+# Artefacts de sauvegarde / copies accidentelles
+/.backup-*
+/src-backup-*/
+/components/
+*.textClipping
+
+# Fichiers d'environnement de production exportés localement
+.env.vercel.production

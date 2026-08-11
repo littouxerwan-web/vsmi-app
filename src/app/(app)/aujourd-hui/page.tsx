@@ -152,16 +152,33 @@ export default async function TodayPage() {
     return date.toISOString().slice(0, 7);
   };
   const photoAccountingMonth = (payment: any) => (payment.accounting_status === "received" ? (payment.received_date ?? payment.expected_date) : payment.expected_date)?.slice(0, 7) ?? null;
-  const photoCaForMonth = (monthIso: string) => photoPayments.filter((payment: any) => payment.accounting_status !== "cancelled" && photoAccountingMonth(payment) === monthIso).reduce((sum: number, payment: any) => sum + N(payment.amount), 0);
-  const urssafForMonth = (monthIso: string) => Math.round(photoCaForMonth(shiftMonth(monthIso, -1)) * 0.216 * 100) / 100;
+  const photoCaByMonth = new Map<string, number>();
+  for (const payment of photoPayments) {
+    if (payment.accounting_status === "cancelled") continue;
+    const monthIso = photoAccountingMonth(payment);
+    if (monthIso) photoCaByMonth.set(monthIso, (photoCaByMonth.get(monthIso) ?? 0) + N(payment.amount));
+  }
+  const urssafForMonth = (monthIso: string) => Math.round((photoCaByMonth.get(shiftMonth(monthIso, -1)) ?? 0) * 0.216 * 100) / 100;
 
-  const receivedPhoto = photoPayments.filter((payment: any) => payment.status === "received" && payment.received_date && payment.received_date <= today);
+  const completedByAccount = new Map<string, any[]>();
+  for (const movement of completedMovements) {
+    const rows = completedByAccount.get(movement.account_id) ?? []; rows.push(movement); completedByAccount.set(movement.account_id, rows);
+  }
+  const receivedPhotoByAccount = new Map<string, any[]>();
+  for (const payment of photoPayments.filter((payment: any) => payment.status === "received" && payment.received_date && payment.received_date <= today)) {
+    const accountId = payment.personal_account_id ?? photoDefaultAccountId;
+    if (!accountId) continue; const rows = receivedPhotoByAccount.get(accountId) ?? []; rows.push(payment); receivedPhotoByAccount.set(accountId, rows);
+  }
+  const completedUrssafByAccount = new Map<string, any[]>();
+  for (const state of ((urssafStates ?? []) as any[])) {
+    if (!state.is_completed || !state.account_id) continue; const rows = completedUrssafByAccount.get(state.account_id) ?? []; rows.push(state); completedUrssafByAccount.set(state.account_id, rows);
+  }
   const liveBalance = (accountId: string) => {
-    const snapshot = latest.get(accountId);
+    const snapshot = latest.get(accountId), snapshotDate = snapshot?.snapshot_date ?? "0000-00-00";
     return N(snapshot?.balance)
-      + completedMovements.filter((movement) => movement.account_id === accountId).reduce((sum, movement) => sum + (["income", "transfer_in"].includes(movement.movement_type) ? N(movement.amount) : -N(movement.amount)), 0)
-      + receivedPhoto.filter((payment: any) => (payment.personal_account_id ?? photoDefaultAccountId) === accountId && payment.received_date > (snapshot?.snapshot_date ?? "0000-00-00")).reduce((sum: number, payment: any) => sum + N(payment.amount), 0)
-      - ((urssafStates ?? []) as any[]).filter((state) => state.is_completed && state.account_id === accountId && (state.completed_date ?? "") > (snapshot?.snapshot_date ?? "0000-00-00") && (state.completed_date ?? "") <= today).reduce((sum, state) => sum + urssafForMonth(String(state.contribution_month).slice(0, 7)), 0);
+      + (completedByAccount.get(accountId) ?? []).reduce((sum, movement) => sum + (["income", "transfer_in"].includes(movement.movement_type) ? N(movement.amount) : -N(movement.amount)), 0)
+      + (receivedPhotoByAccount.get(accountId) ?? []).filter((payment: any) => payment.received_date > snapshotDate).reduce((sum: number, payment: any) => sum + N(payment.amount), 0)
+      - (completedUrssafByAccount.get(accountId) ?? []).filter((state) => (state.completed_date ?? "") > snapshotDate && (state.completed_date ?? "") <= today).reduce((sum, state) => sum + urssafForMonth(String(state.contribution_month).slice(0, 7)), 0);
   };
   const currentBalances = Object.fromEntries(((accounts ?? []) as any[]).map((account) => [account.id, liveBalance(account.id)]));
 

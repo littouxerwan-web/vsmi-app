@@ -80,8 +80,13 @@ export default async function PersoPage({searchParams}:{searchParams:Promise<SP>
  const shiftMonth=(month:string,delta:number)=>{const d=new Date(`${month}-01T12:00:00`);d.setMonth(d.getMonth()+delta);return d.toISOString().slice(0,7);};
  const endOfMonth=(month:string)=>{const d=new Date(`${month}-01T12:00:00`);d.setMonth(d.getMonth()+1);d.setDate(0);return d.toISOString().slice(0,10);};
  const photoAccountingMonth=(p:any)=>(p.accounting_status==="received"?(p.received_date??p.expected_date):p.expected_date)?.slice(0,7)??null;
- const photoCaForMonth=(month:string)=>(photoPayments as any[]).filter(p=>p.accounting_status!=="cancelled"&&photoAccountingMonth(p)===month).reduce((s,p)=>s+Number(p.amount),0);
- const urssafForMonth=(month:string)=>Math.round(photoCaForMonth(shiftMonth(month,-1))*0.216*100)/100;
+ const photoCaByMonth=new Map<string,number>();
+ for(const p of photoPayments as any[]){
+  if(p.accounting_status==="cancelled") continue;
+  const month=photoAccountingMonth(p);
+  if(month) photoCaByMonth.set(month,(photoCaByMonth.get(month)??0)+Number(p.amount));
+ }
+ const urssafForMonth=(month:string)=>Math.round((photoCaByMonth.get(shiftMonth(month,-1))??0)*0.216*100)/100;
  const urssafStateByMonth=new Map((urssafStates as any[]).map(s=>[String(s.contribution_month).slice(0,7),s]));
  const completed=(movements as any[]).filter(m=>{
    if(m.status!=="completed") return false;
@@ -100,11 +105,21 @@ export default async function PersoPage({searchParams}:{searchParams:Promise<SP>
    if(Number.isFinite(snapshotCreatedAt)&&Number.isFinite(completedAt)) return completedAt>snapshotCreatedAt;
    return effectiveDate>snapshot.snapshot_date;
   });
- const receivedPhoto=(photoPayments as any[]).filter(p=>p.status==="received"&&p.received_date&&p.received_date<=today);
- const live=(id:string)=>Number(latest.get(id)?.balance??0)
-   +completed.filter(m=>m.account_id===id).reduce((s,m)=>s+(["income","transfer_in"].includes(m.movement_type)?Number(m.amount):-Number(m.amount)),0)
-   +receivedPhoto.filter(p=>(p.personal_account_id??photoDefaultAccountId)===id&&p.received_date>(latest.get(id)?.snapshot_date??"0000-00-00")&&p.received_date<=today).reduce((s,p)=>s+Number(p.amount),0)
-   -(urssafStates as any[]).filter(s=>s.is_completed&&s.account_id===id&&(s.completed_date??"")>(latest.get(id)?.snapshot_date??"0000-00-00")&&(s.completed_date??"")<=today).reduce((sum,s)=>sum+urssafForMonth(String(s.contribution_month).slice(0,7)),0);
+ const completedByAccount=new Map<string,any[]>();
+ for(const m of completed){const rows=completedByAccount.get(m.account_id)??[];rows.push(m);completedByAccount.set(m.account_id,rows);}
+ const receivedPhotoByAccount=new Map<string,any[]>();
+ for(const p of (photoPayments as any[]).filter(p=>p.status==="received"&&p.received_date&&p.received_date<=today)){
+  const id=p.personal_account_id??photoDefaultAccountId;if(!id) continue;const rows=receivedPhotoByAccount.get(id)??[];rows.push(p);receivedPhotoByAccount.set(id,rows);
+ }
+ const completedUrssafByAccount=new Map<string,any[]>();
+ for(const s of urssafStates as any[]){if(!s.is_completed||!s.account_id) continue;const rows=completedUrssafByAccount.get(s.account_id)??[];rows.push(s);completedUrssafByAccount.set(s.account_id,rows);}
+ const live=(id:string)=>{
+  const snapshot=latest.get(id);const snapshotDate=snapshot?.snapshot_date??"0000-00-00";
+  return Number(snapshot?.balance??0)
+   +(completedByAccount.get(id)??[]).reduce((s,m)=>s+(["income","transfer_in"].includes(m.movement_type)?Number(m.amount):-Number(m.amount)),0)
+   +(receivedPhotoByAccount.get(id)??[]).filter(p=>p.received_date>snapshotDate).reduce((s,p)=>s+Number(p.amount),0)
+   -(completedUrssafByAccount.get(id)??[]).filter(s=>(s.completed_date??"")>snapshotDate&&(s.completed_date??"")<=today).reduce((sum,s)=>sum+urssafForMonth(String(s.contribution_month).slice(0,7)),0);
+ };
  const checking=(accounts as any[]).filter(a=>a.account_type==="checking"), savings=(accounts as any[]).filter(a=>a.account_type==="savings"); const available=checking.reduce((s,a)=>s+live(a.id),0), saved=savings.reduce((s,a)=>s+live(a.id),0);
  const monthEnd=`${currentMonth}-${String(new Date(Number(currentMonth.slice(0,4)),Number(currentMonth.slice(5,7)),0).getDate()).padStart(2,"0")}`;
  const futureBalances=new Map<string,number>((accounts as any[]).map(a=>[a.id,live(a.id)]));

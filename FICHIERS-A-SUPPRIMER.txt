@@ -1,0 +1,7 @@
+src/lib/perso/projection-view.tsx
+src/components/AppShell.tsx
+src/components/perso/savings-analysis.tsx
+src/components/perso/category-budget-analysis.tsx
+src/app/globals 2.css
+src/app/globals 3.css
+src/app/agenda.textClipping
