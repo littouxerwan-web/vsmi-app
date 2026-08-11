@@ -114,6 +114,7 @@ export function MobileNavigation({ photoAccess = false, osteoAccess = false }: {
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={item.href === "/osteo" ? false : undefined}
                     className={`vsmi-press flex min-h-13 items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
                       active
                         ? panel === "common"
@@ -201,6 +202,7 @@ export function MobileNavigation({ photoAccess = false, osteoAccess = false }: {
           ) : osteoAccess ? (
             <Link
               href="/osteo"
+              prefetch={false}
               className={`vsmi-press flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-medium leading-none transition ${
                 pathname === "/osteo" ? "bg-[#9B7CC1] text-black" : "text-white/55"
               }`}

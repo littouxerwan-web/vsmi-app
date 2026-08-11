@@ -9,6 +9,8 @@ export const revalidate = 0;
 
 type SP = { month?: string; view?: string; year?: string };
 
+const LAURE_USER_ID = "791eda92-4159-4db2-b132-1be129f56027";
+
 function OsteoSkeleton() {
   return (
     <main className="osteo-page mx-auto max-w-[1500px] space-y-5 p-4 sm:p-6 lg:p-8">
@@ -33,10 +35,10 @@ export default async function OsteoPage({ searchParams }: { searchParams: Promis
   const params = await searchParams;
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
-  const claims = data?.claims as { sub?: string; app_metadata?: { osteo_access?: boolean } } | undefined;
+  const claims = data?.claims as { sub?: string } | undefined;
 
   if (error || !claims?.sub) redirect("/connexion");
-  if (claims.app_metadata?.osteo_access !== true) redirect("/aujourd-hui");
+  if (claims.sub !== LAURE_USER_ID) redirect("/aujourd-hui");
 
   return (
     <Suspense fallback={<OsteoSkeleton />}>
