@@ -370,7 +370,7 @@ export function AnalysisView({
   const coverage = context.totalExp ? context.totalInc / context.totalExp : 0;
 
   return (
-    <div className="mt-5 space-y-5">
+    <div className="perso-analysis-view mt-5 space-y-5">
       <section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -456,14 +456,14 @@ export function AnalysisView({
         <Panel title="Postes les plus coûteux" subtitle="Clique sur un poste pour voir toutes les opérations qui composent son montant.">
           <div className="space-y-3">
             {context.ranked.slice(0, 10).map((x, i) => (
-              <details key={x.key} className="rounded-xl border border-black/10 bg-neutral-50/60">
+              <details key={x.key} className="analysis-rank-card rounded-xl border">
                 <summary className="cursor-pointer list-none p-3">
                   <div className="mb-1 flex items-center justify-between gap-3 text-sm">
                     <span><b>{i + 1}.</b> {x.name}</span>
                     <span className="text-right font-semibold">{euro(x.amount)} <span className="font-normal text-neutral-400">· {context.totalExp ? pct(x.amount / context.totalExp) : "0 %"}</span></span>
                   </div>
                   <div className="mb-1 text-[11px] text-neutral-400">{euro(x.realized)} réalisé · {euro(x.forecast)} prévu</div>
-                  <div className="h-2 overflow-hidden rounded-full bg-neutral-100"><div className="h-full rounded-full bg-black" style={{ width: `${context.totalExp ? Math.max(2, (x.amount / context.totalExp) * 100) : 0}%` }} /></div>
+                  <div className="analysis-progress-track h-2 overflow-hidden rounded-full"><div className="analysis-progress-fill h-full rounded-full" style={{ width: `${context.totalExp ? Math.max(2, (x.amount / context.totalExp) * 100) : 0}%` }} /></div>
                 </summary>
                 <div className="border-t border-black/10 px-3">
                   <OperationRows rows={x.rows} accounts={accounts} editableEssential />
@@ -622,10 +622,10 @@ function OperationRows({ rows, accounts, editableEssential = false }: { rows: An
 
 function EssentialGroup({ label, amount, total, rows, accounts }: { label: string; amount: number; total: number; rows: AnalysisRow[]; accounts: Account[] }) {
   return (
-    <details className="rounded-xl border border-black/10 bg-neutral-50/60">
+    <details className="analysis-essential-card rounded-xl border">
       <summary className="cursor-pointer list-none p-3">
         <div className="flex justify-between gap-3 text-sm"><span>{label}</span><b>{euro(amount)} · {total ? pct(amount / total) : "0 %"}</b></div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-neutral-100"><div className="h-full rounded-full bg-black" style={{ width: `${total ? (amount / total) * 100 : 0}%` }} /></div>
+        <div className="analysis-progress-track mt-2 h-2 overflow-hidden rounded-full"><div className="analysis-progress-fill h-full rounded-full" style={{ width: `${total ? (amount / total) * 100 : 0}%` }} /></div>
         <p className="mt-2 text-[11px] text-neutral-400">Cliquer pour détailler et reclasser les mouvements réalisés.</p>
       </summary>
       <div className="border-t border-black/10 px-3"><OperationRows rows={rows} accounts={accounts} editableEssential /></div>

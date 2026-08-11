@@ -27,11 +27,13 @@ export function FinanceQuickActions({ debitForm, debitRecurringForm, creditForm,
   };
 
   useEffect(() => {
-    if (searchParams.get("quick") !== "movement") return;
+    const quick = searchParams.get("quick");
+    if (!quick || !["movement", "debit", "credit"].includes(quick)) return;
     setMovementMode("oneoff");
-    setModal("choice");
+    setModal(quick === "debit" ? "debit" : quick === "credit" ? "credit" : "choice");
     const params = new URLSearchParams(searchParams.toString());
     params.delete("quick");
+    params.delete("account_id");
     router.replace(params.size ? `/perso?${params.toString()}` : "/perso", { scroll: false });
   }, [router, searchParams]);
 

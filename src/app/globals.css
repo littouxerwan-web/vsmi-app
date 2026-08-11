@@ -501,10 +501,22 @@ input[type="radio"]:not(:disabled) {
   font-weight: 600 !important;
 }
 
-/* Cartes de soldes : même rendu que la page Aujourd’hui. La couleur choisie
-   est le fond réel de la carte, sans mélange ni aplat intermédiaire. */
-.vsmi-lux-theme #app-private-content .perso-ledger-theme article[style*="background-color"] {
-  isolation: isolate;
+/* Cartes de soldes : la teinte choisie dans Paramètres est conservée par le
+   style inline du composant, mais mélangée avec du blanc pour rester lisible. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section:has(.grid) [style*="color-mix"] {
+  color: var(--perso-ink) !important;
+  border-top-color: var(--perso-line) !important;
+  border-right-color: var(--perso-line) !important;
+  border-bottom-color: var(--perso-line) !important;
+  border-radius: 1rem;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme [style*="color-mix"] .text-neutral-500,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme [style*="color-mix"] .text-neutral-600 {
+  color: var(--perso-muted) !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme [style*="color-mix"] .bg-white\/80 {
+  background-color: rgba(255,255,255,.72) !important;
+  color: var(--perso-ink) !important;
 }
 
 /* Opérations du mois : panneau clair, champs blancs et texte sombre. */
@@ -542,6 +554,12 @@ input[type="radio"]:not(:disabled) {
 .vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] .bg-black {
   background-color: #262724 !important;
   color: #f7f4ed !important;
+}
+
+/* Transactions : teintes très légères, montants sémantiques conservés. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme section[style] > .mt-5 > div[style*="color-mix"] {
+  border-radius: .85rem;
+  color: var(--perso-ink) !important;
 }
 
 /* Typographie moins lourde que la version précédente. */
@@ -645,43 +663,132 @@ input[type="radio"]:not(:disabled) {
   color: #666760 !important;
 }
 
+/* Les cartes de compte conservent leur couleur choisie dans Organiser dans les
+   deux modes. Les surfaces de données restent volontairement claires. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme article[style*="border-color"] {
+  color: #20211e !important;
+}
 
 
 /* --------------------------------------------------------------------------
-   PERSO — Opérations du mois : panneaux arrondis et mouvements cohérents
-   avec la couleur du compte. Aucun fond intermédiaire ne modifie la teinte.
+   PERSO V2.2 — lisibilité des mouvements, modes clair/sombre et analyse.
    -------------------------------------------------------------------------- */
-.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-panel {
-  background-color: #1d1e1b !important;
+.perso-account-card .perso-account-label { color: currentColor !important; opacity: .58; }
+.perso-account-card .perso-account-icon {
+  color: currentColor !important;
+  border-color: color-mix(in srgb, currentColor 22%, transparent) !important;
+  background: color-mix(in srgb, currentColor 8%, transparent) !important;
+}
+
+/* En cours / opérations : même surface pour recherche, synthèse et budgets. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-surface,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-summary,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-metric,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-budget-card {
+  background: #2a2a28 !important;
   color: #f5f3ed !important;
-  border-color: color-mix(in srgb, var(--perso-account-color) 55%, #4a4b47) !important;
+  border-color: rgba(255,255,255,.16) !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-summary > * + * {
+  border-left: 1px solid rgba(255,255,255,.12);
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-budget-card .text-neutral-600,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-surface .text-neutral-500 {
+  color: #bcb8ae !important;
 }
 
-.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-card {
-  background-color: color-mix(in srgb, var(--perso-account-color) 22%, #1d1e1b) !important;
-  border-color: color-mix(in srgb, var(--perso-account-color) 58%, #555650) !important;
+/* Les mouvements sont gris en sombre. La couleur du compte n'agit QUE sur la bordure. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-row {
+  background: #30302e !important;
   color: #f5f3ed !important;
-  box-shadow: none !important;
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-radius: .9rem !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-row .text-neutral-500,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-row .text-neutral-600 {
+  color: #bbb8b0 !important;
 }
 
-.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-card .text-neutral-500,
-.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-card .text-neutral-600 {
-  color: #c3c1ba !important;
+/* Cases de pointage : jamais noires en clair, coche sombre sur fond blanc. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme :is(button, input)[aria-label*="Pointer"],
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme button[aria-label*="Décocher"],
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme input[type="checkbox"] {
+  background: #fff !important;
+  color: #111 !important;
+  border-color: #292a27 !important;
 }
 
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-panel {
+/* Mode clair : opérations entièrement blanches et surfaces harmonisées. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-surface,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-summary,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-metric,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-budget-card,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-row {
+  background: #fff !important;
+  color: #20211e !important;
+  border-color: #d8d2c7;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-row {
+  /* border-color inline = couleur du compte et reste prioritaire */
+  box-shadow: 0 1px 0 rgba(0,0,0,.025);
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-summary > * + * {
+  border-left: 1px solid #e3ded4;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-budget-card .text-neutral-600,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-ops-surface .text-neutral-500,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-row .text-neutral-500,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-row .text-neutral-600 {
+  color: #6f706a !important;
+}
+
+/* Projection / Budgets / Analyse : aucune grande surface noire en mode clair. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-projection-view :is(section,div,details)[class*="bg-black"],
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-savings-view :is(section,div,details)[class*="bg-black"],
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view :is(section,div,details)[class*="bg-black"] {
+  background: #fffdf8 !important;
+  color: #20211e !important;
+  border-color: #d8d2c7 !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-projection-view :is(.bg-white,.bg-neutral-50,.bg-neutral-100,.bg-neutral-200),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-savings-view :is(.bg-white,.bg-neutral-50,.bg-neutral-100,.bg-neutral-200),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view :is(.bg-white,.bg-neutral-50,.bg-neutral-100,.bg-neutral-200) {
   background-color: #fffdf8 !important;
   color: #20211e !important;
-  border-color: color-mix(in srgb, var(--perso-account-color) 55%, #d8d2c7) !important;
 }
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-projection-view :is(.text-neutral-950,.text-neutral-900,.text-neutral-800,.text-neutral-700),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-savings-view :is(.text-neutral-950,.text-neutral-900,.text-neutral-800,.text-neutral-700),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view :is(.text-neutral-950,.text-neutral-900,.text-neutral-800,.text-neutral-700) { color:#20211e !important; }
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-projection-view :is(.text-neutral-600,.text-neutral-500,.text-neutral-400),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-savings-view :is(.text-neutral-600,.text-neutral-500,.text-neutral-400),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view :is(.text-neutral-600,.text-neutral-500,.text-neutral-400) { color:#6f706a !important; }
 
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-card {
-  background-color: #ffffff !important;
-  border-color: color-mix(in srgb, var(--perso-account-color) 70%, #d8d2c7) !important;
-  color: #20211e !important;
+/* Analyse : contraste explicite des blocs les plus coûteux / structure. */
+.vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-rank-card,
+.vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-essential-card {
+  background: #343432 !important;
+  color: #f7f5ef !important;
+  border-color: rgba(255,255,255,.18) !important;
 }
+.vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-rank-card .text-neutral-400,
+.vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-essential-card .text-neutral-400 { color:#c5c1b8 !important; }
+.vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-progress-track { background:#171817 !important; }
+.vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-progress-fill { background:#d2ae57 !important; }
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-rank-card,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-essential-card {
+  background:#fff !important;
+  color:#20211e !important;
+  border-color:#d8d2c7 !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-rank-card .text-neutral-400,
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-essential-card .text-neutral-400 { color:#777871 !important; }
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-progress-track { background:#e6e2da !important; }
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-analysis-view .analysis-progress-fill { background:#b88b28 !important; }
 
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-card .text-neutral-500,
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-movement-card .text-neutral-600 {
-  color: #6f706a !important;
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-checkbox-button {
+  background:#fff !important;
+  color:#111 !important;
+  border-color:#292a27 !important;
+  box-shadow:none !important;
 }
