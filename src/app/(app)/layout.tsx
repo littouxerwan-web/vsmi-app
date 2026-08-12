@@ -8,6 +8,7 @@ import { MobileNavigation } from "@/components/mobile-navigation";
 import { PrivacyModeToggle } from "@/components/privacy-mode-toggle";
 import { ThemeModeToggle } from "@/components/theme-mode-toggle";
 import { InteractionFeedback } from "@/components/interaction-feedback";
+import { TopbarContext } from "@/components/topbar-context";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +59,8 @@ export default async function AppLayout({ children }: AppLayoutProps) {
                 <PrivacyModeToggle />
                 <ThemeModeToggle />
               </div>
+
+              <TopbarContext />
 
               <Link
                 href="/aujourd-hui"

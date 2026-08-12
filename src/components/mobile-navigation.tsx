@@ -18,9 +18,10 @@ import {
 } from "lucide-react";
 
 const ICON_SIZE = 20;
+const currentMonthLabel = new Intl.DateTimeFormat("fr-FR", { month: "long", timeZone: "Europe/Paris" }).format(new Date()).replace(/^./, c => c.toUpperCase());
 
 const commonItems = [
-  { href: "/commun?vue=encours", label: "En cours", icon: WalletCards },
+  { href: "/commun?vue=encours", label: currentMonthLabel, icon: WalletCards },
   { href: "/commun?vue=budget", label: "Budget", icon: CircleDollarSign },
 ];
 
@@ -140,7 +141,7 @@ export function MobileNavigation({ photoAccess = false, osteoAccess = false }: {
         <div className="mx-auto grid max-w-lg grid-cols-5 items-end gap-1">
           {persoLink(
             "/perso?vue=finances",
-            "En cours",
+            currentMonthLabel,
             CircleDollarSign,
             pathname === "/perso" && view === "finances",
           )}

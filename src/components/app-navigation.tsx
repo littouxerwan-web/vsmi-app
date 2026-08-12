@@ -14,14 +14,16 @@ import {
   Stethoscope,
 } from "lucide-react";
 
+const currentMonthLabel = new Intl.DateTimeFormat("fr-FR", { month: "long", timeZone: "Europe/Paris" }).format(new Date()).replace(/^./, c => c.toUpperCase());
+
 const basePersoNavigation = [
-  { href: "/perso?vue=finances", label: "En cours", icon: CircleDollarSign },
+  { href: "/perso?vue=finances", label: currentMonthLabel, icon: CircleDollarSign },
   { href: "/perso?vue=projection", label: "Projection", icon: TrendingUp },
   { href: "/perso?vue=analyse", label: "Analyse", icon: BarChart3 },
 ];
 
 const commonNavigation = [
-  { href: "/commun?vue=encours", label: "En cours", icon: WalletCards },
+  { href: "/commun?vue=encours", label: currentMonthLabel, icon: WalletCards },
   { href: "/commun?vue=budget", label: "Budget", icon: CircleDollarSign },
 ];
 
@@ -84,7 +86,7 @@ export function AppNavigation({ photoAccess = false, childrenAccess = false, ost
           <summary className="vsmi-press flex cursor-pointer list-none items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-[#C7A45A] transition hover:bg-[#C7A45A]/14">
             <span className="flex items-center gap-3">
               <UserRound size={19} />
-              PERSO
+              MES COMPTES
             </span>
             <span className="text-lg transition group-open:rotate-45">+</span>
           </summary>
@@ -141,7 +143,7 @@ export function AppNavigation({ photoAccess = false, childrenAccess = false, ost
 
       <div className="border-t border-white/10 px-7 py-5">
         <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.16em]">
-          <span className="text-[#C7A45A]">PERSO</span>
+          <span className="text-[#C7A45A]">MES COMPTES</span>
           <span className="text-neutral-600">•</span>
           <span className="text-[#D9DADD]">COMMUN</span>
           {photoAccess ? (
