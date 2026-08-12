@@ -2,8 +2,11 @@
 import {useMemo,useState} from "react";
 
 type Account={id:string;name:string;owner_name:string};
-export function CommonTransferForm({accounts,action,today}:{accounts:Account[];action:(formData:FormData)=>void|Promise<void>;today:string}){
- const people=useMemo(()=>Array.from(new Set(accounts.map(a=>a.owner_name))).sort((a,b)=>a.localeCompare(b,"fr")),[accounts]);
+export function CommonTransferForm({accounts,people:configuredPeople,action,today}:{accounts:Account[];people:string[];action:(formData:FormData)=>void|Promise<void>;today:string}){
+ const people=useMemo(()=>{
+  const source=[...configuredPeople,...accounts.map(a=>a.owner_name)].map(v=>String(v||"").trim()).filter(Boolean);
+  return Array.from(new Set(source));
+ },[accounts,configuredPeople]);
  const [person,setPerson]=useState(people[0]??"");
  const filtered=accounts.filter(a=>a.owner_name===person);
  return <form action={action} className="mt-4 grid gap-3">
