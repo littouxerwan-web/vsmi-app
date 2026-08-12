@@ -112,14 +112,40 @@ export async function createTransfer(fd: FormData) {
   const destination = text(fd, "destination_account_id");
   const amount = number(fd, "amount");
   const date = text(fd, "movement_date");
-  const label = text(fd, "label") || "Virement interne";
+  const requestedLabel = text(fd, "label") || "Virement interne";
   const status = text(fd, "status") === "completed" ? "completed" : "planned";
   if (!source || !destination || source === destination || !date || !Number.isFinite(amount) || amount <= 0) fail("Le virement interne est incomplet ou incorrect.");
-  const group = crypto.randomUUID();
-  const completedDate = status === "completed"
-    ? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())
-    : null;
+  const commonToken="__COMMON__";
+  const involvesCommon=source===commonToken||destination===commonToken;
+  if(source===commonToken&&destination===commonToken) fail("Choisis un compte PERSO et le compte COMMUN.");
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const completedDate = status === "completed" ? day : null;
   const completedAt = status === "completed" ? new Date().toISOString() : null;
+
+  if(involvesCommon){
+    const personalAccountId=source===commonToken?destination:source;
+    const {data:ownedAccount,error:accountError}=await supabase.from("personal_accounts").select("id").eq("id",personalAccountId).eq("owner_id",user.id).eq("is_active",true).maybeSingle();
+    if(accountError||!ownedAccount) fail(accountError?.message??"Compte PERSO introuvable.");
+    const {data:commonSettings}=await supabase.from("common_settings").select("person_1_name,person_2_name").eq("singleton",true).maybeSingle();
+    const meta=user.user_metadata??{};
+    const metadataName=String(meta.first_name??meta.given_name??meta.full_name??"").trim().split(/\s+/)[0];
+    const fallbackName=user.app_metadata?.role==="personal"?String(commonSettings?.person_2_name??"Laure"):String(commonSettings?.person_1_name??"Erwan");
+    const firstName=metadataName||fallbackName||"Perso";
+    const commonLabel=`Virement ${firstName}`;
+    const personalLabel=requestedLabel==="Virement interne"?`Virement ${source===commonToken?"depuis":"vers"} COMMUN`:requestedLabel;
+    const commonType=source===commonToken?"expense":"income";
+    const personalType=source===commonToken?"transfer_in":"transfer_out";
+    const {data:commonRow,error:commonError}=await supabase.from("common_movements").insert({movement_type:commonType,label:commonLabel,amount,movement_date:date,status,completed_date:completedDate,completed_at:completedAt,created_by:user.id}).select("id").single();
+    if(commonError) fail(commonError.message);
+    const group=crypto.randomUUID();
+    const {error:personalError}=await supabase.from("personal_movements").insert({owner_id:user.id,account_id:personalAccountId,movement_type:personalType,label:personalLabel,amount,movement_date:date,status,completed_date:completedDate,completed_at:completedAt,transfer_group_id:group});
+    if(personalError){await supabase.from("common_movements").delete().eq("id",commonRow.id);fail(personalError.message);}
+    revalidatePath("/commun");
+    await refresh(status === "completed" ? `Virement avec COMMUN effectué (${firstName}).` : `Virement avec COMMUN ajouté aux prévisions (${firstName}).`);
+  }
+
+  const group = crypto.randomUUID();
+  const label=requestedLabel;
   const { error } = await supabase.from("personal_movements").insert([
     { owner_id: user.id, account_id: source, movement_type: "transfer_out", label, amount, movement_date: date, status, completed_date: completedDate, completed_at: completedAt, transfer_group_id: group },
     { owner_id: user.id, account_id: destination, movement_type: "transfer_in", label, amount, movement_date: date, status, completed_date: completedDate, completed_at: completedAt, transfer_group_id: group },
