@@ -34,6 +34,17 @@ export async function saveCommonSettings(f:FormData){
 export async function createCommonSnapshot(f:FormData){const {s,user}=await db(),b=num(f,"balance"),d=t(f,"snapshot_date");if(!d||!Number.isFinite(b))fail("Solde incorrect.");const {error}=await s.from("common_balance_snapshots").upsert({balance:b,snapshot_date:d,created_by:user.id},{onConflict:"snapshot_date"});if(error)fail(error.message);ok("Solde mis à jour.")}
 export async function createCommonCategory(f:FormData){const {s}=await db(),name=t(f,"name"),type=t(f,"movement_type");if(!name||!["income","expense"].includes(type))fail("Catégorie incomplète.");const {error}=await s.from("common_categories").insert({name,movement_type:type});if(error)fail(error.message);ok("Catégorie ajoutée.")}
 export async function createCommonMovement(f:FormData){const {s,user}=await db(),amount=num(f,"amount"),type=t(f,"movement_type"),completed=t(f,"status")==="completed";if(!t(f,"label")||!t(f,"movement_date")||amount<=0)fail("Mouvement incomplet.");const day=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Paris",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());const {error}=await s.from("common_movements").insert({category_id:t(f,"category_id")||null,movement_type:type,label:t(f,"label"),amount,movement_date:t(f,"movement_date"),status:completed?"completed":"planned",completed_date:completed?day:null,completed_at:completed?new Date().toISOString():null,created_by:user.id});if(error)fail(error.message);ok("Mouvement ajouté.")}
+
+export async function createCommonPersonalTransfer(f:FormData){
+ const {s}=await db();
+ const amount=num(f,"amount"),direction=t(f,"direction"),personName=t(f,"person_name"),accountId=t(f,"personal_account_id"),date=t(f,"movement_date"),status=t(f,"status")==="completed"?"completed":"planned";
+ if(!personName||!accountId||!date||!Number.isFinite(amount)||amount<=0||!["to_common","from_common"].includes(direction))fail("Virement interne incomplet.");
+ const {error}=await s.rpc("common_create_personal_transfer",{p_person_name:personName,p_account_id:accountId,p_direction:direction,p_amount:amount,p_movement_date:date,p_status:status});
+ if(error)fail(error.message);
+ revalidatePath("/perso");
+ await ok(`Virement ${personName} enregistré.`);
+}
+
 export async function createCommonRecurrence(f:FormData){const {s,user}=await db(),amount=num(f,"amount");if(!t(f,"label")||!t(f,"start_date")||amount<=0)fail("Récurrence incomplète.");const {error}=await s.from("common_recurrences").insert({category_id:t(f,"category_id")||null,movement_type:t(f,"movement_type"),label:t(f,"label"),amount,frequency:t(f,"frequency")||"monthly",interval_count:Math.max(1,Math.trunc(num(f,"interval_count")||1)),start_date:t(f,"start_date"),end_date:t(f,"end_date")||null,created_by:user.id});if(error)fail(error.message);ok("Récurrence ajoutée.")}
 export async function deleteCommonMovement(id:string){const {s}=await db();const {error}=await s.from("common_movements").delete().eq("id",id);if(error)fail(error.message);ok("Mouvement supprimé.")}
 export async function deleteCommonCategory(id:string){const {s}=await db();const {error}=await s.from("common_categories").delete().eq("id",id);if(error)fail(error.message);ok("Catégorie supprimée.")}
