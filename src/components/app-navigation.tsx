@@ -100,7 +100,6 @@ export function AppNavigation({ photoAccess = false, childrenAccess = false, ost
         {osteoAccess ? (
           <Link
             href="/osteo"
-            prefetch={false}
             className="vsmi-press mt-4 flex items-center gap-3 rounded-2xl border border-[#9B7CC1]/40 bg-[#9B7CC1]/12 px-4 py-3 text-sm font-semibold text-[#D9C7EF] transition hover:bg-[#9B7CC1]/20"
           >
             <Stethoscope size={19} strokeWidth={1.8} />

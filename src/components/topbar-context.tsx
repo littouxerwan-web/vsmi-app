@@ -7,7 +7,7 @@ const currentMonthLabel = () =>
     .format(new Date())
     .replace(/^./, (c) => c.toUpperCase());
 
-export function TopbarContext() {
+export function TopbarContext({ mobile = false }: { mobile?: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const vue = searchParams.get("vue") ?? "finances";
@@ -33,10 +33,19 @@ export function TopbarContext() {
   else if (pathname === "/osteo") section = "OSTEO";
   else if (pathname === "/aujourd-hui") section = "AUJOURD’HUI";
 
+  if (mobile) {
+    return (
+      <div className="vsmi-topbar-context pointer-events-none flex min-w-0 items-center justify-center gap-1.5 px-4 text-center lg:hidden">
+        <span className="truncate text-[9px] font-semibold uppercase tracking-[.14em] text-[#D2AE57]">{section}</span>
+        {detail ? <><span className="vsmi-topbar-separator shrink-0 text-white/20">•</span><span className="vsmi-topbar-detail truncate text-[9px] font-medium uppercase tracking-[.09em] text-white/60">{detail}</span></> : null}
+      </div>
+    );
+  }
+
   return (
-    <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-2 lg:flex">
-      <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[.16em] text-[#D2AE57]">{section}</span>
-      {detail ? <><span className="text-white/25">•</span><span className="whitespace-nowrap text-[11px] font-medium uppercase tracking-[.12em] text-white/65">{detail}</span></> : null}
+    <div className="vsmi-topbar-context pointer-events-none absolute right-1/2 top-1/2 mr-[4.75rem] hidden max-w-[11rem] -translate-y-1/2 items-center justify-end gap-2 xl:max-w-[20rem] 2xl:max-w-[26rem] lg:flex">
+      <span className="truncate text-[11px] font-semibold uppercase tracking-[.16em] text-[#D2AE57]">{section}</span>
+      {detail ? <><span className="shrink-0 text-white/25">•</span><span className="vsmi-topbar-detail truncate text-[11px] font-medium uppercase tracking-[.12em] text-white/65">{detail}</span></> : null}
     </div>
   );
 }

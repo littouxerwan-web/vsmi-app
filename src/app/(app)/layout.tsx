@@ -105,6 +105,9 @@ export default async function AppLayout({ children }: AppLayoutProps) {
                 </form>
               </div>
             </div>
+            <div className="border-t border-white/[0.06] py-1.5 lg:hidden">
+              <TopbarContext mobile />
+            </div>
           </header>
 
           <div id="app-private-content" className="relative pb-24 lg:pb-0">

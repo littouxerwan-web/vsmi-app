@@ -1479,3 +1479,70 @@ html.vsmi-light-mode .osteo-page .osteo-analysis-result.is-negative {
   color: #dc2626 !important;
   -webkit-text-fill-color: #dc2626 !important;
 }
+
+/* ========================================================================== 
+   VSMI 2026-08-12 — filtres mensuels compacts, dark/light et responsive
+   ========================================================================== */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-operation-search {
+  background: #30322f !important;
+  border-color: #4a4c47 !important;
+  color: #f3f1ea !important;
+  box-shadow: 0 8px 22px rgba(0,0,0,.12);
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-operation-search input {
+  background: transparent !important;
+  border: 0 !important;
+  color: inherit !important;
+  box-shadow: none !important;
+  padding-left: .5rem !important;
+  padding-right: .25rem !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-status-filter {
+  background: #292b28 !important;
+  border-color: #4a4c47 !important;
+  color: #d8d6cf !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-status-filter:hover {
+  border-color: #d2ae57 !important;
+  color: #f3f1ea !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-status-filter.is-active {
+  background: #d2ae57 !important;
+  border-color: #d2ae57 !important;
+  color: #171814 !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-operation-search {
+  background: #ffffff !important;
+  border-color: #d8d2c7 !important;
+  color: #20211e !important;
+  box-shadow: 0 7px 18px rgba(45,39,28,.06);
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-status-filter {
+  background: #fffdf8 !important;
+  border-color: #d8d2c7 !important;
+  color: #55564f !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-status-filter:hover {
+  background: #fff8e8 !important;
+  border-color: #c7a44a !important;
+  color: #3a301d !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-status-filter.is-active {
+  background: #d2ae57 !important;
+  border-color: #c39b3f !important;
+  color: #171814 !important;
+}
+@media (max-width: 639px) {
+  .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-operation-search,
+  .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-status-filter {
+    min-height: 2.75rem;
+  }
+}
+
+/* Contexte de page dans la topbar : contraste conservé en mode clair. */
+.vsmi-light-mode .vsmi-lux-theme header .vsmi-topbar-context .vsmi-topbar-detail {
+  color: #5f605a !important;
+}
+.vsmi-light-mode .vsmi-lux-theme header .vsmi-topbar-context .vsmi-topbar-separator {
+  color: rgba(32,33,30,.28) !important;
+}
