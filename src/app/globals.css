@@ -1546,3 +1546,45 @@ html.vsmi-light-mode .osteo-page .osteo-analysis-result.is-negative {
 .vsmi-light-mode .vsmi-lux-theme header .vsmi-topbar-context .vsmi-topbar-separator {
   color: rgba(32,33,30,.28) !important;
 }
+
+/* ========================================================================== 
+   VSMI 2026-08-13 — Lisibilité light mode : contrôle + sous-textes mouvements
+   ========================================================================== */
+
+/* Contrôle du calcul : contraste renforcé en mode clair, y compris le tableau. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit {
+  background: #eef6fa !important;
+  border-color: #a9c9d8 !important;
+  color: #263f4b !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit .projection-control-title {
+  color: #173b4b !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit .projection-control-copy {
+  color: #4b6673 !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit table {
+  color: #304d5a !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit th {
+  color: #244b5d !important;
+  font-weight: 700 !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit td {
+  color: #365562 !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit td.text-emerald-700 {
+  color: #166534 !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit td.text-red-700 {
+  color: #b42318 !important;
+}
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit td.text-violet-700 {
+  color: #6d28d9 !important;
+}
+
+/* Projection + page mensuelle : sous-textes plus contrastés, sans dépasser le libellé principal. */
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-movement-row :is(.text-neutral-500,.text-neutral-400),
+.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-row :is(.text-neutral-500,.text-neutral-400) {
+  color: #5f625d !important;
+}
