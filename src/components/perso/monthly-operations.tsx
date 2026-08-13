@@ -1,7 +1,7 @@
 "use client";
 
 import { MovementDeleteChoices } from "@/components/perso/movement-delete-actions";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Baby, Camera, Check, Clock3, Pencil, Repeat2, Search, SlidersHorizontal } from "lucide-react";
 import {
@@ -34,15 +34,20 @@ function add(d:Date,f:Recurrence["frequency"],n:number){const x=new Date(d);if(f
 function occurrences(r:Recurrence,month:string){const start=new Date(`${r.start_date}T12:00:00`),end=new Date(`${month}-01T12:00:00`);end.setMonth(end.getMonth()+1);let d=start,guard=0,out:string[]=[];while(d<end&&guard++<1000){const iso=d.toISOString().slice(0,10);if(iso.startsWith(month)&&(!r.end_date||iso<=r.end_date))out.push(iso);d=add(d,r.frequency,r.interval_count);}return out;}
 function photoLabel(p:PhotoPayment){const kind=p.payment_type==="deposit"?"Acompte":"Solde";const date=p.wedding_date?formatDate(p.wedding_date):"date à définir";return `Mariage ${p.display_name} ${date} · ${kind}`;}
 
-export function MonthlyOperations({accounts,categories,movements,recurrences,overrides,exclusions=[],photoPayments=[],photoDefaultAccountId=null,urssafDefaultAccountId=null,urssafStates=[],savingsOperations=[],selectedAccountId=null}:{accounts:Account[];categories:Category[];movements:Movement[];recurrences:Recurrence[];overrides:Override[];exclusions?:Exclusion[];photoPayments?:PhotoPayment[];photoDefaultAccountId?:string|null;urssafDefaultAccountId?:string|null;urssafStates?:UrssafState[];budgetRows?:unknown[];savingsOperations?:SavingsOperation[];selectedAccountId?:string|null}){
+export function MonthlyOperations({accounts,categories,movements,recurrences,overrides,exclusions=[],photoPayments=[],photoDefaultAccountId=null,urssafDefaultAccountId=null,urssafStates=[],savingsOperations=[],selectedAccountId=null,initialMonth=null}:{accounts:Account[];categories:Category[];movements:Movement[];recurrences:Recurrence[];overrides:Override[];exclusions?:Exclusion[];photoPayments?:PhotoPayment[];photoDefaultAccountId?:string|null;urssafDefaultAccountId?:string|null;urssafStates?:UrssafState[];budgetRows?:unknown[];savingsOperations?:SavingsOperation[];selectedAccountId?:string|null;initialMonth?:string|null}){
  const searchParams=useSearchParams();
+ const router=useRouter();
+ const pathname=usePathname();
  const requestedAccount=selectedAccountId??searchParams.get("account");
  const initialAccount=requestedAccount&&accounts.some(a=>a.id===requestedAccount)?requestedAccount:"all";
+ const now=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Paris",year:"numeric",month:"2-digit"}).format(new Date());
+ const [month,setMonth]=useState(initialMonth&&/^\d{4}-\d{2}$/.test(initialMonth)?initialMonth:now);
+ const [accountFilter,setAccountFilter]=useState(initialAccount);const [query,setQuery]=useState("");const [typeFilter]=useState("all");const [statusFilter,setStatusFilter]=useState("planned");const [sortBy]=useState("date-asc");
  useEffect(()=>{
   const next=requestedAccount&&accounts.some(a=>a.id===requestedAccount)?requestedAccount:"all";
   setAccountFilter(next);
  },[requestedAccount,accounts]);
- const now=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Paris",year:"numeric",month:"2-digit"}).format(new Date());const [month,setMonth]=useState(now);const [accountFilter,setAccountFilter]=useState(initialAccount);const [query,setQuery]=useState("");const [typeFilter]=useState("all");const [statusFilter,setStatusFilter]=useState("planned");const [sortBy]=useState("date-asc");
+ useEffect(()=>{if(initialMonth&&/^\d{4}-\d{2}$/.test(initialMonth))setMonth(initialMonth)},[initialMonth]);
  const selectedAccount=accounts.find(a=>a.id===accountFilter);
  const accountTint=selectedAccount?.color??null;
  const shiftMonth=(value:string,delta:number)=>{const d=new Date(`${value}-01T12:00:00`);d.setMonth(d.getMonth()+delta);return d.toISOString().slice(0,7);};
@@ -95,7 +100,7 @@ export function MonthlyOperations({accounts,categories,movements,recurrences,ove
  const savingsProposed=relevantSavings.filter(o=>o.savingsProposal?.kind==="deposit").reduce((s,o)=>s+Number(o.amount),0);
  const visibleSavingsRows=relevantSavings.filter((o,index,rows)=>rows.findIndex(x=>x.id===o.id)===index).sort((a,b)=>a.movement_date.localeCompare(b.movement_date));
  return <section className="perso-monthly-operations overflow-hidden rounded-[1.4rem] border p-3 transition-colors sm:p-4" style={{backgroundColor:accountTint?`color-mix(in srgb, ${accountTint} 5%, transparent)`:undefined,borderColor:accountTint??"rgba(255,255,255,.14)"}}>
-  <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-end"><div><h2 className="text-xl font-semibold">Opérations du mois</h2><p className="mt-1 text-xs text-neutral-500">{selectedAccount?`Filtré sur ${selectedAccount.name}`:"Tous les comptes"}</p></div><label className="text-xs font-medium text-neutral-600">Mois<select value={month} onChange={e=>setMonth(e.target.value)} className="mt-1 w-full min-w-48 rounded-xl border border-black/10 bg-white px-3 py-2 text-sm">{availableMonths.map(value=><option key={value} value={value}>{monthName(value)}</option>)}</select></label></div>
+  <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-end"><div><h2 className="text-xl font-semibold">Opérations du mois</h2><p className="mt-1 text-xs text-neutral-500">{selectedAccount?`Filtré sur ${selectedAccount.name}`:"Tous les comptes"}</p></div><label className="text-xs font-medium text-neutral-600">Mois<select value={month} onChange={e=>{const next=e.target.value;setMonth(next);const params=new URLSearchParams(searchParams.toString());params.set("month",next);router.replace(`${pathname}?${params.toString()}`,{scroll:false});}} className="mt-1 w-full min-w-48 rounded-xl border border-black/10 bg-white px-3 py-2 text-sm">{availableMonths.map(value=><option key={value} value={value}>{monthName(value)}</option>)}</select></label></div>
   <div className="mt-4"><div className="flex flex-col gap-2 sm:flex-row sm:items-center"><label className="perso-operation-search relative flex h-11 min-w-0 flex-1 items-center rounded-2xl border px-3"><Search size={16} className="pointer-events-none shrink-0 text-neutral-400"/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Rechercher un mouvement…" className="h-full min-w-0 flex-1 border-0 bg-transparent px-2 text-sm outline-none"/></label><div className="grid grid-cols-3 gap-2 sm:flex sm:shrink-0" aria-label="Filtrer selon le pointage">{[["all","Tous"],["completed","Cochés"],["planned","Non cochés"]].map(([value,label])=><button key={value} type="button" onClick={()=>setStatusFilter(value)} aria-pressed={statusFilter===value} className={`perso-status-filter min-h-11 rounded-2xl border px-3 text-xs font-semibold transition sm:min-w-[5.6rem] ${statusFilter===value?"is-active":""}`}>{label}</button>)}</div></div><p className="mt-2 px-1 text-xs text-neutral-500">{visibleOps.length+visiblePhotos.length+visibleSavingsRows.length+(showUrssaf?1:0)} opération(s) affichée(s)</p></div>
   <div className="mt-3 grid grid-cols-2 gap-px bg-black/10 xl:grid-cols-4"><Metric label="Crédits cochés" value={money(checkedCredits)}/><Metric label="Crédits non cochés" value={money(uncheckedCredits)}/><Metric label="Débits cochés" value={money(checkedDebits)}/><Metric label="Débits non cochés" value={money(uncheckedDebits)}/></div>
   <div className="mt-2 grid gap-2 sm:grid-cols-2"><Metric label="Épargne utilisée dans la projection" value={money(savingsUsed)} dark/><Metric label="Épargne proposée dans la projection" value={money(savingsProposed)} dark/></div>
