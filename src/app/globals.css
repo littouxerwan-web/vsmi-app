@@ -1548,43 +1548,86 @@ html.vsmi-light-mode .osteo-page .osteo-analysis-result.is-negative {
 }
 
 /* ========================================================================== 
-   VSMI 2026-08-13 — Lisibilité light mode : contrôle + sous-textes mouvements
+   VSMI 2026-08-13 — Audit final Dark / White
+   Corrige les fonds sombres résiduels du mode clair et les actions d'épargne.
    ========================================================================== */
 
-/* Contrôle du calcul : contraste renforcé en mode clair, y compris le tableau. */
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit {
-  background: #eef6fa !important;
-  border-color: #a9c9d8 !important;
-  color: #263f4b !important;
-}
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit .projection-control-title {
-  color: #173b4b !important;
-}
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit .projection-control-copy {
-  color: #4b6673 !important;
-}
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit table {
-  color: #304d5a !important;
-}
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit th {
-  color: #244b5d !important;
-  font-weight: 700 !important;
-}
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit td {
-  color: #365562 !important;
-}
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit td.text-emerald-700 {
-  color: #166534 !important;
-}
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit td.text-red-700 {
-  color: #b42318 !important;
-}
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit td.text-violet-700 {
-  color: #6d28d9 !important;
+/* Le wrapper interne PERSO héritait encore du fond graphite entre les sections,
+   ce qui créait de larges bandes noires visibles en mode White. */
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme > div,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme > div,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-analysis-view {
+  background: #f6f3ec !important;
+  color: #20211e !important;
 }
 
-/* Projection + page mensuelle : sous-textes plus contrastés, sans dépasser le libellé principal. */
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-movement-row :is(.text-neutral-500,.text-neutral-400),
-.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-monthly-operations .perso-movement-row :is(.text-neutral-500,.text-neutral-400) {
-  color: #5f625d !important;
+/* Les espaces entre cartes/sections ne doivent jamais laisser apparaître le fond
+   graphite lorsque le mode White est actif. */
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .enfants-ledger-theme,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .osteo-page {
+  background-color: #f6f3ec !important;
+}
+
+/* Projection : les details servant uniquement de conteneur de bouton ne doivent
+   pas être transformés en rectangle blanc par la règle générique des panneaux. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view details.projection-savings-edit,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view details.projection-savings-edit {
+  display: inline-block !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: inherit !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-savings-edit-button {
+  background: #302e2a !important;
+  color: #f4f1ea !important;
+  border-color: #5a574f !important;
+  box-shadow: none !important;
+}
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-savings-edit-button {
+  background: #fffdf8 !important;
+  color: #20211e !important;
+  border-color: #d5cec0 !important;
+  box-shadow: 0 1px 2px rgba(32,33,30,.06) !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-savings-edit-button:hover {
+  border-color: #d2ae57 !important;
+}
+
+/* Le panneau d'édition qui s'ouvre reste un vrai panneau, contrairement au
+   conteneur details lui-même. */
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view details.projection-savings-edit > div {
+  background: #fffdf8 !important;
+  color: #20211e !important;
+  border-color: #ddd7cc !important;
+}
+
+/* Audit mode White : neutralise les grandes surfaces très sombres restantes dans
+   les modules comptables, sans toucher aux cartes de comptes colorées de l'accueil. */
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme :is(section,article,details):is([class*="bg-neutral-950"],[class*="bg-neutral-900"],[class*="bg-zinc-950"],[class*="bg-zinc-900"],[class*="bg-stone-950"],[class*="bg-stone-900"]),
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .commun-ledger-theme :is(section,article,details):is([class*="bg-neutral-950"],[class*="bg-neutral-900"],[class*="bg-zinc-950"],[class*="bg-zinc-900"],[class*="bg-stone-950"],[class*="bg-stone-900"]),
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .mariages-ledger-theme :is(section,article,details):is([class*="bg-neutral-950"],[class*="bg-neutral-900"],[class*="bg-zinc-950"],[class*="bg-zinc-900"],[class*="bg-stone-950"],[class*="bg-stone-900"]),
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .enfants-ledger-theme :is(section,article,details):is([class*="bg-neutral-950"],[class*="bg-neutral-900"],[class*="bg-zinc-950"],[class*="bg-zinc-900"],[class*="bg-stone-950"],[class*="bg-stone-900"]) {
+  background: #fffdf8 !important;
+  color: #20211e !important;
+  border-color: #ddd7cc !important;
+}
+
+/* Sous-textes : secondaires mais lisibles dans les deux thèmes. */
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme :is(.text-neutral-400,.text-neutral-500) {
+  color: #73746e !important;
+}
+html:not(.vsmi-light-mode) .vsmi-lux-theme #app-private-content .perso-ledger-theme :is(.text-neutral-400,.text-neutral-500) {
+  color: #bab9b2 !important;
 }
