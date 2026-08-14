@@ -245,7 +245,7 @@ export default async function TodayPage() {
   })).reduce((sum, amount) => sum + amount, 0);
   const commonMonthEnd = commonBalance + commonDirectPlanned + commonRecurringMissing;
 
-  const anomalyRows: { id: string; title: string; detail: string; level?: "warning" | "danger" }[] = [];
+  const anomalyRows: { id: string; title: string; detail: string; date: string; level?: "warning" | "danger" }[] = [];
   for (const warning of projection.savingsWarnings ?? []) {
     const checkingName = (accounts as any[]).find((a) => a.id === warning.checkingAccountId)?.name ?? "Compte courant";
     const savingsName = (accounts as any[]).find((a) => a.id === warning.savingsAccountId)?.name ?? "Compte épargne";
@@ -253,6 +253,7 @@ export default async function TodayPage() {
       id: `savings-${warning.month}-${warning.checkingAccountId}`,
       title: `Épargne insuffisante · ${checkingName}`,
       detail: `${warning.required.toFixed(2)} € nécessaires, ${warning.available.toFixed(2)} € mobilisables sur ${savingsName} (${warning.missing.toFixed(2)} € manquants).`,
+      date: `${warning.month}-15`,
       level: "danger",
     });
   }
@@ -264,7 +265,7 @@ export default async function TodayPage() {
   for (const rows of duplicateMap.values()) if (rows.length > 1) {
     const first = rows[0];
     const accountName = (accounts as any[]).find((a) => a.id === first.account_id)?.name ?? "Compte";
-    anomalyRows.push({ id: `dup-${first.id}`, title: "Doublon probable", detail: `${rows.length} mouvements identiques « ${first.label} » de ${Number(first.amount).toFixed(2)} € le ${first.movement_date} sur ${accountName}.`, level: "warning" });
+    anomalyRows.push({ id: `dup-${first.id}`, title: "Doublon probable", detail: `${rows.length} mouvements identiques « ${first.label} » de ${Number(first.amount).toFixed(2)} € sur ${accountName}.`, date: first.movement_date, level: "warning" });
   }
 
   const tiles = [

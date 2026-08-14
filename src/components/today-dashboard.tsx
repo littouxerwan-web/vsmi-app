@@ -42,7 +42,7 @@ type Props = {
   initialColors?: Record<string, TileColor>;
   weddings?: Wedding[];
   weddingStats?: { upcoming: number; receivedMonth: number; expectedYear: number } | null;
-  anomalies?: { id: string; title: string; detail: string; level?: "warning" | "danger" }[];
+  anomalies?: { id: string; title: string; detail: string; date: string; level?: "warning" | "danger" }[];
 };
 
 const money = (value: number) => new Intl.NumberFormat("fr-FR", {
@@ -111,7 +111,26 @@ export function TodayDashboard({
   const [movementType, setMovementType] = useState<"expense" | "income">("expense");
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<string | null>(null);
+  const today = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const [alertWindowDays, setAlertWindowDays] = useState<30 | 45 | 60 | 90>(45);
   const sorted = useMemo(() => orderedTiles(tiles, order), [tiles, order]);
+
+  const filteredAnomalies = useMemo(() => {
+    const start = new Date(`${today}T00:00:00`);
+    const end = new Date(start);
+    end.setDate(end.getDate() + alertWindowDays);
+    return anomalies
+      .filter((item) => {
+        const date = new Date(`${item.date}T00:00:00`);
+        return !Number.isNaN(date.getTime()) && date >= start && date <= end;
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [anomalies, alertWindowDays, today]);
+
+  const formatAlertDate = (date: string) => {
+    const parsed = new Date(`${date}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? date : new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }).format(parsed);
+  };
 
   const move = (key: string, delta: number) => {
     const next = [...order];
@@ -155,23 +174,34 @@ export function TodayDashboard({
     });
   };
 
-  const today = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
   return (
     <div className="space-y-6 pb-24 lg:pb-8">
       {anomalies.length ? (
         <details className="rounded-2xl border border-amber-300/40 bg-amber-300/10 px-4 py-3 text-white">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-            <span className="flex items-center gap-2 text-sm font-semibold"><CircleAlert size={17} className="text-amber-300" />{anomalies.length} point{anomalies.length > 1 ? "s" : ""} à vérifier</span>
+            <span className="flex items-center gap-2 text-sm font-semibold"><CircleAlert size={17} className="text-amber-300" />{filteredAnomalies.length} point{filteredAnomalies.length > 1 ? "s" : ""} à vérifier sur {alertWindowDays} jours</span>
             <span className="text-xs text-white/55">Voir</span>
           </summary>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-white/55">Alertes du {formatAlertDate(today)} au {formatAlertDate(new Date(new Date(`${today}T00:00:00`).getTime() + alertWindowDays * 86400000).toISOString().slice(0, 10))}</p>
+            <div className="flex gap-1 rounded-xl border border-white/10 bg-black/10 p-1">
+              {([30, 45, 60, 90] as const).map((days) => (
+                <button key={days} type="button" onClick={(event) => { event.preventDefault(); setAlertWindowDays(days); }} className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${alertWindowDays === days ? "bg-[#D2AE57] text-black" : "text-white/65 hover:bg-white/10"}`}>{days} j</button>
+              ))}
+            </div>
+          </div>
           <div className="mt-3 grid gap-2">
-            {anomalies.slice(0, 5).map((item) => (
+            {filteredAnomalies.length ? filteredAnomalies.slice(0, 8).map((item) => (
               <div key={item.id} className={`rounded-xl border px-3 py-2 ${item.level === "danger" ? "border-red-400/30 bg-red-400/10" : "border-white/10 bg-white/[.04]"}`}>
-                <p className="text-sm font-medium">{item.title}</p>
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="text-sm font-medium">{item.title}</p>
+                  <time className="text-xs font-semibold text-white/55" dateTime={item.date}>{formatAlertDate(item.date)}</time>
+                </div>
                 <p className="mt-0.5 text-xs leading-5 text-white/60">{item.detail}</p>
               </div>
-            ))}
+            )) : <p className="rounded-xl border border-white/10 bg-white/[.04] px-3 py-2 text-xs text-white/60">Aucune alerte sur cette période.</p>}
+            {filteredAnomalies.length > 8 ? <p className="text-xs text-white/50">+ {filteredAnomalies.length - 8} autre{filteredAnomalies.length - 8 > 1 ? "s" : ""} alerte{filteredAnomalies.length - 8 > 1 ? "s" : ""} sur la période.</p> : null}
           </div>
         </details>
       ) : null}
