@@ -13,7 +13,76 @@ type PriceOffer = {
   delivery?: string | null;
   rating?: number | null;
   ratingCount?: number | null;
+  relevance: number;
 };
+
+const ACCESSORY_WORDS = [
+  "accessoire",
+  "accessoires",
+  "batterie",
+  "battery",
+  "chargeur",
+  "charger",
+  "capuchon",
+  "bouchon",
+  "lens cap",
+  "pare soleil",
+  "pare-soleil",
+  "hood",
+  "grip",
+  "thumb grip",
+  "poignee",
+  "poignée",
+  "etui",
+  "étui",
+  "case",
+  "housse",
+  "protection",
+  "coque",
+  "filtre",
+  "filter",
+  "cpl",
+  "mist",
+  "sangle",
+  "strap",
+  "adaptateur",
+  "adapter",
+  "cable",
+  "câble",
+  "support",
+  "mount",
+  "cage",
+  "verre trempe",
+  "verre trempé",
+  "screen protector",
+];
+
+const ACCESSORY_SIGNALS = [
+  "pour ",
+  "compatible ",
+  "remplacement ",
+  "replacement ",
+  "fits ",
+  "destiné à ",
+  "destine a ",
+];
+
+const STOP_WORDS = new Set([
+  "de",
+  "du",
+  "des",
+  "la",
+  "le",
+  "les",
+  "un",
+  "une",
+  "et",
+  "pour",
+  "avec",
+  "the",
+  "for",
+  "with",
+]);
 
 function asText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -33,6 +102,22 @@ function asNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function normalizeText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tokenize(value: string): string[] {
+  return normalizeText(value)
+    .split(" ")
+    .filter((token) => token.length > 1 && !STOP_WORDS.has(token));
+}
+
 function normalizeUrl(value: unknown): string | null {
   const raw = asText(value);
   if (!raw) return null;
@@ -42,7 +127,6 @@ function normalizeUrl(value: unknown): string | null {
     if (url.protocol !== "http:" && url.protocol !== "https:") return null;
     return url.toString();
   } catch {
-    // Quelques réponses peuvent omettre le protocole.
     if (/^[\w.-]+\.[a-z]{2,}(?:\/|$)/i.test(raw)) {
       try {
         return new URL(`https://${raw}`).toString();
@@ -62,6 +146,80 @@ function sellerFromUrl(url: string): string {
   }
 }
 
+function queryLooksLikeAccessory(query: string): boolean {
+  const q = normalizeText(query);
+  return ACCESSORY_WORDS.some((word) => q.includes(normalizeText(word)));
+}
+
+function accessoryPenalty(title: string, query: string): number {
+  if (queryLooksLikeAccessory(query)) return 0;
+
+  const t = normalizeText(title);
+  let penalty = 0;
+
+  for (const word of ACCESSORY_WORDS) {
+    if (t.includes(normalizeText(word))) penalty += 8;
+  }
+
+  for (const signal of ACCESSORY_SIGNALS) {
+    if (t.includes(normalizeText(signal))) penalty += 3;
+  }
+
+  return Math.min(penalty, 24);
+}
+
+function relevanceScore(title: string, query: string): number {
+  const t = normalizeText(title);
+  const q = normalizeText(query);
+  const queryTokens = tokenize(query);
+
+  if (!queryTokens.length) return 0;
+
+  const matchedTokens = queryTokens.filter((token) => t.includes(token));
+  const coverage = matchedTokens.length / queryTokens.length;
+
+  let score = coverage * 20;
+
+  // La phrase exacte ou presque exacte est fortement privilégiée.
+  if (t.includes(q)) score += 12;
+
+  // Les références alphanumériques (RX1R, A7IV, 24-70...) sont très discriminantes.
+  const modelTokens = queryTokens.filter(
+    (token) => /\d/.test(token) && /[a-z]/.test(token),
+  );
+  if (modelTokens.length) {
+    const modelMatches = modelTokens.filter((token) => t.includes(token)).length;
+    score += (modelMatches / modelTokens.length) * 12;
+    if (modelMatches < modelTokens.length) score -= 10;
+  }
+
+  score -= accessoryPenalty(title, query);
+
+  return score;
+}
+
+function enrichedShoppingQuery(query: string): string {
+  if (queryLooksLikeAccessory(query)) return query;
+
+  // On aide Google Shopping à éviter les accessoires, mais le filtrage local
+  // reste la sécurité principale car les opérateurs "-" ne sont pas toujours stricts.
+  const negatives = [
+    "batterie",
+    "chargeur",
+    "capuchon",
+    "pare-soleil",
+    "grip",
+    "étui",
+    "housse",
+    "filtre",
+    "sangle",
+    "adaptateur",
+    "cage",
+  ];
+
+  return `${query} ${negatives.map((word) => `-${word}`).join(" ")}`;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const apiKey = process.env.SERPER_API_KEY?.trim();
@@ -72,7 +230,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json().catch(() => null) as
+    const body = (await request.json().catch(() => null)) as
       | { query?: unknown; mode?: unknown }
       | null;
 
@@ -86,8 +244,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Shopping est privilégié pour les achats. Pour les abonnements,
-    // une recherche web classique donne souvent de meilleurs résultats.
     const endpoint =
       mode === "subscription"
         ? "https://google.serper.dev/search"
@@ -100,10 +256,10 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        q: query,
+        q: mode === "purchase" ? enrichedShoppingQuery(query) : query,
         gl: "fr",
         hl: "fr",
-        num: 10,
+        num: 20,
       }),
       cache: "no-store",
     });
@@ -138,15 +294,14 @@ export async function POST(request: NextRequest) {
           ? data.shopping
           : [];
 
-    const items: PriceOffer[] = sourceRows
+    const scored: PriceOffer[] = sourceRows
       .map((row: any, index: number): PriceOffer | null => {
         const url = normalizeUrl(row?.link ?? row?.url);
         if (!url) return null;
 
-        const title =
-          asText(row?.title) ||
-          asText(row?.name) ||
-          "Offre";
+        const title = asText(row?.title) || asText(row?.name) || "Offre";
+        const relevance =
+          mode === "purchase" ? relevanceScore(title, query) : 20;
 
         const seller =
           asText(row?.source) ||
@@ -183,18 +338,35 @@ export async function POST(request: NextRequest) {
             typeof row?.ratingCount === "number" && Number.isFinite(row.ratingCount)
               ? row.ratingCount
               : null,
+          relevance,
         };
       })
-      .filter((item: PriceOffer | null): item is PriceOffer => item !== null)
+      .filter((item: PriceOffer | null): item is PriceOffer => item !== null);
+
+    // Pour un achat, on n'affiche que des résultats suffisamment proches de la requête.
+    // Une recherche d'accessoire explicite reste autorisée.
+    const minimumRelevance = mode === "purchase" ? 14 : 0;
+    const relevant = scored.filter((item) => item.relevance >= minimumRelevance);
+
+    const items = relevant
       .sort((a, b) => {
-        if (a.price === null && b.price === null) return 0;
+        // La pertinence prime nettement sur le prix.
+        const relevanceDiff = b.relevance - a.relevance;
+        if (Math.abs(relevanceDiff) >= 3) return relevanceDiff;
+
+        // À pertinence proche, le prix devient le critère de classement.
+        if (a.price === null && b.price === null) return relevanceDiff;
         if (a.price === null) return 1;
         if (b.price === null) return -1;
         return a.price - b.price;
       })
-      .slice(0, 5);
+      .slice(0, 5)
+      .map(({ relevance: _relevance, ...item }) => item);
 
-    return NextResponse.json({ items });
+    return NextResponse.json({
+      items,
+      filteredCount: Math.max(0, scored.length - relevant.length),
+    });
   } catch (error) {
     console.error("[price-compare]", error);
     return NextResponse.json(
