@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
+  Activity,
   BarChart3,
   CalendarRange,
   ChevronDown,
@@ -13,12 +14,14 @@ import {
   TrendingUp,
   WalletCards,
   PiggyBank,
+  History,
 } from "lucide-react";
 import {
   assignMovementCategory,
   createCategoryAndAssignMovement,
   updateMovementAnalysisEssential,
 } from "@/app/(app)/perso/actions";
+import { mobilizableSavingsForAccount, type SavingsBudgetAllocation, type SavingsProposalDecision } from "@/lib/perso/savings-engine";
 
 type Movement = {
   id: string;
@@ -51,7 +54,7 @@ type Recurrence = {
   exclude_from_analysis?: boolean | null;
 };
 type Account = { id: string; name: string; account_type: string };
-type SavingsProfile = { id:string; sourceAccountId:string|null; destinationAccountId:string|null };
+type SavingsProfile = { id:string; label?:string; sourceAccountId:string|null; destinationAccountId:string|null; threshold?:number };
 type ProjectionPoint = {
   date: string;
   balances: Record<string, number>;
@@ -119,6 +122,9 @@ export function AnalysisView({
   accounts,
   recurrences,
   profiles = [],
+  currentBalances = {},
+  savingsBudgets = [],
+  savingsProposals = [],
 }: {
   movements: Movement[];
   projectedOperations: Movement[];
@@ -128,6 +134,9 @@ export function AnalysisView({
   accounts: Account[];
   recurrences: Recurrence[];
   profiles?: SavingsProfile[];
+  currentBalances?: Record<string, number>;
+  savingsBudgets?: SavingsBudgetAllocation[];
+  savingsProposals?: SavingsProposalDecision[];
 }) {
   const [period, setPeriod] = useState<Period>("month");
   const [accountId, setAccountId] = useState("all");
@@ -369,6 +378,51 @@ export function AnalysisView({
   const savingsPotential = context.nonEssential * 0.1;
   const coverage = context.totalExp ? context.totalInc / context.totalExp : 0;
 
+  const financialHealth = useMemo(() => {
+    const now = new Date();
+    const todayIso = iso(now);
+    const d30 = new Date(now); d30.setDate(d30.getDate() + 30);
+    const d90 = new Date(now); d90.setDate(d90.getDate() + 90);
+    const through30 = iso(d30), through90 = iso(d90);
+    const checking = accounts.filter((a) => a.account_type === "checking");
+    const savingsAccounts = accounts.filter((a) => a.account_type === "savings");
+    const cash = checking.reduce((sum, a) => sum + Number(currentBalances[a.id] ?? 0), 0);
+    const mobilizable = savingsAccounts.reduce((sum, a) => sum + mobilizableSavingsForAccount(Number(currentBalances[a.id] ?? 0), a.id, savingsBudgets, 30), 0);
+    const next30 = projectedOperations.filter((o) => o.movement_date >= todayIso && o.movement_date <= through30 && (accountId === "all" || o.account_id === accountId));
+    const fixed30 = next30.filter((o) => o.movement_type === "expense" && Boolean(o.recurrence_id)).reduce((sum, o) => sum + Number(o.amount), 0);
+    const income30 = next30.filter((o) => o.movement_type === "income").reduce((sum, o) => sum + Number(o.amount), 0);
+    const expense30 = next30.filter((o) => o.movement_type === "expense").reduce((sum, o) => sum + Number(o.amount), 0);
+    const essentialMonthly = Math.max(1, context.essential / Math.max(1, context.months));
+    const coverageMonths = (cash + mobilizable) / essentialMonthly;
+    const balances = new Map(checking.map((a) => [a.id, Number(currentBalances[a.id] ?? 0)]));
+    let low = [...balances.values()].reduce((a, b) => a + b, 0), lowDate = todayIso;
+    const future = projectedOperations.filter((o) => o.movement_date >= todayIso && o.movement_date <= through90 && balances.has(o.account_id)).sort((a,b) => a.movement_date.localeCompare(b.movement_date));
+    for (const o of future) {
+      const before = Number(balances.get(o.account_id) ?? 0);
+      balances.set(o.account_id, before + (["income","transfer_in"].includes(o.movement_type) ? Number(o.amount) : -Number(o.amount)));
+      const total = [...balances.values()].reduce((a,b) => a+b, 0);
+      if (total < low) { low = total; lowDate = o.movement_date; }
+    }
+    return { cash, mobilizable, fixed30, rest30: income30 - expense30, coverageMonths, low, lowDate };
+  }, [accounts, currentBalances, savingsBudgets, projectedOperations, accountId, context.essential, context.months]);
+
+  const savingsHistory = useMemo(() => {
+    const accountName = (id?: string | null) => accounts.find((a) => a.id === id)?.name ?? "Compte";
+    const rows = new Map<string, { key:string; month:string; amount:number; status:string; label:string }>();
+    for (const o of projectedOperations.filter((o) => o.savingsProposal && o.movement_type === "transfer_out")) {
+      const p = o.savingsProposal! as any;
+      const source = p.sourceAccountId, destination = p.destinationAccountId, month = String(p.sourceMonth ?? o.movement_date).slice(0,7);
+      const key = `${source}:${destination}:${month}`;
+      rows.set(key, { key, month, amount:Number(o.amount), status:String(p.status ?? "automatic"), label:`${accountName(source)} → ${accountName(destination)}` });
+    }
+    for (const p of savingsProposals as any[]) {
+      const month = String(p.source_month ?? "").slice(0,7); if (!month) continue;
+      const key = `${p.source_account_id}:${p.destination_account_id}:${month}`;
+      rows.set(key, { key, month, amount:Number(p.amount ?? 0), status:String(p.status ?? "pending"), label:`${accountName(p.source_account_id)} → ${accountName(p.destination_account_id)}` });
+    }
+    return [...rows.values()].sort((a,b) => b.month.localeCompare(a.month)).slice(0,18);
+  }, [projectedOperations, savingsProposals, accounts]);
+
   return (
     <div className="perso-analysis-view mt-5 space-y-5">
       <section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6">
@@ -412,6 +466,33 @@ export function AnalysisView({
         <Metric icon={TrendingUp} label="Revenus cumulés" value={euro(context.totalInc)} detail={`${euro(context.realizedInc)} reçus · ${euro(context.forecastInc)} prévus`} />
         <Metric icon={Scale} label="Solde de la période" value={euro(context.totalInc - context.totalExp)} detail={`Couverture ${pct(coverage)}`} />
         <Metric icon={BarChart3} label="Dépense moyenne / mois" value={euro(context.avg)} detail={`Revenus moyens ${euro(context.avgIncome)}`} />
+      </div>
+
+      <div className="px-3 sm:px-5 lg:px-6">
+        <section className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2"><Activity size={18}/><h3 className="font-semibold">Santé financière</h3></div>
+          <p className="mt-1 text-xs text-neutral-500">Vue compacte, recalculée avec les mouvements et projections disponibles.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <HealthMetric label="Trésorerie disponible" value={euro2(financialHealth.cash)} />
+            <HealthMetric label="Épargne mobilisable" value={euro2(financialHealth.mobilizable)} />
+            <HealthMetric label="Dépenses fixes · 30 j" value={euro2(financialHealth.fixed30)} />
+            <HealthMetric label="Reste à vivre · 30 j" value={euro2(financialHealth.rest30)} danger={financialHealth.rest30 < 0} />
+            <HealthMetric label="Couverture" value={`${financialHealth.coverageMonths.toFixed(1)} mois`} />
+            <HealthMetric label="Point bas prévu · 90 j" value={euro2(financialHealth.low)} detail={dateLabel(financialHealth.lowDate)} danger={financialHealth.low < 0} />
+          </div>
+        </section>
+      </div>
+
+      <div className="px-3 sm:px-5 lg:px-6">
+        <details className="rounded-2xl border border-black/10 bg-white shadow-sm">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
+            <div className="flex items-center gap-3"><History size={18}/><div><h3 className="font-semibold">Historique des propositions d’épargne</h3><p className="mt-1 text-xs text-neutral-500">Propositions automatiques et décisions enregistrées, sans alourdir la vue principale.</p></div></div>
+            <ChevronDown size={18}/>
+          </summary>
+          <div className="border-t border-black/10 px-5 py-3">
+            {savingsHistory.length ? <div className="divide-y divide-black/10">{savingsHistory.map((row) => <div key={row.key} className="flex items-center justify-between gap-4 py-3 text-sm"><div><p className="font-medium capitalize">{monthLabel(row.month)}</p><p className="text-xs text-neutral-500">{row.label} · {historyStatus(row.status)}</p></div><b>{euro2(row.amount)}</b></div>)}</div> : <Empty text="Aucune proposition d’épargne enregistrée pour le moment."/>}
+          </div>
+        </details>
       </div>
 
       <div className="px-3 sm:px-5 lg:px-6">
@@ -640,6 +721,8 @@ function sourceLabel(m: AnalysisRow) {
   if (m.recurrence_id) return "Mouvement régulier";
   return m.analysisKind === "realized" ? "Mouvement réel" : "Mouvement prévu";
 }
+function historyStatus(status:string){return status==="accepted"?"acceptée":status==="deleted"?"supprimée":status==="pending"?"modifiée / en attente":"automatique";}
+function HealthMetric({label,value,detail,danger=false}:{label:string;value:string;detail?:string;danger?:boolean}){return <div className={`rounded-xl border p-3 ${danger?"border-red-200 bg-red-50":"border-black/10 bg-neutral-50"}`}><p className="text-[11px] font-medium text-neutral-500">{label}</p><p className={`mt-1 text-base font-semibold ${danger?"text-red-700":""}`}>{value}</p>{detail?<p className="mt-0.5 text-[11px] text-neutral-500">{detail}</p>:null}</div>}
 function Metric({ icon: Icon, label, value, detail }: { icon: any; label: string; value: string; detail: string }) { return <div className="analysis-metric rounded-2xl border border-black/10 bg-white p-4 shadow-sm"><div className="flex items-center gap-2 text-neutral-500"><Icon size={16} /><span className="text-xs font-medium">{label}</span></div><p className="mt-3 text-xl font-semibold">{value}</p><p className="mt-1 text-xs text-neutral-400">{detail}</p></div>; }
 function Panel({ title, subtitle, children }: { title: string; subtitle: string; children: any }) { return <section className="analysis-panel rounded-2xl border border-black/10 bg-white p-5 shadow-sm"><h3 className="font-semibold">{title}</h3><p className="mb-5 mt-1 text-xs text-neutral-500">{subtitle}</p>{children}</section>; }
 function Info({ icon: Icon, label, value }: { icon: any; label: string; value: string }) { return <div className="flex items-center justify-between gap-3 border-t border-black/10 pt-3 text-sm"><span className="flex items-center gap-2 text-neutral-500"><Icon size={15} />{label}</span><b>{value}</b></div>; }

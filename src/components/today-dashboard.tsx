@@ -42,6 +42,7 @@ type Props = {
   initialColors?: Record<string, TileColor>;
   weddings?: Wedding[];
   weddingStats?: { upcoming: number; receivedMonth: number; expectedYear: number } | null;
+  anomalies?: { id: string; title: string; detail: string; level?: "warning" | "danger" }[];
 };
 
 const money = (value: number) => new Intl.NumberFormat("fr-FR", {
@@ -101,6 +102,7 @@ export function TodayDashboard({
   initialColors = {},
   weddings = [],
   weddingStats = null,
+  anomalies = [],
 }: Props) {
   const [order, setOrder] = useState(() => orderedTiles(tiles, initialOrder).map((tile) => tile.key));
   const [colors, setColors] = useState<Record<string, TileColor>>(initialColors);
@@ -157,6 +159,22 @@ export function TodayDashboard({
 
   return (
     <div className="space-y-6 pb-24 lg:pb-8">
+      {anomalies.length ? (
+        <details className="rounded-2xl border border-amber-300/40 bg-amber-300/10 px-4 py-3 text-white">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+            <span className="flex items-center gap-2 text-sm font-semibold"><CircleAlert size={17} className="text-amber-300" />{anomalies.length} point{anomalies.length > 1 ? "s" : ""} à vérifier</span>
+            <span className="text-xs text-white/55">Voir</span>
+          </summary>
+          <div className="mt-3 grid gap-2">
+            {anomalies.slice(0, 5).map((item) => (
+              <div key={item.id} className={`rounded-xl border px-3 py-2 ${item.level === "danger" ? "border-red-400/30 bg-red-400/10" : "border-white/10 bg-white/[.04]"}`}>
+                <p className="text-sm font-medium">{item.title}</p>
+                <p className="mt-0.5 text-xs leading-5 text-white/60">{item.detail}</p>
+              </div>
+            ))}
+          </div>
+        </details>
+      ) : null}
       <section>
         <div className="mb-4 flex items-end justify-between gap-3">
           <div>
