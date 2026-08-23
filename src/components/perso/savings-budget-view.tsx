@@ -38,6 +38,13 @@ export function SavingsBudgetView({accounts,budgets,currentBalances,forecastRows
  const standardAllocated=standardBudgets.reduce((s,b)=>s+savingsBudgetAmount(b,balanceFor(b.account_id),budgets),0);
  const availability=scopedAccounts.reduce((acc,a)=>{const v=savingsAvailabilityForAccount(balanceFor(a.id),a.id,budgets,FLOOR);acc.mobilizable+=v.mobilizable;acc.free+=v.free;acc.untouchable+=v.untouchable;acc.usable+=v.totalUsable;return acc;},{mobilizable:0,free:0,untouchable:0,usable:0});
  const mobilizable=availability.usable;
+ const freeAfterProtections=scopedAccounts.reduce((sum,a)=>{
+  const balance=balanceFor(a.id);
+  const accountBudgets=budgets.filter(b=>b.account_id===a.id);
+  const projectAmount=accountBudgets.filter(b=>b.kind==="project").reduce((v,b)=>v+savingsBudgetAmount(b,balance,budgets),0);
+  const protectionAmount=accountBudgets.filter(b=>b.kind!=="project").reduce((v,b)=>v+savingsBudgetAmount(b,balance,budgets),0);
+  return sum+Math.max(0,balance-FLOOR-projectAmount-protectionAmount);
+ },0);
  // Les enveloppes ventilent le solde total. Le plancher de 30 € limite ce qui est
  // mobilisable, mais ne doit pas déclencher une fausse sur-affectation à 100 %.
  const overAllocated=Math.max(0,Math.round((allocated-currentSavings)*100)/100);
@@ -91,9 +98,9 @@ export function SavingsBudgetView({accounts,budgets,currentBalances,forecastRows
     <select value={accountId} onChange={e=>setAccountId(e.target.value)} className="min-h-11 rounded-xl border px-3"><option value={GLOBAL}>Vue globale · tous les comptes épargne</option>{savingsAccounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select>
    </div>
    {!savingsAccounts.length?<p className="mt-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-800">Crée d’abord un compte d’épargne.</p>:<>
-    <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><Metric label={global?"Épargne totale globale":"Épargne totale"} value={money(currentSavings)}/><Metric label="Budgets hors projets" value={money(standardAllocated)}/><Metric label="Affecté aux projets" value={money(projectsAllocated)}/><Metric label="Épargne mobilisable" value={money(availability.mobilizable)} dark/><Metric label="Libre en relais" value={money(availability.free)}/><Metric label="Intouchable" value={money(availability.untouchable)}/></div>
+    <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><Metric label={global?"Épargne totale globale":"Épargne totale"} value={money(currentSavings)}/><Metric label="Budgets hors projets" value={money(standardAllocated)}/><Metric label="Affecté aux projets" value={money(projectsAllocated)}/><Metric label="Épargne mobilisable" value={money(availability.mobilizable)} dark/><Metric label="Libre après protections" value={money(freeAfterProtections)}/><Metric label="Intouchable" value={money(availability.untouchable)}/></div>
     {hasOverAllocation?<div className="mt-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"><AlertTriangle size={17}/><p>Les enveloppes dépassent l’épargne disponible de {money(overAllocated)}.</p></div>:null}
-    {global?<div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{savingsAccounts.map(a=>{const b=balanceFor(a.id),v=savingsAvailabilityForAccount(b,a.id,budgets,FLOOR),aff=budgets.filter(x=>x.account_id===a.id).reduce((s,x)=>s+savingsBudgetAmount(x,b,budgets),0);return <button key={a.id} type="button" onClick={()=>setAccountId(a.id)} className="rounded-2xl border border-black/10 p-4 text-left hover:bg-neutral-50"><div className="flex justify-between gap-3"><span className="font-medium">{a.name}</span><span className="font-semibold">{money(b)}</span></div><p className="mt-1 text-xs text-neutral-500">Affecté {money(aff)} · mobilisable {money(v.mobilizable)} · libre {money(v.free)} · intouchable {money(v.untouchable)}</p></button>})}</div>:null}
+    {global?<div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{savingsAccounts.map(a=>{const b=balanceFor(a.id),v=savingsAvailabilityForAccount(b,a.id,budgets,FLOOR),aff=budgets.filter(x=>x.account_id===a.id).reduce((s,x)=>s+savingsBudgetAmount(x,b,budgets),0),project=budgets.filter(x=>x.account_id===a.id&&x.kind==="project").reduce((s,x)=>s+savingsBudgetAmount(x,b,budgets),0),protection=budgets.filter(x=>x.account_id===a.id&&x.kind!=="project").reduce((s,x)=>s+savingsBudgetAmount(x,b,budgets),0),freeAfter=Math.max(0,b-FLOOR-project-protection);return <button key={a.id} type="button" onClick={()=>setAccountId(a.id)} className="rounded-2xl border border-black/10 p-4 text-left hover:bg-neutral-50"><div className="flex justify-between gap-3"><span className="font-medium">{a.name}</span><span className="font-semibold">{money(b)}</span></div><p className="mt-1 text-xs text-neutral-500">Affecté {money(aff)} · mobilisable {money(v.mobilizable)} · libre après protections {money(freeAfter)} · intouchable {money(v.untouchable)}</p></button>})}</div>:null}
    </>}
   </section>
 
