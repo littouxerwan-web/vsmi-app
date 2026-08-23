@@ -42,6 +42,10 @@ export function SavingsBudgetView({accounts,budgets,currentBalances,forecastRows
  // mobilisable, mais ne doit pas déclencher une fausse sur-affectation à 100 %.
  const overAllocated=Math.max(0,Math.round((allocated-currentSavings)*100)/100);
  const hasOverAllocation=overAllocated>0.02;
+ const selectedMobile=selected?savingsAvailabilityForAccount(balanceFor(selected.id),selected.id,budgets,FLOOR).mobilizable:0;
+ const [projectSafetyFloor,setProjectSafetyFloor]=useState("");
+ const effectiveProjectFloor=Math.max(FLOOR,Number(projectSafetyFloor)||Math.max(FLOOR,Math.round((selectedMobile*.5)/100)*100));
+ const projectCapacity=useMemo(()=>selected?globalProjectCapacity({account:selected,savings:balanceFor(selected.id),allBudgets:budgets,forecastRows,recurrences,safetyFloor:effectiveProjectFloor}):null,[selected?.id,currentBalances,budgets,forecastRows,recurrences,effectiveProjectFloor]);
 
  const series=useMemo<BudgetPoint[]>(()=>{
   if(!scopedAccounts.length)return [];
@@ -101,8 +105,12 @@ export function SavingsBudgetView({accounts,budgets,currentBalances,forecastRows
    </section>
    <section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6">
     <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4"><div className="flex items-start gap-3"><Sparkles size={19}/><div><p className="font-semibold text-violet-950">Projet</p><p className="mt-1 text-sm text-violet-900">Prépare un achat avec un montant cible. Les virements ponctuels ou réguliers affectés au projet alimentent sa progression et ses dates prévisionnelles à 50 % et 100 %. Cette somme est exclue du calcul en % des autres budgets.</p></div></div></div>
+    <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-neutral-900">
+     <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[.16em] text-emerald-800">Capacité globale projets · 5 ans</p><h4 className="mt-1 text-lg font-semibold">Combien affecter chaque mois à tous les projets ?</h4><p className="mt-1 max-w-2xl text-xs text-neutral-600">VSMI simule les 60 prochains mois et calcule une enveloppe commune. Les projets se partagent ensuite cette enveloppe sans refaire un calcul de sécurité chacun.</p></div><label className="text-xs text-neutral-700">Épargne mobilisable minimum à conserver<input value={projectSafetyFloor} onChange={e=>setProjectSafetyFloor(e.target.value)} placeholder={String(effectiveProjectFloor)} type="number" min={FLOOR} step="50" className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm lg:w-56"/></label></div>
+     {projectCapacity?<div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5 text-xs"><div className="rounded-xl bg-white p-3"><span className="text-neutral-500">Enveloppe conseillée</span><strong className="mt-1 block text-lg text-emerald-800">{money(projectCapacity.totalRecommended)} / mois</strong></div><div className="rounded-xl bg-white p-3"><span className="text-neutral-500">Déjà affecté</span><strong className="mt-1 block text-lg">{money(projectCapacity.alreadyMonthly)} / mois</strong></div><div className="rounded-xl bg-white p-3"><span className="text-neutral-500">Encore disponible</span><strong className="mt-1 block text-lg">{money(projectCapacity.extraRecommended)} / mois</strong></div><div className="rounded-xl bg-white p-3"><span className="text-neutral-500">Maximum prudent total</span><strong className="mt-1 block text-lg">{money(projectCapacity.totalMax)} / mois</strong></div><div className="rounded-xl bg-white p-3"><span className="text-neutral-500">Épargne mobilisable la plus basse</span><strong className="mt-1 block text-lg">{money(projectCapacity.minimum)}</strong><span className="mt-1 block text-neutral-500">{monthLabel(projectCapacity.minimumMonth)}</span></div></div>:null}
+    </div>
     <details className="mt-4"><summary className="flex cursor-pointer items-center gap-2 font-semibold"><Plus size={17}/>Créer un projet</summary><SavingsBudgetForm accountId={selected.id} savings={balanceFor(selected.id)} forceKind="project" allBudgets={budgets}/></details>
-    <div className="mt-5 grid gap-3 lg:grid-cols-2">{projectBudgets.length?projectBudgets.map(b=><ProjectCard key={b.id} budget={b} account={selected} savings={balanceFor(selected.id)} movements={movements} recurrences={recurrences} allBudgets={budgets} forecastRows={forecastRows}/>):<div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">Aucun projet pour ce compte d’épargne.</div>}</div>
+    <div className="mt-5 grid gap-3 lg:grid-cols-2">{projectBudgets.length?projectBudgets.map(b=><ProjectCard key={b.id} budget={b} account={selected} savings={balanceFor(selected.id)} movements={movements} recurrences={recurrences} allBudgets={budgets} availableMonthly={projectCapacity?.extraRecommended??0}/>):<div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">Aucun projet pour ce compte d’épargne.</div>}</div>
    </section>
   </div>:global?<section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6"><div className="flex items-start gap-3 rounded-2xl bg-neutral-50 p-4"><PiggyBank size={18}/><div><p className="font-medium">Vue globale</p><p className="mt-1 text-sm text-neutral-500">Sélectionne un compte pour gérer séparément ses budgets d’épargne et ses projets.</p></div></div></section>:null}
 
@@ -162,47 +170,57 @@ function recurrenceAmountThrough(r:GoalRecurrence,through:string,from:string){
  return Math.round(total*100)/100;
 }
 
-function fiveYearFundingRecommendation({budget,account,savings,current,target,allBudgets,forecastRows,recurrences,startDate,safetyFloor}:{budget:SavingsBudgetAllocation;account:Account;savings:number;current:number;target:number;allBudgets:SavingsBudgetAllocation[];forecastRows:ForecastRow[];recurrences:GoalRecurrence[];startDate:string;safetyFloor:number}){
- const startMonth=iso(new Date()).slice(0,7);
- const rows=forecastRows.filter(r=>r.accountId===account.id&&r.month>=startMonth).sort((a,b)=>a.month.localeCompare(b.month)).slice(0,60);
- const fallback=Array.from({length:60},(_,i)=>({month:addMonths(startMonth,i),accountId:account.id,savings,savingsUsed:0} as ForecastRow));
- const horizon=rows.length?rows:fallback; const remaining=Math.max(0,target-current); const from=iso(new Date());
- const projectedMobile=(monthly:number)=>{let minimum=Infinity,minimumMonth=horizon[0]?.month??startMonth;
-  for(const row of horizon){const monthEndDate=(()=>{const d=new Date(`${row.month}-01T12:00:00`);d.setMonth(d.getMonth()+1);d.setDate(0);return iso(d)})();
-   const balance=Math.max(FLOOR,Number(row.savings)||0);
-   const cloned=allBudgets.map(b=>{if(b.kind!=="project"||b.account_id!==account.id)return b;
-    const future=recurrences.filter(r=>r.savings_budget_id===b.id&&r.movement_type==="transfer").reduce((sum,r)=>sum+recurrenceAmountThrough(r,monthEndDate,from),0);
-    let extra=0; if(b.id===budget.id&&monthly>0&&remaining>0){let d=new Date(`${startDate}T12:00:00`),n=0;while(iso(d)<=monthEndDate&&n<120){if(iso(d)>=from)extra+=monthly;d.setMonth(d.getMonth()+1);n++;}extra=Math.min(remaining,extra);}
-    return {...b,allocation_mode:"amount" as const,allocation_value:Math.min(Number(b.target_amount??Infinity),Math.max(0,Number(b.allocation_value)||0)+future+extra)};
-   });
-   const mobile=savingsAvailabilityForAccount(balance,account.id,cloned,FLOOR).mobilizable; if(mobile<minimum){minimum=mobile;minimumMonth=row.month;}
-  } return {minimum:Number.isFinite(minimum)?Math.max(0,minimum):0,minimumMonth};
- };
- const floor=Math.max(FLOOR,Number(safetyFloor)||0); const baseline=projectedMobile(0); if(remaining<=0)return {max:0,recommended:0,baselineMin:baseline.minimum,recommendedMin:baseline.minimum,minimumMonth:baseline.minimumMonth};
- let lo=0,hi=remaining; for(let i=0;i<28;i++){const mid=(lo+hi)/2;if(projectedMobile(mid).minimum>=floor)lo=mid;else hi=mid;}
- const max=Math.max(0,Math.floor(lo)); const recommended=Math.max(0,Math.floor((max*.85)/5)*5); const advised=projectedMobile(recommended);
- return {max,recommended,baselineMin:baseline.minimum,recommendedMin:advised.minimum,minimumMonth:advised.minimumMonth};
+function monthlyEquivalent(r:GoalRecurrence){
+ const amount=Math.max(0,Number(r.amount)||0),interval=Math.max(1,Number(r.interval_count)||1);
+ if(r.frequency==="weekly")return amount*52/(12*interval);
+ if(r.frequency==="quarterly")return amount/(3*interval);
+ if(r.frequency==="yearly")return amount/(12*interval);
+ return amount/interval;
 }
 
-function ProjectCard({budget,account,savings,movements,recurrences,allBudgets,forecastRows}:{budget:SavingsBudgetAllocation;account:Account;savings:number;movements:GoalMovement[];recurrences:GoalRecurrence[];allBudgets:SavingsBudgetAllocation[];forecastRows:ForecastRow[]}){
+function globalProjectCapacity({account,savings,allBudgets,forecastRows,recurrences,safetyFloor}:{account:Account;savings:number;allBudgets:SavingsBudgetAllocation[];forecastRows:ForecastRow[];recurrences:GoalRecurrence[];safetyFloor:number}){
+ const projects=allBudgets.filter(b=>b.kind==="project"&&b.account_id===account.id);
+ const projectIds=new Set(projects.map(b=>b.id));
+ const active=recurrences.filter(r=>r.is_active!==false&&r.movement_type==="transfer"&&r.savings_budget_id&&projectIds.has(r.savings_budget_id));
+ const alreadyMonthly=active.reduce((sum,r)=>sum+monthlyEquivalent(r),0);
+ const startMonth=iso(new Date()).slice(0,7),from=iso(new Date());
+ const rows=forecastRows.filter(r=>r.accountId===account.id&&r.month>=startMonth).sort((a,b)=>a.month.localeCompare(b.month)).slice(0,60);
+ const fallback=Array.from({length:60},(_,i)=>({month:addMonths(startMonth,i),accountId:account.id,savings,savingsUsed:0} as ForecastRow));
+ const horizon=rows.length?rows:fallback;
+ const projectedMobile=(extraMonthly:number)=>{let minimum=Infinity,minimumMonth=horizon[0]?.month??startMonth;
+  for(let index=0;index<horizon.length;index++){const row=horizon[index];const monthEndDate=(()=>{const d=new Date(`${row.month}-01T12:00:00`);d.setMonth(d.getMonth()+1);d.setDate(0);return iso(d)})();
+   const balance=Math.max(FLOOR,Number(row.savings)||0);
+   const cloned=allBudgets.map(b=>{if(b.kind!=="project"||b.account_id!==account.id)return b;
+    const future=active.filter(r=>r.savings_budget_id===b.id).reduce((sum,r)=>sum+recurrenceAmountThrough(r,monthEndDate,from),0);
+    const extra=b.id===projects[0]?.id?extraMonthly*(index+1):0;
+    return {...b,allocation_mode:"amount" as const,allocation_value:Math.min(Number(b.target_amount??Infinity),Math.max(0,Number(b.allocation_value)||0)+future+extra)};
+   });
+   const mobile=savingsAvailabilityForAccount(balance,account.id,cloned,FLOOR).mobilizable;if(mobile<minimum){minimum=mobile;minimumMonth=row.month;}
+  }
+  return {minimum:Number.isFinite(minimum)?Math.max(0,minimum):0,minimumMonth};
+ };
+ const floor=Math.max(FLOOR,Number(safetyFloor)||0),baseline=projectedMobile(0);
+ let lo=0,hi=Math.max(1000,savings);for(let i=0;i<30;i++){const mid=(lo+hi)/2;if(projectedMobile(mid).minimum>=floor)lo=mid;else hi=mid;}
+ const extraMax=Math.max(0,Math.floor(lo)),extraRecommended=Math.max(0,Math.floor((extraMax*.85)/5)*5),advised=projectedMobile(extraRecommended);
+ return {alreadyMonthly,extraMax,extraRecommended,totalRecommended:alreadyMonthly+extraRecommended,totalMax:alreadyMonthly+extraMax,minimum:advised.minimum,minimumMonth:advised.minimumMonth};
+}
+
+function ProjectCard({budget,account,savings,movements,recurrences,allBudgets,availableMonthly}:{budget:SavingsBudgetAllocation;account:Account;savings:number;movements:GoalMovement[];recurrences:GoalRecurrence[];allBudgets:SavingsBudgetAllocation[];availableMonthly:number}){
  const current=savingsBudgetAmount(budget,savings,allBudgets); const target=Math.max(0,Number(budget.target_amount??0));
  const existing=projectedGoalDates(budget,current,movements,recurrences);
- const currentMobile=savingsAvailabilityForAccount(savings,account.id,allBudgets,FLOOR).mobilizable;
- const autoSafety=Math.max(FLOOR,Math.round((currentMobile*.5)/100)*100);
- const [amount,setAmount]=useState("100"); const [frequency,setFrequency]=useState("monthly"); const [interval,setInterval]=useState("1"); const [startDate,setStartDate]=useState(iso(new Date())); const [safetyFloor,setSafetyFloor]=useState(String(autoSafety));
+ const [amount,setAmount]=useState("100"); const [frequency,setFrequency]=useState("monthly"); const [interval,setInterval]=useState("1"); const [startDate,setStartDate]=useState(iso(new Date()));
  const simulation=fundingDates(target,current,Math.max(0,Number(amount)||0),frequency,Math.max(1,Number(interval)||1),startDate);
  const progress=target>0?Math.min(100,Math.round(current/target*100)):0; const remaining=Math.max(0,target-current);
- const recommendation=useMemo(()=>fiveYearFundingRecommendation({budget,account,savings,current,target,allBudgets,forecastRows,recurrences,startDate,safetyFloor:Math.max(FLOOR,Number(safetyFloor)||0)}),[budget,account,savings,current,target,allBudgets,forecastRows,recurrences,startDate,safetyFloor]);
- const applyRecommended=()=>{if(recommendation.recommended<=0)return;setAmount(String(recommendation.recommended));setFrequency("monthly");setInterval("1");};
+ const monthlyPlan=frequency==="monthly"?Math.max(0,Number(amount)||0)/Math.max(1,Number(interval)||1):frequency==="weekly"?Math.max(0,Number(amount)||0)*52/(12*Math.max(1,Number(interval)||1)):frequency==="quarterly"?Math.max(0,Number(amount)||0)/(3*Math.max(1,Number(interval)||1)):Math.max(0,Number(amount)||0)/(12*Math.max(1,Number(interval)||1));
  return <div className="savings-project-card rounded-2xl border border-violet-200 bg-white p-4">
   <div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><Sparkles size={16} className="text-violet-700"/><p className="font-semibold">{budget.name}</p></div><p className="mt-1 text-xs text-neutral-500">Projet · {budget.protection==="untouchable"?"Intouchable":"Libre · utilisé après la réserve"}</p></div><p className="font-semibold">{money(current)}</p></div>
   {target>0?<><div className="mt-4 h-2 overflow-hidden rounded-full bg-violet-100"><div className="h-full rounded-full bg-violet-600" style={{width:`${progress}%`}}/></div><p className="mt-2 text-sm">{money(current)} / {money(target)} · {progress} %</p><p className="mt-1 text-xs text-neutral-500">Reste à financer : {money(remaining)}</p></>:<p className="mt-3 text-sm text-amber-700">Ajoute un objectif € au projet pour calculer sa date de réalisation.</p>}
   <div className="savings-project-dates mt-4 grid grid-cols-2 gap-3 text-xs"><div><span className="text-neutral-500">50 % estimé avec les financements validés</span><strong className="mt-1 block">{existing.half?dateLabel(existing.half):"Non déterminable"}</strong></div><div><span className="text-neutral-500">100 % estimé avec les financements validés</span><strong className="mt-1 block">{existing.full?dateLabel(existing.full):"Non déterminable"}</strong></div></div>
   {target>current?<div className="savings-project-funding mt-5 rounded-2xl border border-violet-200 bg-violet-50/60 p-4"><p className="font-semibold text-violet-950">Planifier le financement</p><p className="mt-1 text-xs text-violet-900">Simule un versement depuis {account.name}. Il s’agit d’une affectation interne au projet : le solde bancaire du compte d’épargne ne change pas.</p>
-   <div className="savings-project-advice mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><label className="text-xs text-neutral-700">Épargne mobilisable minimum à conserver sur 5 ans<input value={safetyFloor} onChange={e=>setSafetyFloor(e.target.value)} type="number" min={FLOOR} step="50" className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm sm:w-56"/><span className="mt-1 block text-[11px] text-neutral-500">Prérempli à 50 % de l’épargne mobilisable actuelle ({money(currentMobile)}), modifiable.</span></label><button type="button" onClick={applyRecommended} disabled={recommendation.recommended<=0} className="min-h-10 rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white disabled:bg-neutral-300">Utiliser le montant conseillé</button></div>
-    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4 text-xs"><div className="rounded-lg bg-white p-2"><span className="text-neutral-500">Conseillé / mois</span><strong className="mt-1 block text-base text-emerald-800">{money(recommendation.recommended)}</strong></div><div className="rounded-lg bg-white p-2"><span className="text-neutral-500">Maximum prudent / mois</span><strong className="mt-1 block text-base">{money(recommendation.max)}</strong></div><div className="rounded-lg bg-white p-2"><span className="text-neutral-500">Minimum projeté avec conseillé</span><strong className="mt-1 block text-base">{money(recommendation.recommendedMin)}</strong></div><div className="rounded-lg bg-white p-2"><span className="text-neutral-500">Point bas estimé</span><strong className="mt-1 block text-base">{monthLabel(recommendation.minimumMonth)}</strong></div></div>
-    <p className="mt-2 text-[11px] text-neutral-600">Calcul prudent sur les 60 prochains mois. Le maximum respecte ton seuil à chaque mois ; le conseillé conserve en plus une marge de 15 %. Les financements de projets déjà programmés sont pris en compte.</p>
+   <div className={`savings-project-advice mt-4 rounded-xl border p-3 ${monthlyPlan>availableMonthly+0.01?"border-amber-300 bg-amber-50":"border-emerald-200 bg-emerald-50"}`}>
+    <p className="text-xs font-semibold text-neutral-800">Enveloppe globale encore disponible : {money(availableMonthly)} / mois</p>
+    <p className="mt-1 text-[11px] text-neutral-600">La sécurité sur 5 ans est calculée une seule fois pour l’ensemble des projets. Ce projet consomme environ {money(monthlyPlan)} / mois de cette enveloppe.</p>
+    {monthlyPlan>availableMonthly+0.01?<p className="mt-2 text-xs font-semibold text-amber-800">Ce financement dépasse l’enveloppe mensuelle encore disponible de {money(monthlyPlan-availableMonthly)}.</p>:null}
    </div>
    <div className="mt-3 grid gap-3 sm:grid-cols-2">
     <label className="text-xs text-neutral-600">Montant par versement €<input value={amount} onChange={e=>setAmount(e.target.value)} type="number" min="0.01" step="0.01" className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"/></label>
@@ -211,7 +229,7 @@ function ProjectCard({budget,account,savings,movements,recurrences,allBudgets,fo
     <label className="text-xs text-neutral-600">Premier versement<input value={startDate} onChange={e=>setStartDate(e.target.value)} type="date" className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"/></label>
    </div>
    <div className="savings-project-plan-dates mt-3 grid grid-cols-2 gap-3 rounded-xl bg-white p-3 text-xs"><div><span className="text-neutral-500">50 % avec ce plan</span><strong className="mt-1 block text-violet-950">{simulation.half?dateLabel(simulation.half):"Non déterminable"}</strong></div><div><span className="text-neutral-500">100 % avec ce plan</span><strong className="mt-1 block text-violet-950">{simulation.full?dateLabel(simulation.full):"Non déterminable"}</strong></div></div>
-   <form action={createProjectFundingPlan} className="mt-3"><input type="hidden" name="budget_id" value={budget.id}/><input type="hidden" name="amount" value={amount}/><input type="hidden" name="frequency" value={frequency}/><input type="hidden" name="interval_count" value={interval}/><input type="hidden" name="start_date" value={startDate}/><input type="hidden" name="end_date" value={simulation.full??""}/><button disabled={!simulation.full||Number(amount)<=0} className="min-h-10 rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-neutral-300">Valider ce financement</button></form>
+   <form action={createProjectFundingPlan} className="mt-3"><input type="hidden" name="budget_id" value={budget.id}/><input type="hidden" name="amount" value={amount}/><input type="hidden" name="frequency" value={frequency}/><input type="hidden" name="interval_count" value={interval}/><input type="hidden" name="start_date" value={startDate}/><input type="hidden" name="end_date" value={simulation.full??""}/><button disabled={!simulation.full||Number(amount)<=0||monthlyPlan>availableMonthly+0.01} className="min-h-10 rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-neutral-300">Valider ce financement</button></form>
   </div>:<div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Objectif atteint.</div>}
   <details className="mt-4"><summary className="cursor-pointer text-xs font-medium text-neutral-600">Modifier le projet</summary><SavingsBudgetForm accountId={account.id} savings={savings} budget={budget} forceKind="project" allBudgets={allBudgets}/><form action={deleteSavingsBudget.bind(null,budget.id)} className="mt-2"><button className="flex items-center gap-2 text-xs font-medium text-red-700"><Trash2 size={14}/>Supprimer le projet</button></form></details>
  </div>;
