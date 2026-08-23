@@ -192,16 +192,29 @@ function globalProjectCapacity({account,savings,allBudgets,forecastRows,recurren
    const balance=Math.max(FLOOR,Number(row.savings)||0);
    const cloned=allBudgets.map(b=>{if(b.kind!=="project"||b.account_id!==account.id)return b;
     const future=active.filter(r=>r.savings_budget_id===b.id).reduce((sum,r)=>sum+recurrenceAmountThrough(r,monthEndDate,from),0);
-    const extra=b.id===projects[0]?.id?extraMonthly*(index+1):0;
-    return {...b,allocation_mode:"amount" as const,allocation_value:Math.min(Number(b.target_amount??Infinity),Math.max(0,Number(b.allocation_value)||0)+future+extra)};
+    return {...b,allocation_mode:"amount" as const,allocation_value:Math.min(Number(b.target_amount??Infinity),Math.max(0,Number(b.allocation_value)||0)+future)};
    });
-   const mobile=savingsAvailabilityForAccount(balance,account.id,cloned,FLOOR).mobilizable;if(mobile<minimum){minimum=mobile;minimumMonth=row.month;}
+   // extraMonthly est une NOUVELLE enveloppe globale. Elle doit consommer le stock
+   // une seule fois, de façon cumulative, et ne doit surtout pas être plafonnée par
+   // l'objectif d'un projet particulier. Sinon 10 000 € peuvent être interprétés
+   // à tort comme 10 000 € disponibles chaque mois.
+   const baseMobile=savingsAvailabilityForAccount(balance,account.id,cloned,FLOOR).mobilizable;
+   const mobile=Math.max(0,baseMobile-extraMonthly*(index+1));
+   if(mobile<minimum){minimum=mobile;minimumMonth=row.month;}
   }
   return {minimum:Number.isFinite(minimum)?Math.max(0,minimum):0,minimumMonth};
  };
  const floor=Math.max(FLOOR,Number(safetyFloor)||0),baseline=projectedMobile(0);
  let lo=0,hi=Math.max(1000,savings);for(let i=0;i<30;i++){const mid=(lo+hi)/2;if(projectedMobile(mid).minimum>=floor)lo=mid;else hi=mid;}
- const extraMax=Math.max(0,Math.floor(lo)),extraRecommended=Math.max(0,Math.floor((extraMax*.85)/5)*5),advised=projectedMobile(extraRecommended);
+ // Garde-fou : le stock disponible aujourd’hui n’est jamais un flux mensuel.
+ // Sans alimentation future démontrée, sa contribution mensuelle durable ne peut
+ // dépasser (mobilisable actuel - seuil) / 60. Le moteur de projection peut être
+ // plus restrictif, mais jamais plus généreux à cause d’un effet de stock répété.
+ const currentMobile=savingsAvailabilityForAccount(savings,account.id,allBudgets,FLOOR).mobilizable;
+ const stockMonthlyCap=Math.max(0,(currentMobile-floor)/60);
+ const simulatedExtraMax=Math.max(0,lo);
+ const extraMax=Math.max(0,Math.floor(Math.min(simulatedExtraMax,stockMonthlyCap)));
+ const extraRecommended=Math.max(0,Math.floor((extraMax*.85)/5)*5),advised=projectedMobile(extraRecommended);
  return {alreadyMonthly,extraMax,extraRecommended,totalRecommended:alreadyMonthly+extraRecommended,totalMax:alreadyMonthly+extraMax,minimum:advised.minimum,minimumMonth:advised.minimumMonth};
 }
 
