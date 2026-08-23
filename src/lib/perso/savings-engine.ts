@@ -13,16 +13,29 @@ export type SavingsBudgetAllocation={
  id:string; account_id:string; name:string; kind:"project"|"reserve"; allocation_mode:"amount"|"percent"; allocation_value:number; protection:"free"|"preserve"|"untouchable"; allow_recovery:boolean; critical_threshold?:number|null; target_amount?:number|null; target_date?:string|null; priority?:number|null;
 };
 
-export function savingsBudgetAmount(budget:SavingsBudgetAllocation,savingsBalance:number){
+function rawSavingsBudgetAmount(budget:SavingsBudgetAllocation,savingsBalance:number){
  const raw=budget.allocation_mode==="percent"?Math.max(0,savingsBalance)*Math.max(0,Number(budget.allocation_value))/100:Math.max(0,Number(budget.allocation_value));
  return Math.max(0,Math.round(raw*100)/100);
+}
+
+export function savingsProjectAmountForAccount(savingsBalance:number,accountId:string,budgets:SavingsBudgetAllocation[]|undefined){
+ return Math.max(0,Math.round((budgets??[]).filter(b=>b.account_id===accountId&&b.kind==="project").reduce((sum,b)=>sum+rawSavingsBudgetAmount(b,savingsBalance),0)*100)/100);
+}
+
+export function savingsBudgetAmount(budget:SavingsBudgetAllocation,savingsBalance:number,budgets?:SavingsBudgetAllocation[]){
+ // Les projets sont des sommes déjà réservées à un achat. Ils ne doivent jamais
+ // entrer dans l'assiette d'un autre budget calculé en pourcentage.
+ if(budget.kind==="project"||budget.allocation_mode!=="percent")return rawSavingsBudgetAmount(budget,savingsBalance);
+ const projectAllocated=savingsProjectAmountForAccount(savingsBalance,budget.account_id,budgets);
+ const base=Math.max(0,Math.max(0,savingsBalance)-projectAllocated);
+ return Math.max(0,Math.round((base*Math.max(0,Number(budget.allocation_value))/100)*100)/100);
 }
 
 export function savingsAvailabilityForAccount(savingsBalance:number,accountId:string,budgets:SavingsBudgetAllocation[]|undefined,floor=30){
  const balance=Math.max(0,Number(savingsBalance)||0);
  const physical=Math.max(0,balance-floor);
  const rows=(budgets??[]).filter(b=>b.account_id===accountId);
- const amount=(b:SavingsBudgetAllocation)=>savingsBudgetAmount(b,balance);
+ const amount=(b:SavingsBudgetAllocation)=>savingsBudgetAmount(b,balance,rows);
  if(!rows.length)return {physical,mobilizable:physical,reserve:0,unallocated:physical,free:0,untouchable:0,totalUsable:physical};
 
  // Hiérarchie métier unique :

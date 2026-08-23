@@ -10,12 +10,13 @@ type Props = {
   creditForm: ReactNode;
   creditRecurringForm: ReactNode;
   transferForm: ReactNode;
+  transferRecurringForm: ReactNode;
   categoryForm: ReactNode;
 };
 type Modal = "choice" | "debit" | "credit" | "transfer" | "category" | null;
 type MovementMode = "oneoff" | "recurring";
 
-export function FinanceQuickActions({ debitForm, debitRecurringForm, creditForm, creditRecurringForm, transferForm, categoryForm }: Props) {
+export function FinanceQuickActions({ debitForm, debitRecurringForm, creditForm, creditRecurringForm, transferForm, transferRecurringForm, categoryForm }: Props) {
   const [modal, setModal] = useState<Modal>(null);
   const [movementMode, setMovementMode] = useState<MovementMode>("oneoff");
   const searchParams = useSearchParams();
@@ -69,7 +70,7 @@ export function FinanceQuickActions({ debitForm, debitRecurringForm, creditForm,
     <div className="flex flex-wrap gap-2">
       <Action label="+ Débit" onClick={() => openMovement("debit")} primary />
       <Action label="+ Crédit" onClick={() => openMovement("credit")} />
-      <Action label="+ Virement interne" onClick={() => setModal("transfer")} />
+      <Action label="+ Virement interne" onClick={() => {setMovementMode("oneoff");setModal("transfer");}} />
       <Action label="+ Catégorie" onClick={() => setModal("category")} />
     </div>
 
@@ -96,7 +97,7 @@ export function FinanceQuickActions({ debitForm, debitRecurringForm, creditForm,
               <button type="button" onClick={() => setMovementMode("recurring")} className={`flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold ${movementMode === "recurring" ? "bg-white shadow-sm" : "text-neutral-500"}`}><CalendarClock size={16}/>Régulier</button>
             </div>
             {movementForm}
-          </> : modal === "transfer" ? transferForm : categoryForm}
+          </> : modal === "transfer" ? <><div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-neutral-100 p-1"><button type="button" onClick={()=>setMovementMode("oneoff")} className={`min-h-11 rounded-lg px-3 text-sm font-semibold ${movementMode==="oneoff"?"bg-white shadow-sm":"text-neutral-500"}`}>Ponctuel</button><button type="button" onClick={()=>setMovementMode("recurring")} className={`flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold ${movementMode==="recurring"?"bg-white shadow-sm":"text-neutral-500"}`}><CalendarClock size={16}/>Régulier</button></div>{movementMode==="recurring"?transferRecurringForm:transferForm}</> : categoryForm}
         </div>
       </div>
     </div> : null}

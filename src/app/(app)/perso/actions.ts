@@ -99,7 +99,7 @@ export async function createMovement(fd: FormData) {
   const completedDate = status === "completed"
     ? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())
     : null;
-  const payload = { owner_id: user.id, account_id: text(fd, "account_id"), category_id: optional(fd, "category_id"), movement_type: movementType, label: text(fd, "label"), amount, movement_date: movementDate, status, completed_date: completedDate, completed_at: status === "completed" ? new Date().toISOString() : null, exclude_from_analysis: text(fd, "exclude_from_analysis") === "on", notes: optional(fd, "notes") };
+  const payload = { owner_id: user.id, account_id: text(fd, "account_id"), category_id: optional(fd, "category_id"), movement_type: movementType, label: text(fd, "label"), amount, movement_date: movementDate, status, completed_date: completedDate, completed_at: status === "completed" ? new Date().toISOString() : null, exclude_from_analysis: text(fd, "exclude_from_analysis") === "on", savings_budget_id: optional(fd, "savings_budget_id"), notes: optional(fd, "notes") };
   if (!payload.account_id || !payload.label || !payload.movement_date || !Number.isFinite(amount) || amount <= 0) fail("Complète les informations du mouvement.");
   if (!["income", "expense"].includes(movementType)) fail("Type de mouvement incorrect.");
   const { error } = await supabase.from("personal_movements").insert(payload);
@@ -114,6 +114,7 @@ export async function createTransfer(fd: FormData) {
   const date = text(fd, "movement_date");
   const requestedLabel = text(fd, "label") || "Virement interne";
   const status = text(fd, "status") === "completed" ? "completed" : "planned";
+  const savingsBudgetId = optional(fd, "savings_budget_id");
   if (!source || !destination || source === destination || !date || !Number.isFinite(amount) || amount <= 0) fail("Le virement interne est incomplet ou incorrect.");
   const commonToken="__COMMON__";
   const involvesCommon=source===commonToken||destination===commonToken;
@@ -121,6 +122,15 @@ export async function createTransfer(fd: FormData) {
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const completedDate = status === "completed" ? day : null;
   const completedAt = status === "completed" ? new Date().toISOString() : null;
+
+  if(savingsBudgetId){
+    if(involvesCommon) fail("Un budget d’épargne ne peut être affecté qu’à un virement entre comptes PERSO.");
+    const {data:budget,error:budgetError}=await supabase.from("personal_savings_budgets").select("id,account_id,kind,allocation_mode,allocation_value").eq("id",savingsBudgetId).eq("owner_id",user.id).maybeSingle();
+    if(budgetError||!budget) fail(budgetError?.message??"Budget d’épargne introuvable.");
+    if(budget.kind!=="project") fail("L’affectation d’un virement est réservée aux budgets d’épargne de type Projet.");
+    if(budget.account_id!==destination) fail("Le budget d’épargne choisi doit appartenir au compte destinataire.");
+    if(budget.allocation_mode!=="amount") fail("Pour recevoir des virements, le budget d’épargne doit être défini en montant €.");
+  }
 
   if(involvesCommon){
     const personalAccountId=source===commonToken?destination:source;
@@ -148,19 +158,24 @@ export async function createTransfer(fd: FormData) {
   const label=requestedLabel;
   const { error } = await supabase.from("personal_movements").insert([
     { owner_id: user.id, account_id: source, movement_type: "transfer_out", label, amount, movement_date: date, status, completed_date: completedDate, completed_at: completedAt, transfer_group_id: group },
-    { owner_id: user.id, account_id: destination, movement_type: "transfer_in", label, amount, movement_date: date, status, completed_date: completedDate, completed_at: completedAt, transfer_group_id: group },
+    { owner_id: user.id, account_id: destination, movement_type: "transfer_in", label, amount, movement_date: date, status, completed_date: completedDate, completed_at: completedAt, transfer_group_id: group, savings_budget_id: savingsBudgetId },
   ]);
   if (error) fail(error.message);
+  if(savingsBudgetId && status === "completed"){
+    const {data:b}=await supabase.from("personal_savings_budgets").select("allocation_value").eq("id",savingsBudgetId).eq("owner_id",user.id).single();
+    const {error:e}=await supabase.from("personal_savings_budgets").update({allocation_value:Number(b?.allocation_value??0)+amount}).eq("id",savingsBudgetId).eq("owner_id",user.id); if(e) fail(e.message);
+  }
   await refresh(status === "completed" ? "Virement interne effectué." : "Virement interne ajouté aux prévisions.");
 }
 
 export async function createRecurrence(fd: FormData) {
   const { supabase, user } = await auth();
   const movementType = text(fd, "movement_type"); const amount = number(fd, "amount");
-  const payload = { owner_id: user.id, account_id: text(fd, "account_id"), destination_account_id: optional(fd, "destination_account_id"), category_id: optional(fd, "category_id"), movement_type: movementType, label: text(fd, "label"), amount, frequency: text(fd, "frequency"), interval_count: Math.max(1, Math.trunc(number(fd, "interval_count") || 1)), start_date: text(fd, "start_date"), end_date: optional(fd, "end_date"), annual_change_percent: number(fd, "annual_change_percent") || 0, is_essential: movementType === "expense" && text(fd, "is_essential") === "on", exclude_from_analysis: text(fd, "exclude_from_analysis") === "on", notes: optional(fd, "notes") };
+  const payload = { owner_id: user.id, account_id: text(fd, "account_id"), destination_account_id: optional(fd, "destination_account_id"), category_id: optional(fd, "category_id"), movement_type: movementType, label: text(fd, "label"), amount, frequency: text(fd, "frequency"), interval_count: Math.max(1, Math.trunc(number(fd, "interval_count") || 1)), start_date: text(fd, "start_date"), end_date: optional(fd, "end_date"), annual_change_percent: number(fd, "annual_change_percent") || 0, is_essential: movementType === "expense" && text(fd, "is_essential") === "on", exclude_from_analysis: text(fd, "exclude_from_analysis") === "on", savings_budget_id: optional(fd, "savings_budget_id"), notes: optional(fd, "notes") };
   if (!payload.account_id || !payload.label || !payload.start_date || !Number.isFinite(amount) || amount <= 0) fail("Complète la récurrence.");
   if (movementType === "transfer" && !payload.destination_account_id) fail("Choisis le compte d’épargne destinataire.");
   if (movementType === "transfer" && payload.destination_account_id === payload.account_id) fail("Le compte émetteur et le compte destinataire doivent être différents.");
+  if (movementType === "transfer" && payload.savings_budget_id) { const {data:b}=await supabase.from("personal_savings_budgets").select("account_id,kind,allocation_mode").eq("id",payload.savings_budget_id).eq("owner_id",user.id).maybeSingle(); if(!b||b.kind!=="project"||b.allocation_mode!=="amount"||b.account_id!==payload.destination_account_id) fail("Le budget d’épargne doit être un projet en montant € rattaché au compte destinataire."); }
   const { error } = await supabase.from("personal_recurrences").insert(payload);
   if (error) fail(error.message); await refresh("Récurrence ajoutée aux projections.");
 }
@@ -385,7 +400,7 @@ export async function completeRecurrenceOccurrence(recurrenceId: string, occurre
 
   const { data: recurrence, error: recurrenceError } = await supabase
     .from("personal_recurrences")
-    .select("id,account_id,destination_account_id,category_id,movement_type,label,amount,notes")
+    .select("id,account_id,destination_account_id,category_id,movement_type,label,amount,notes,savings_budget_id")
     .eq("id", recurrenceId)
     .eq("owner_id", user.id)
     .single();
@@ -423,9 +438,10 @@ export async function completeRecurrenceOccurrence(recurrenceId: string, occurre
     const group = crypto.randomUUID();
     const { error } = await supabase.from("personal_movements").insert([
       { owner_id: user.id, account_id: recurrence.account_id, category_id: recurrence.category_id, movement_type: "transfer_out", label: recurrence.label, amount, movement_date: occurrenceDate, status: "completed", completed_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()), completed_at: new Date().toISOString(), notes: recurrence.notes, transfer_group_id: group, recurrence_id: recurrenceId },
-      { owner_id: user.id, account_id: recurrence.destination_account_id, category_id: recurrence.category_id, movement_type: "transfer_in", label: recurrence.label, amount, movement_date: occurrenceDate, status: "completed", completed_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()), completed_at: new Date().toISOString(), notes: recurrence.notes, transfer_group_id: group, recurrence_id: recurrenceId },
+      { owner_id: user.id, account_id: recurrence.destination_account_id, category_id: recurrence.category_id, movement_type: "transfer_in", label: recurrence.label, amount, movement_date: occurrenceDate, status: "completed", completed_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()), completed_at: new Date().toISOString(), notes: recurrence.notes, transfer_group_id: group, recurrence_id: recurrenceId, savings_budget_id: recurrence.savings_budget_id },
     ]);
     if (error) fail(error.message);
+    if(recurrence.savings_budget_id){ const {data:b}=await supabase.from("personal_savings_budgets").select("allocation_value").eq("id",recurrence.savings_budget_id).eq("owner_id",user.id).single(); const {error:e}=await supabase.from("personal_savings_budgets").update({allocation_value:Number(b?.allocation_value??0)+amount}).eq("id",recurrence.savings_budget_id).eq("owner_id",user.id); if(e) fail(e.message); }
   } else {
     const { error } = await supabase.from("personal_movements").insert({
       owner_id: user.id,
@@ -1094,7 +1110,7 @@ export async function createSavingsBudget(fd: FormData) {
   const allowRecovery=kind==="reserve"||protection==="free";
   const criticalThreshold=Math.max(0,number(fd,"critical_threshold")||0);
   const targetAmount=number(fd,"target_amount");
-  if(!accountId||!name||allocationValue<=0) fail("Complète le budget d’épargne.");
+  if(!accountId||!name||(kind==="reserve"&&allocationValue<=0)) fail("Complète le budget d’épargne.");
   if(allocationMode==="percent"&&allocationValue>100) fail("Un pourcentage ne peut pas dépasser 100 %.");
   const {error}=await supabase.from("personal_savings_budgets").insert({owner_id:user.id,account_id:accountId,name,kind,allocation_mode:allocationMode,allocation_value:allocationValue,protection,allow_recovery:allowRecovery,critical_threshold:criticalThreshold,target_amount:Number.isFinite(targetAmount)&&targetAmount>0?targetAmount:null,target_date:optional(fd,"target_date"),priority:0});
   if(error) fail(error.message); savingsBudgetRedirect("Budget d’épargne ajouté.");
@@ -1110,7 +1126,7 @@ export async function updateSavingsBudget(fd: FormData) {
   const allowRecovery=kind==="reserve"||protection==="free";
   const criticalThreshold=Math.max(0,number(fd,"critical_threshold")||0);
   const targetAmount=number(fd,"target_amount");
-  if(!id||!accountId||!name||allocationValue<=0) fail("Budget d’épargne incomplet.");
+  if(!id||!accountId||!name||(kind==="reserve"&&allocationValue<=0)) fail("Budget d’épargne incomplet.");
   if(allocationMode==="percent"&&allocationValue>100) fail("Un pourcentage ne peut pas dépasser 100 %.");
   const {error}=await supabase.from("personal_savings_budgets").update({account_id:accountId,name,kind,allocation_mode:allocationMode,allocation_value:allocationValue,protection,allow_recovery:allowRecovery,critical_threshold:criticalThreshold,target_amount:Number.isFinite(targetAmount)&&targetAmount>0?targetAmount:null,target_date:optional(fd,"target_date"),priority:0}).eq("id",id).eq("owner_id",user.id);
   if(error) fail(error.message); savingsBudgetRedirect("Budget d’épargne modifié.");

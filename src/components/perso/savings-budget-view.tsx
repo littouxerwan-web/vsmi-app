@@ -3,11 +3,13 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, PiggyBank, Plus, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
 import { createSavingsBudget, deleteSavingsBudget, updateSavingsBudget } from "@/app/(app)/perso/actions";
-import { mobilizableSavingsForAccount, savingsAvailabilityForAccount, savingsBudgetAmount, type SavingsBudgetAllocation } from "@/lib/perso/savings-engine";
+import { mobilizableSavingsForAccount, savingsAvailabilityForAccount, savingsBudgetAmount, savingsProjectAmountForAccount, type SavingsBudgetAllocation } from "@/lib/perso/savings-engine";
 
 type Account={id:string;name:string;account_type:"checking"|"savings"|"crypto";color?:string|null};
 type ForecastRow={month:string;accountId:string;savings:number;savingsUsed:number;proposal?:number;proposalDate?:string|null;savingsUseDate?:string|null};
-type Props={accounts:Account[];budgets:SavingsBudgetAllocation[];currentBalances:Record<string,number>;forecastRows:ForecastRow[]};
+type GoalMovement={savings_budget_id?:string|null;movement_type:string;amount:number;movement_date:string;status:string};
+type GoalRecurrence={id:string;savings_budget_id?:string|null;movement_type:string;amount:number;frequency:string;interval_count:number;start_date:string;end_date?:string|null;is_active?:boolean};
+type Props={accounts:Account[];budgets:SavingsBudgetAllocation[];currentBalances:Record<string,number>;forecastRows:ForecastRow[];movements?:GoalMovement[];recurrences?:GoalRecurrence[]};
 type BudgetPoint={date:string;total:number;mobile:number;budgetValues:Record<string,number>};
 
 const GLOBAL="__global__";
@@ -19,7 +21,7 @@ const iso=(d:Date)=>d.toISOString().slice(0,10);
 const PALETTE=["#2563eb","#7c3aed","#db2777","#ea580c","#0891b2","#65a30d","#b91c1c","#4f46e5","#0f766e","#a16207","#9333ea","#0369a1"];
 const addMonths=(month:string,n:number)=>{const d=new Date(`${month}-01T12:00:00`);d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,7);};
 
-export function SavingsBudgetView({accounts,budgets,currentBalances,forecastRows}:Props){
+export function SavingsBudgetView({accounts,budgets,currentBalances,forecastRows,movements=[],recurrences=[]}:Props){
  const savingsAccounts=accounts.filter(a=>a.account_type==="savings");
  const [accountId,setAccountId]=useState(GLOBAL);
  const global=accountId===GLOBAL;
@@ -27,9 +29,13 @@ export function SavingsBudgetView({accounts,budgets,currentBalances,forecastRows
  const scopedAccounts=global?savingsAccounts:selected?[selected]:[];
  const scopedIds=new Set(scopedAccounts.map(a=>a.id));
  const scopedBudgets=budgets.filter(b=>scopedIds.has(b.account_id));
+ const projectBudgets=scopedBudgets.filter(b=>b.kind==="project");
+ const standardBudgets=scopedBudgets.filter(b=>b.kind!=="project");
  const balanceFor=(id:string)=>Math.max(0,Number(currentBalances[id]??0));
  const currentSavings=scopedAccounts.reduce((s,a)=>s+balanceFor(a.id),0);
- const allocated=scopedBudgets.reduce((s,b)=>s+savingsBudgetAmount(b,balanceFor(b.account_id)),0);
+ const allocated=scopedBudgets.reduce((s,b)=>s+savingsBudgetAmount(b,balanceFor(b.account_id),budgets),0);
+ const projectsAllocated=projectBudgets.reduce((s,b)=>s+savingsBudgetAmount(b,balanceFor(b.account_id),budgets),0);
+ const standardAllocated=standardBudgets.reduce((s,b)=>s+savingsBudgetAmount(b,balanceFor(b.account_id),budgets),0);
  const availability=scopedAccounts.reduce((acc,a)=>{const v=savingsAvailabilityForAccount(balanceFor(a.id),a.id,budgets,FLOOR);acc.mobilizable+=v.mobilizable;acc.free+=v.free;acc.untouchable+=v.untouchable;acc.usable+=v.totalUsable;return acc;},{mobilizable:0,free:0,untouchable:0,usable:0});
  const mobilizable=availability.usable;
  // Les enveloppes ventilent le solde total. Le plancher de 30 € limite ce qui est
@@ -67,7 +73,7 @@ export function SavingsBudgetView({accounts,budgets,currentBalances,forecastRows
    const total=scopedAccounts.reduce((sum,a)=>sum+(balances.get(a.id)??0),0);
    const mobile=scopedAccounts.reduce((sum,a)=>sum+mobilizableSavingsForAccount(balances.get(a.id)??0,a.id,budgets,FLOOR),0);
    const budgetValues:Record<string,number>={};
-   for(const budget of scopedBudgets)budgetValues[budget.id]=savingsBudgetAmount(budget,balances.get(budget.account_id)??0);
+   for(const budget of scopedBudgets)budgetValues[budget.id]=savingsBudgetAmount(budget,balances.get(budget.account_id)??0,budgets);
    out.push({date,total,mobile,budgetValues});
    day=tomorrow;
   }
@@ -77,37 +83,52 @@ export function SavingsBudgetView({accounts,budgets,currentBalances,forecastRows
  return <div className="perso-savings-budget-view mt-5 space-y-5">
   <section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6">
    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-    <div><p className="text-xs font-semibold uppercase tracking-[.18em] text-neutral-500">Organisation de l’épargne</p><h2 className="mt-2 text-xl font-semibold">Budgets Épargne</h2><p className="mt-1 max-w-3xl text-sm text-neutral-500">Les enveloppes de type « Réserve » et l’épargne non affectée sont mobilisables immédiatement. Quand elles sont épuisées, les projets « Libre » peuvent prendre le relais. Les projets « Intouchable » ne sont jamais utilisés. Le plancher de {money(FLOOR)} par compte reste protégé.</p></div>
+    <div><p className="text-xs font-semibold uppercase tracking-[.18em] text-neutral-500">Organisation de l’épargne</p><h2 className="mt-2 text-xl font-semibold">Budgets Épargne</h2><p className="mt-1 max-w-3xl text-sm text-neutral-500">Les budgets d’épargne organisent la trésorerie disponible. Les achats à préparer sont isolés dans le bloc « Projet » : les sommes qui leur sont affectées sont retirées de l’assiette utilisée pour calculer les autres budgets en pourcentage. Le plancher de {money(FLOOR)} par compte reste protégé.</p></div>
     <select value={accountId} onChange={e=>setAccountId(e.target.value)} className="min-h-11 rounded-xl border px-3"><option value={GLOBAL}>Vue globale · tous les comptes épargne</option>{savingsAccounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select>
    </div>
    {!savingsAccounts.length?<p className="mt-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-800">Crée d’abord un compte d’épargne.</p>:<>
-    <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><Metric label={global?"Épargne totale globale":"Épargne totale"} value={money(currentSavings)}/><Metric label="Épargne affectée" value={money(allocated)}/><Metric label="Épargne mobilisable" value={money(availability.mobilizable)} dark/><Metric label="Libre en relais" value={money(availability.free)}/><Metric label="Intouchable" value={money(availability.untouchable)}/></div>
+    <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><Metric label={global?"Épargne totale globale":"Épargne totale"} value={money(currentSavings)}/><Metric label="Budgets hors projets" value={money(standardAllocated)}/><Metric label="Affecté aux projets" value={money(projectsAllocated)}/><Metric label="Épargne mobilisable" value={money(availability.mobilizable)} dark/><Metric label="Libre en relais" value={money(availability.free)}/><Metric label="Intouchable" value={money(availability.untouchable)}/></div>
     {hasOverAllocation?<div className="mt-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"><AlertTriangle size={17}/><p>Les enveloppes dépassent l’épargne disponible de {money(overAllocated)}.</p></div>:null}
-    {global?<div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{savingsAccounts.map(a=>{const b=balanceFor(a.id),v=savingsAvailabilityForAccount(b,a.id,budgets,FLOOR),aff=budgets.filter(x=>x.account_id===a.id).reduce((s,x)=>s+savingsBudgetAmount(x,b),0);return <button key={a.id} type="button" onClick={()=>setAccountId(a.id)} className="rounded-2xl border border-black/10 p-4 text-left hover:bg-neutral-50"><div className="flex justify-between gap-3"><span className="font-medium">{a.name}</span><span className="font-semibold">{money(b)}</span></div><p className="mt-1 text-xs text-neutral-500">Affecté {money(aff)} · mobilisable {money(v.mobilizable)} · libre {money(v.free)} · intouchable {money(v.untouchable)}</p></button>})}</div>:null}
+    {global?<div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{savingsAccounts.map(a=>{const b=balanceFor(a.id),v=savingsAvailabilityForAccount(b,a.id,budgets,FLOOR),aff=budgets.filter(x=>x.account_id===a.id).reduce((s,x)=>s+savingsBudgetAmount(x,b,budgets),0);return <button key={a.id} type="button" onClick={()=>setAccountId(a.id)} className="rounded-2xl border border-black/10 p-4 text-left hover:bg-neutral-50"><div className="flex justify-between gap-3"><span className="font-medium">{a.name}</span><span className="font-semibold">{money(b)}</span></div><p className="mt-1 text-xs text-neutral-500">Affecté {money(aff)} · mobilisable {money(v.mobilizable)} · libre {money(v.free)} · intouchable {money(v.untouchable)}</p></button>})}</div>:null}
    </>}
   </section>
 
-  {!global&&selected?<section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6"><details><summary className="flex cursor-pointer items-center gap-2 font-semibold"><Plus size={17}/>Créer une enveloppe</summary><SavingsBudgetForm accountId={selected.id} savings={balanceFor(selected.id)}/></details><div className="mt-5 grid gap-3 lg:grid-cols-2">{scopedBudgets.length?scopedBudgets.map(b=><BudgetCard key={b.id} budget={b} accountId={selected.id} savings={balanceFor(selected.id)}/>):<div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">Aucune enveloppe : toute l’épargne disponible au-dessus du plancher est considérée comme épargne mobilisable.</div>}</div></section>:global?<section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6"><div className="flex items-start gap-3 rounded-2xl bg-neutral-50 p-4"><PiggyBank size={18}/><div><p className="font-medium">Vue globale</p><p className="mt-1 text-sm text-neutral-500">Sélectionne un compte pour créer ou modifier ses enveloppes. Un pourcentage reste toujours calculé sur le solde de son propre compte.</p></div></div></section>:null}
+  {!global&&selected?<div className="space-y-5">
+   <section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6">
+    <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-neutral-500">Budgets d’épargne</p><h3 className="mt-1 text-lg font-semibold">Réserves et protections</h3><p className="mt-1 text-sm text-neutral-500">Les pourcentages sont calculés sur le solde du compte après déduction des sommes affectées aux projets.</p></div></div>
+    <details className="mt-4"><summary className="flex cursor-pointer items-center gap-2 font-semibold"><Plus size={17}/>Créer un budget d’épargne</summary><SavingsBudgetForm accountId={selected.id} savings={balanceFor(selected.id)} forceKind="reserve" allBudgets={budgets}/></details>
+    <div className="mt-5 grid gap-3 lg:grid-cols-2">{standardBudgets.length?standardBudgets.map(b=><BudgetCard key={b.id} budget={b} accountId={selected.id} savings={balanceFor(selected.id)} movements={movements} recurrences={recurrences} allBudgets={budgets}/>):<div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">Aucun budget hors projet : l’épargne non affectée reste disponible au-dessus du plancher.</div>}</div>
+   </section>
+   <section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6">
+    <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4"><div className="flex items-start gap-3"><Sparkles size={19}/><div><p className="font-semibold text-violet-950">Projet</p><p className="mt-1 text-sm text-violet-900">Prépare un achat avec un montant cible. Les virements ponctuels ou réguliers affectés au projet alimentent sa progression et ses dates prévisionnelles à 50 % et 100 %. Cette somme est exclue du calcul en % des autres budgets.</p></div></div></div>
+    <details className="mt-4"><summary className="flex cursor-pointer items-center gap-2 font-semibold"><Plus size={17}/>Créer un projet</summary><SavingsBudgetForm accountId={selected.id} savings={balanceFor(selected.id)} forceKind="project" allBudgets={budgets}/></details>
+    <div className="mt-5 grid gap-3 lg:grid-cols-2">{projectBudgets.length?projectBudgets.map(b=><BudgetCard key={b.id} budget={b} accountId={selected.id} savings={balanceFor(selected.id)} movements={movements} recurrences={recurrences} allBudgets={budgets}/>):<div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">Aucun projet pour ce compte d’épargne.</div>}</div>
+   </section>
+  </div>:global?<section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6"><div className="flex items-start gap-3 rounded-2xl bg-neutral-50 p-4"><PiggyBank size={18}/><div><p className="font-medium">Vue globale</p><p className="mt-1 text-sm text-neutral-500">Sélectionne un compte pour gérer séparément ses budgets d’épargne et ses projets.</p></div></div></section>:null}
 
   {scopedAccounts.length?<section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6"><div className="rounded-2xl border border-sky-200 bg-sky-50 p-4"><p className="font-semibold text-sky-950">Projection future centralisée</p><p className="mt-1 text-sm text-sky-900">Les Budgets Épargne définissent uniquement les enveloppes, protections et montants mobilisables. La trajectoire future des soldes est désormais calculée exclusivement dans Projection afin d’éviter toute divergence entre deux moteurs.</p></div></section>:null}
  </div>;
 }
 
-function SavingsBudgetForm({accountId,savings,budget}:{accountId:string;savings:number;budget?:SavingsBudgetAllocation}){
- const [kind,setKind]=useState<"project"|"reserve">(budget?.kind??"project");
- const [mode,setMode]=useState<"amount"|"percent">(budget?.allocation_mode??"amount");
+function SavingsBudgetForm({accountId,savings,budget,forceKind,allBudgets=[]}:{accountId:string;savings:number;budget?:SavingsBudgetAllocation;forceKind?:"project"|"reserve";allBudgets?:SavingsBudgetAllocation[]}){
+ const [kind,setKind]=useState<"project"|"reserve">(forceKind??budget?.kind??"reserve");
+ const [mode,setMode]=useState<"amount"|"percent">(kind==="project"?"amount":budget?.allocation_mode??"amount");
  const [value,setValue]=useState(String(budget?.allocation_value??""));
  const numeric=Math.max(0,Number(value)||0);
- const preview=mode==="percent"?Math.round((savings*Math.min(100,numeric)/100)*100)/100:numeric;
+ const projectAllocated=savingsProjectAmountForAccount(savings,accountId,allBudgets.filter(b=>b.id!==budget?.id));
+ const percentBase=Math.max(0,savings-projectAllocated);
+ const preview=mode==="percent"?Math.round((percentBase*Math.min(100,numeric)/100)*100)/100:numeric;
  const projectProtection=budget?.kind==="project"&&budget?.protection==="untouchable"?"untouchable":"free";
  return <form action={budget?updateSavingsBudget:createSavingsBudget} className="mt-4 grid gap-3 rounded-2xl bg-neutral-50 p-4 sm:grid-cols-2 xl:grid-cols-4">
   {budget?<input type="hidden" name="id" value={budget.id}/>:null}
   <input type="hidden" name="account_id" value={accountId}/>
   {kind==="reserve"?<input type="hidden" name="protection" value="free"/>:null}
+  {forceKind?<input type="hidden" name="kind" value={forceKind}/>:null}
+  {kind==="project"?<input type="hidden" name="allocation_mode" value="amount"/>:null}
   <label className="text-xs text-neutral-600">Nom<input name="name" required defaultValue={budget?.name??""} placeholder="Vacances, sécurité…" className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"/></label>
-  <label className="text-xs text-neutral-600">Type<select name="kind" value={kind} onChange={e=>setKind(e.target.value as "project"|"reserve")} className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"><option value="project">Projet</option><option value="reserve">Réserve</option></select></label>
-  <label className="text-xs text-neutral-600">Mode<select name="allocation_mode" value={mode} onChange={e=>setMode(e.target.value as "amount"|"percent")} className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"><option value="amount">Montant €</option><option value="percent">Pourcentage %</option></select></label>
-  <label className="text-xs text-neutral-600">{mode==="percent"?"Pourcentage":"Montant"}<input name="allocation_value" value={value} onChange={e=>setValue(e.target.value)} type="number" min="0.01" max={mode==="percent"?100:undefined} step="0.01" required className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"/>{mode==="percent"?<span className="mt-1 block font-medium text-neutral-600">{numeric} % de {money(savings)} = {money(preview)}</span>:null}</label>
+  {!forceKind?<label className="text-xs text-neutral-600">Type<select name="kind" value={kind} onChange={e=>{const next=e.target.value as "project"|"reserve";setKind(next);if(next==="project")setMode("amount")}} className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"><option value="project">Projet</option><option value="reserve">Réserve</option></select></label>:<div className="rounded-xl border bg-white px-3 py-2 text-xs text-neutral-600"><span className="block">Type</span><strong className="mt-1 block text-sm text-neutral-900">{forceKind==="project"?"Projet":"Budget d’épargne"}</strong></div>}
+  {kind==="project"?null:<label className="text-xs text-neutral-600">Mode<select name="allocation_mode" value={mode} onChange={e=>setMode(e.target.value as "amount"|"percent")} className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"><option value="amount">Montant €</option><option value="percent">Pourcentage %</option></select></label>}
+  <label className="text-xs text-neutral-600">{kind==="project"?"Déjà affecté au projet €":mode==="percent"?"Pourcentage":"Montant"}<input name="allocation_value" value={value} onChange={e=>setValue(e.target.value)} type="number" min={kind==="project"?"0":"0.01"} max={mode==="percent"?100:undefined} step="0.01" required className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"/>{mode==="percent"?<span className="mt-1 block font-medium text-neutral-600">{numeric} % de {money(percentBase)} hors projets = {money(preview)}</span>:kind==="project"?<span className="mt-1 block text-neutral-500">Laisse 0 si le projet doit être alimenté uniquement par des virements affectés.</span>:null}</label>
   {kind==="project"?<label className="text-xs text-neutral-600">Protection<select name="protection" defaultValue={projectProtection} className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"><option value="free">Libre · utilisable après la réserve</option><option value="untouchable">Intouchable · jamais utilisée</option></select></label>:<div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800"><strong>Réserve</strong><span className="mt-1 block">Mobilisable immédiatement pour protéger la trésorerie.</span></div>}
   <label className="text-xs text-neutral-600">Seuil critique €<input name="critical_threshold" type="number" min="0" step="0.01" defaultValue={budget?.critical_threshold??0} className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"/></label>
   <label className="text-xs text-neutral-600">Objectif €<input name="target_amount" type="number" min="0" step="0.01" defaultValue={budget?.target_amount??""} className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"/></label>
@@ -116,10 +137,19 @@ function SavingsBudgetForm({accountId,savings,budget}:{accountId:string;savings:
  </form>;
 }
 
-function BudgetCard({budget,accountId,savings}:{budget:SavingsBudgetAllocation;accountId:string;savings:number}){
- const amount=savingsBudgetAmount(budget,savings);
+function addFrequency(date:Date,frequency:string,interval:number){const d=new Date(date);const n=Math.max(1,interval||1);if(frequency==="weekly")d.setDate(d.getDate()+7*n);else if(frequency==="quarterly")d.setMonth(d.getMonth()+3*n);else if(frequency==="yearly")d.setFullYear(d.getFullYear()+n);else d.setMonth(d.getMonth()+n);return d;}
+function projectedGoalDates(budget:SavingsBudgetAllocation,current:number,movements:GoalMovement[],recurrences:GoalRecurrence[]){
+ const target=Math.max(0,Number(budget.target_amount??0)); if(!target)return {half:null,full:null};
+ const events:{date:string;amount:number}[]=[]; const todayIso=iso(new Date());
+ for(const m of movements)if(m.savings_budget_id===budget.id&&m.movement_type==="transfer_in"&&m.status!=="completed"&&m.status!=="cancelled"&&m.movement_date>=todayIso)events.push({date:m.movement_date,amount:Number(m.amount)||0});
+ const horizon=new Date();horizon.setFullYear(horizon.getFullYear()+10);
+ for(const r of recurrences)if(r.savings_budget_id===budget.id&&r.movement_type==="transfer"&&r.is_active!==false){let d=new Date(`${r.start_date}T12:00:00`);const end=r.end_date?new Date(`${r.end_date}T12:00:00`):horizon;while(d<=horizon&&d<=end){const di=iso(d);if(di>=todayIso)events.push({date:di,amount:Number(r.amount)||0});d=addFrequency(d,r.frequency,Number(r.interval_count)||1);}}
+ events.sort((a,b)=>a.date.localeCompare(b.date)); let value=current; let half:string|null=value>=target*.5?todayIso:null; let full:string|null=value>=target?todayIso:null; for(const e of events){value+=e.amount;if(!half&&value>=target*.5)half=e.date;if(!full&&value>=target){full=e.date;break;}}return {half,full};
+}
+function BudgetCard({budget,accountId,savings,movements,recurrences,allBudgets}:{budget:SavingsBudgetAllocation;accountId:string;savings:number;movements:GoalMovement[];recurrences:GoalRecurrence[];allBudgets:SavingsBudgetAllocation[]}){
+ const amount=savingsBudgetAmount(budget,savings,allBudgets); const target=Math.max(0,Number(budget.target_amount??0)); const progress=target?Math.min(100,(amount/target)*100):0; const dates=projectedGoalDates(budget,amount,movements,recurrences);
  const status=budget.kind==="reserve"?"Réserve · mobilisable immédiatement":budget.protection==="untouchable"?"Projet · Intouchable · jamais mobilisé":"Projet · Libre · utilisé après la réserve";
- return <details className="rounded-2xl border border-black/10 p-4"><summary className="cursor-pointer list-none"><div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><span className="grid size-8 place-items-center rounded-full bg-neutral-100">{budget.kind==="reserve"?<ShieldCheck size={15}/>:<Sparkles size={15}/>}</span><p className="font-semibold">{budget.name}</p></div><p className="mt-2 text-xs text-neutral-500">{status}</p>{budget.allocation_mode==="percent"?<p className="mt-1 text-xs font-medium text-neutral-700">{Number(budget.allocation_value)} % de {money(savings)} = {money(amount)}</p>:null}</div><p className="font-semibold">{money(amount)}</p></div></summary><SavingsBudgetForm accountId={accountId} savings={savings} budget={budget}/><form action={deleteSavingsBudget.bind(null,budget.id)} className="mt-3"><button className="flex items-center gap-2 text-xs font-medium text-red-700"><Trash2 size={14}/>Supprimer cette enveloppe</button></form></details>;
+ return <details className="rounded-2xl border border-black/10 p-4"><summary className="cursor-pointer list-none"><div className="flex items-start justify-between gap-3"><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="grid size-8 place-items-center rounded-full bg-neutral-100">{budget.kind==="reserve"?<ShieldCheck size={15}/>:<Sparkles size={15}/>}</span><p className="font-semibold">{budget.name}</p></div><p className="mt-2 text-xs text-neutral-500">{status}</p>{target>0?<><div className="mt-3 h-2 overflow-hidden rounded-full bg-neutral-100"><div className="h-full rounded-full bg-black" style={{width:`${progress}%`}}/></div><p className="mt-1 text-xs font-medium text-neutral-700">{money(amount)} / {money(target)} · {Math.round(progress)} %</p><div className="mt-2 grid grid-cols-2 gap-2 text-xs"><div className="rounded-xl bg-neutral-50 p-2"><span className="text-neutral-500">50 % estimé</span><strong className="mt-1 block">{dates.half?dateLabel(dates.half):"Non déterminable"}</strong></div><div className="rounded-xl bg-neutral-50 p-2"><span className="text-neutral-500">100 % estimé</span><strong className="mt-1 block">{dates.full?dateLabel(dates.full):"Non déterminable"}</strong></div></div></>:null}</div><p className="font-semibold">{money(amount)}</p></div></summary><SavingsBudgetForm accountId={accountId} savings={savings} budget={budget} allBudgets={allBudgets}/><form action={deleteSavingsBudget.bind(null,budget.id)} className="mt-3"><button className="flex items-center gap-2 text-xs font-medium text-red-700"><Trash2 size={14}/>Supprimer cette enveloppe</button></form></details>;
 }
 function Metric({label,value,dark}:{label:string;value:string;dark?:boolean}){return <div className={`rounded-2xl p-4 ${dark?"bg-black text-white":"bg-neutral-100"}`}><p className="text-xs opacity-70">{label}</p><p className="mt-2 text-xl font-semibold">{value}</p></div>}
 
