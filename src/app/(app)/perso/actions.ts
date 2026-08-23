@@ -1100,6 +1100,52 @@ function savingsBudgetRedirect(message:string){
   redirect(`${PATH}?vue=budgets-epargne&succes=${encodeURIComponent(message)}`);
 }
 
+export async function createProjectFundingPlan(fd: FormData) {
+  const { supabase, user } = await auth();
+  const budgetId = text(fd, "budget_id");
+  const amount = number(fd, "amount");
+  const frequency = text(fd, "frequency");
+  const intervalCount = Math.max(1, Math.trunc(number(fd, "interval_count") || 1));
+  const startDate = text(fd, "start_date");
+  const endDate = optional(fd, "end_date");
+  if (!budgetId || !Number.isFinite(amount) || amount <= 0 || !startDate) fail("Complète le plan de financement.");
+  if (!["weekly", "monthly", "quarterly", "yearly"].includes(frequency)) fail("Périodicité incorrecte.");
+
+  const { data: budget, error: budgetError } = await supabase
+    .from("personal_savings_budgets")
+    .select("id,name,account_id,kind,allocation_mode,target_amount,allocation_value")
+    .eq("id", budgetId)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (budgetError || !budget) fail(budgetError?.message ?? "Projet introuvable.");
+  if (budget.kind !== "project" || budget.allocation_mode !== "amount") fail("Ce financement doit être rattaché à un projet en montant €.");
+  if (!Number(budget.target_amount || 0)) fail("Définis d’abord le montant cible du projet.");
+
+  // Un financement de projet est une affectation virtuelle à l'intérieur du même
+  // compte d'épargne : le moteur crée un transfert sortant/entrant sur le même
+  // compte, ce qui laisse son solde bancaire inchangé tout en alimentant le projet.
+  const { error } = await supabase.from("personal_recurrences").insert({
+    owner_id: user.id,
+    account_id: budget.account_id,
+    destination_account_id: budget.account_id,
+    category_id: null,
+    movement_type: "transfer",
+    label: `Projet ${budget.name}`,
+    amount,
+    frequency,
+    interval_count: intervalCount,
+    start_date: startDate,
+    end_date: endDate,
+    annual_change_percent: 0,
+    is_essential: false,
+    exclude_from_analysis: true,
+    savings_budget_id: budget.id,
+    notes: "Financement interne d’un projet d’épargne",
+  });
+  if (error) fail(error.message);
+  savingsBudgetRedirect("Plan de financement du projet enregistré.");
+}
+
 export async function createSavingsBudget(fd: FormData) {
   const { supabase, user } = await auth();
   const accountId=text(fd,"account_id"), name=text(fd,"name");

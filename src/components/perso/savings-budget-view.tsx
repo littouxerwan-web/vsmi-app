@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, PiggyBank, Plus, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
-import { createSavingsBudget, deleteSavingsBudget, updateSavingsBudget } from "@/app/(app)/perso/actions";
+import { createProjectFundingPlan, createSavingsBudget, deleteSavingsBudget, updateSavingsBudget } from "@/app/(app)/perso/actions";
 import { mobilizableSavingsForAccount, savingsAvailabilityForAccount, savingsBudgetAmount, savingsProjectAmountForAccount, type SavingsBudgetAllocation } from "@/lib/perso/savings-engine";
 
 type Account={id:string;name:string;account_type:"checking"|"savings"|"crypto";color?:string|null};
@@ -102,7 +102,7 @@ export function SavingsBudgetView({accounts,budgets,currentBalances,forecastRows
    <section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6">
     <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4"><div className="flex items-start gap-3"><Sparkles size={19}/><div><p className="font-semibold text-violet-950">Projet</p><p className="mt-1 text-sm text-violet-900">Prépare un achat avec un montant cible. Les virements ponctuels ou réguliers affectés au projet alimentent sa progression et ses dates prévisionnelles à 50 % et 100 %. Cette somme est exclue du calcul en % des autres budgets.</p></div></div></div>
     <details className="mt-4"><summary className="flex cursor-pointer items-center gap-2 font-semibold"><Plus size={17}/>Créer un projet</summary><SavingsBudgetForm accountId={selected.id} savings={balanceFor(selected.id)} forceKind="project" allBudgets={budgets}/></details>
-    <div className="mt-5 grid gap-3 lg:grid-cols-2">{projectBudgets.length?projectBudgets.map(b=><BudgetCard key={b.id} budget={b} accountId={selected.id} savings={balanceFor(selected.id)} movements={movements} recurrences={recurrences} allBudgets={budgets}/>):<div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">Aucun projet pour ce compte d’épargne.</div>}</div>
+    <div className="mt-5 grid gap-3 lg:grid-cols-2">{projectBudgets.length?projectBudgets.map(b=><ProjectCard key={b.id} budget={b} account={selected} savings={balanceFor(selected.id)} movements={movements} recurrences={recurrences} allBudgets={budgets}/>):<div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">Aucun projet pour ce compte d’épargne.</div>}</div>
    </section>
   </div>:global?<section className="border-y border-black/10 bg-white px-3 py-5 sm:px-5 lg:px-6"><div className="flex items-start gap-3 rounded-2xl bg-neutral-50 p-4"><PiggyBank size={18}/><div><p className="font-medium">Vue globale</p><p className="mt-1 text-sm text-neutral-500">Sélectionne un compte pour gérer séparément ses budgets d’épargne et ses projets.</p></div></div></section>:null}
 
@@ -142,10 +142,44 @@ function projectedGoalDates(budget:SavingsBudgetAllocation,current:number,moveme
  const target=Math.max(0,Number(budget.target_amount??0)); if(!target)return {half:null,full:null};
  const events:{date:string;amount:number}[]=[]; const todayIso=iso(new Date());
  for(const m of movements)if(m.savings_budget_id===budget.id&&m.movement_type==="transfer_in"&&m.status!=="completed"&&m.status!=="cancelled"&&m.movement_date>=todayIso)events.push({date:m.movement_date,amount:Number(m.amount)||0});
- const horizon=new Date();horizon.setFullYear(horizon.getFullYear()+10);
+ const horizon=new Date();horizon.setFullYear(horizon.getFullYear()+30);
  for(const r of recurrences)if(r.savings_budget_id===budget.id&&r.movement_type==="transfer"&&r.is_active!==false){let d=new Date(`${r.start_date}T12:00:00`);const end=r.end_date?new Date(`${r.end_date}T12:00:00`):horizon;while(d<=horizon&&d<=end){const di=iso(d);if(di>=todayIso)events.push({date:di,amount:Number(r.amount)||0});d=addFrequency(d,r.frequency,Number(r.interval_count)||1);}}
  events.sort((a,b)=>a.date.localeCompare(b.date)); let value=current; let half:string|null=value>=target*.5?todayIso:null; let full:string|null=value>=target?todayIso:null; for(const e of events){value+=e.amount;if(!half&&value>=target*.5)half=e.date;if(!full&&value>=target){full=e.date;break;}}return {half,full};
 }
+
+function fundingDates(target:number,current:number,amount:number,frequency:string,interval:number,startDate:string){
+ if(target<=0||amount<=0||!startDate)return {half:null as string|null,full:null as string|null,count:0};
+ let value=Math.max(0,current); const halfTarget=target*.5; let half:string|null=value>=halfTarget?iso(new Date()):null; let full:string|null=value>=target?iso(new Date()):null; let count=0;
+ let d=new Date(`${startDate}T12:00:00`); const horizon=new Date(d);horizon.setFullYear(horizon.getFullYear()+30);
+ while(!full&&d<=horizon&&count<2000){value+=amount;count++;const di=iso(d);if(!half&&value>=halfTarget)half=di;if(value>=target){full=di;break;}d=addFrequency(d,frequency,interval);}
+ return {half,full,count};
+}
+
+function ProjectCard({budget,account,savings,movements,recurrences,allBudgets}:{budget:SavingsBudgetAllocation;account:Account;savings:number;movements:GoalMovement[];recurrences:GoalRecurrence[];allBudgets:SavingsBudgetAllocation[]}){
+ const current=savingsBudgetAmount(budget,savings,allBudgets); const target=Math.max(0,Number(budget.target_amount??0));
+ const existing=projectedGoalDates(budget,current,movements,recurrences);
+ const [amount,setAmount]=useState("100"); const [frequency,setFrequency]=useState("monthly"); const [interval,setInterval]=useState("1"); const [startDate,setStartDate]=useState(iso(new Date()));
+ const simulation=fundingDates(target,current,Math.max(0,Number(amount)||0),frequency,Math.max(1,Number(interval)||1),startDate);
+ const progress=target>0?Math.min(100,Math.round(current/target*100)):0;
+ const remaining=Math.max(0,target-current);
+ return <div className="rounded-2xl border border-violet-200 bg-white p-4">
+  <div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><Sparkles size={16} className="text-violet-700"/><p className="font-semibold">{budget.name}</p></div><p className="mt-1 text-xs text-neutral-500">Projet · {budget.protection==="untouchable"?"Intouchable":"Libre · utilisé après la réserve"}</p></div><p className="font-semibold">{money(current)}</p></div>
+  {target>0?<><div className="mt-4 h-2 overflow-hidden rounded-full bg-violet-100"><div className="h-full rounded-full bg-violet-600" style={{width:`${progress}%`}}/></div><p className="mt-2 text-sm">{money(current)} / {money(target)} · {progress} %</p><p className="mt-1 text-xs text-neutral-500">Reste à financer : {money(remaining)}</p></>:<p className="mt-3 text-sm text-amber-700">Ajoute un objectif € au projet pour calculer sa date de réalisation.</p>}
+  <div className="mt-4 grid grid-cols-2 gap-3 text-xs"><div><span className="text-neutral-500">50 % estimé avec les financements validés</span><strong className="mt-1 block">{existing.half?dateLabel(existing.half):"Non déterminable"}</strong></div><div><span className="text-neutral-500">100 % estimé avec les financements validés</span><strong className="mt-1 block">{existing.full?dateLabel(existing.full):"Non déterminable"}</strong></div></div>
+  {target>current?<div className="mt-5 rounded-2xl border border-violet-200 bg-violet-50/60 p-4"><p className="font-semibold text-violet-950">Planifier le financement</p><p className="mt-1 text-xs text-violet-900">Simule un versement depuis {account.name}. Il s’agit d’une affectation interne au projet : le solde bancaire du compte d’épargne ne change pas.</p>
+   <div className="mt-3 grid gap-3 sm:grid-cols-2">
+    <label className="text-xs text-neutral-600">Montant par versement €<input value={amount} onChange={e=>setAmount(e.target.value)} type="number" min="0.01" step="0.01" className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"/></label>
+    <label className="text-xs text-neutral-600">Périodicité<select value={frequency} onChange={e=>setFrequency(e.target.value)} className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"><option value="monthly">Mensuelle</option><option value="weekly">Hebdomadaire</option><option value="quarterly">Trimestrielle</option><option value="yearly">Annuelle</option></select></label>
+    <label className="text-xs text-neutral-600">Tous les…<input value={interval} onChange={e=>setInterval(e.target.value)} type="number" min="1" step="1" className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"/></label>
+    <label className="text-xs text-neutral-600">Premier versement<input value={startDate} onChange={e=>setStartDate(e.target.value)} type="date" className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"/></label>
+   </div>
+   <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl bg-white p-3 text-xs"><div><span className="text-neutral-500">50 % avec ce plan</span><strong className="mt-1 block text-violet-950">{simulation.half?dateLabel(simulation.half):"Non déterminable"}</strong></div><div><span className="text-neutral-500">100 % avec ce plan</span><strong className="mt-1 block text-violet-950">{simulation.full?dateLabel(simulation.full):"Non déterminable"}</strong></div></div>
+   <form action={createProjectFundingPlan} className="mt-3"><input type="hidden" name="budget_id" value={budget.id}/><input type="hidden" name="amount" value={amount}/><input type="hidden" name="frequency" value={frequency}/><input type="hidden" name="interval_count" value={interval}/><input type="hidden" name="start_date" value={startDate}/><input type="hidden" name="end_date" value={simulation.full??""}/><button disabled={!simulation.full||Number(amount)<=0} className="min-h-10 rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-neutral-300">Valider ce financement</button></form>
+  </div>:<div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Objectif atteint.</div>}
+  <details className="mt-4"><summary className="cursor-pointer text-xs font-medium text-neutral-600">Modifier le projet</summary><SavingsBudgetForm accountId={account.id} savings={savings} budget={budget} forceKind="project" allBudgets={allBudgets}/><form action={deleteSavingsBudget.bind(null,budget.id)} className="mt-2"><button className="flex items-center gap-2 text-xs font-medium text-red-700"><Trash2 size={14}/>Supprimer le projet</button></form></details>
+ </div>;
+}
+
 function BudgetCard({budget,accountId,savings,movements,recurrences,allBudgets}:{budget:SavingsBudgetAllocation;accountId:string;savings:number;movements:GoalMovement[];recurrences:GoalRecurrence[];allBudgets:SavingsBudgetAllocation[]}){
  const amount=savingsBudgetAmount(budget,savings,allBudgets); const target=Math.max(0,Number(budget.target_amount??0)); const progress=target?Math.min(100,(amount/target)*100):0; const dates=projectedGoalDates(budget,amount,movements,recurrences);
  const status=budget.kind==="reserve"?"Réserve · mobilisable immédiatement":budget.protection==="untouchable"?"Projet · Intouchable · jamais mobilisé":"Projet · Libre · utilisé après la réserve";
