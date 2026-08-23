@@ -184,20 +184,14 @@ function globalProjectCapacity({account,savings,allBudgets,forecastRows,recurren
  const active=recurrences.filter(r=>r.is_active!==false&&r.movement_type==="transfer"&&r.savings_budget_id&&projectIds.has(r.savings_budget_id));
  const alreadyMonthly=active.reduce((sum,r)=>sum+monthlyEquivalent(r),0);
  const startMonth=iso(new Date()).slice(0,7),from=iso(new Date());
- const rows=forecastRows.filter(r=>r.accountId===account.id&&r.month>=startMonth).sort((a,b)=>a.month.localeCompare(b.month)).slice(0,60);
- const fallback=Array.from({length:60},(_,i)=>({month:addMonths(startMonth,i),accountId:account.id,savings,savingsUsed:0} as ForecastRow));
- const horizon=rows.length?rows:fallback;
+ const sourceRows=forecastRows.filter(r=>r.accountId===account.id&&r.month>=startMonth).sort((a,b)=>a.month.localeCompare(b.month));
+ const byMonth=new Map(sourceRows.map(r=>[r.month,r]));
+ let lastSavings=sourceRows[0]?.savings??savings;
+ const horizon=Array.from({length:60},(_,i)=>{const month=addMonths(startMonth,i),row=byMonth.get(month);if(row)lastSavings=Number(row.savings)||0;return row??({month,accountId:account.id,savings:lastSavings,savingsUsed:0} as ForecastRow)});
  const projectedMobile=(extraMonthly:number)=>{let minimum=Infinity,minimumMonth=horizon[0]?.month??startMonth;
   for(let index=0;index<horizon.length;index++){const row=horizon[index];const monthEndDate=(()=>{const d=new Date(`${row.month}-01T12:00:00`);d.setMonth(d.getMonth()+1);d.setDate(0);return iso(d)})();
    const balance=Math.max(FLOOR,Number(row.savings)||0);
-   const cloned=allBudgets.map(b=>{if(b.kind!=="project"||b.account_id!==account.id)return b;
-    const future=active.filter(r=>r.savings_budget_id===b.id).reduce((sum,r)=>sum+recurrenceAmountThrough(r,monthEndDate,from),0);
-    return {...b,allocation_mode:"amount" as const,allocation_value:Math.min(Number(b.target_amount??Infinity),Math.max(0,Number(b.allocation_value)||0)+future)};
-   });
-   // extraMonthly est une NOUVELLE enveloppe globale. Elle doit consommer le stock
-   // une seule fois, de façon cumulative, et ne doit surtout pas être plafonnée par
-   // l'objectif d'un projet particulier. Sinon 10 000 € peuvent être interprétés
-   // à tort comme 10 000 € disponibles chaque mois.
+   const cloned=allBudgets.map(b=>{if(b.kind!=="project"||b.account_id!==account.id)return b;const future=active.filter(r=>r.savings_budget_id===b.id).reduce((sum,r)=>sum+recurrenceAmountThrough(r,monthEndDate,from),0);return {...b,allocation_mode:"amount" as const,allocation_value:Math.min(Number(b.target_amount??Infinity),Math.max(0,Number(b.allocation_value)||0)+future)};});
    const baseMobile=savingsAvailabilityForAccount(balance,account.id,cloned,FLOOR).mobilizable;
    const mobile=Math.max(0,baseMobile-extraMonthly*(index+1));
    if(mobile<minimum){minimum=mobile;minimumMonth=row.month;}
@@ -205,17 +199,10 @@ function globalProjectCapacity({account,savings,allBudgets,forecastRows,recurren
   return {minimum:Number.isFinite(minimum)?Math.max(0,minimum):0,minimumMonth};
  };
  const floor=Math.max(FLOOR,Number(safetyFloor)||0),baseline=projectedMobile(0);
- let lo=0,hi=Math.max(1000,savings);for(let i=0;i<30;i++){const mid=(lo+hi)/2;if(projectedMobile(mid).minimum>=floor)lo=mid;else hi=mid;}
- // Garde-fou : le stock disponible aujourd’hui n’est jamais un flux mensuel.
- // Sans alimentation future démontrée, sa contribution mensuelle durable ne peut
- // dépasser (mobilisable actuel - seuil) / 60. Le moteur de projection peut être
- // plus restrictif, mais jamais plus généreux à cause d’un effet de stock répété.
- const currentMobile=savingsAvailabilityForAccount(savings,account.id,allBudgets,FLOOR).mobilizable;
- const stockMonthlyCap=Math.max(0,(currentMobile-floor)/60);
- const simulatedExtraMax=Math.max(0,lo);
- const extraMax=Math.max(0,Math.floor(Math.min(simulatedExtraMax,stockMonthlyCap)));
+ let lo=0,hi=Math.max(1000,savings*2);for(let i=0;i<40;i++){const mid=(lo+hi)/2;if(projectedMobile(mid).minimum>=floor)lo=mid;else hi=mid;}
+ const extraMax=Math.max(0,Math.floor(lo));
  const extraRecommended=Math.max(0,Math.floor((extraMax*.85)/5)*5),advised=projectedMobile(extraRecommended);
- return {alreadyMonthly,extraMax,extraRecommended,totalRecommended:alreadyMonthly+extraRecommended,totalMax:alreadyMonthly+extraMax,minimum:advised.minimum,minimumMonth:advised.minimumMonth};
+ return {alreadyMonthly,extraMax,extraRecommended,totalRecommended:alreadyMonthly+extraRecommended,totalMax:alreadyMonthly+extraMax,minimum:advised.minimum,minimumMonth:advised.minimumMonth,baselineMinimum:baseline.minimum};
 }
 
 function ProjectCard({budget,account,savings,movements,recurrences,allBudgets,availableMonthly}:{budget:SavingsBudgetAllocation;account:Account;savings:number;movements:GoalMovement[];recurrences:GoalRecurrence[];allBudgets:SavingsBudgetAllocation[];availableMonthly:number}){
