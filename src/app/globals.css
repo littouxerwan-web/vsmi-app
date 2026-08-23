@@ -1631,3 +1631,41 @@ html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme :i
 html:not(.vsmi-light-mode) .vsmi-lux-theme #app-private-content .perso-ledger-theme :is(.text-neutral-400,.text-neutral-500) {
   color: #bab9b2 !important;
 }
+
+/* 2026-08-23 — Projets épargne : surfaces lisibles en mode sombre. */
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view .savings-project-card {
+  background: #2f312e !important;
+  border-color: #5a5d56 !important;
+  color: #f5f3ed !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view .savings-project-funding {
+  background: #3a3c38 !important;
+  border-color: #6e716a !important;
+  color: #f5f3ed !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view .savings-project-advice {
+  background: #e9f5ed !important;
+  border-color: #a8d5b5 !important;
+  color: #183b24 !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view .savings-project-advice .bg-white,
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view .savings-project-plan-dates {
+  background: #f7f5ef !important;
+  color: #20211e !important;
+  border-color: #d8d3c8 !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view .savings-project-funding :is(.text-violet-950,.text-violet-900,.text-violet-700) {
+  color: #f1e9ff !important;
+}
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view .savings-project-plan-dates :is(.text-violet-950,.text-violet-900,.text-violet-700),
+.vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view .savings-project-advice :is(.text-neutral-500,.text-neutral-600,.text-neutral-700) {
+  color: #4f544e !important;
+}
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view :is(.savings-project-card,.savings-project-funding) {
+  background: #fffdf8 !important;
+  color: #20211e !important;
+  border-color: #ddd7cc !important;
+}
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view .savings-project-funding :is(.text-violet-950,.text-violet-900,.text-violet-700) {
+  color: #5b21b6 !important;
+}
