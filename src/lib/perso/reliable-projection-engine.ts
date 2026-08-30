@@ -170,7 +170,7 @@ export function buildReliableProjection(input:Input){
   const stored=pendingProposal(source,dest,m);if(stored)amount=Math.min(amount,Number(stored.amount));
   if(amount<0.01)return 0;
   const meta:RPSavingsMeta={sourceAccountId:source,destinationAccountId:dest,sourceMonth:m,automaticAmount:amount,status:stored?'pending':'automatic',kind};
-  const group=`auto-${kind}-${source}-${dest}-${m}`;
+  const group=`auto-${kind}-${source}-${dest}-${date}`;
   const out:RPOperation={id:`${group}-out`,projected:true,transfer_group_id:group,account_id:source,category_id:null,movement_type:'transfer_out',label,amount,movement_date:date,status:'planned',source:'savings',savingsProposal:meta};
   const inn:RPOperation={...out,id:`${group}-in`,account_id:dest,movement_type:'transfer_in'};
   apply(out);apply(inn);allOps.push(out,inn);monthOps.set(m,[...(monthOps.get(m)??[]),out,inn]);
@@ -186,51 +186,53 @@ export function buildReliableProjection(input:Input){
   return amount;
  };
  const delta=(o:RPOperation)=>['income','transfer_in'].includes(o.movement_type)?Number(o.amount):-Number(o.amount);
- const baseOpsByAccount=new Map<string,RPOperation[]>();
- for(const o of baseOps){const rows=baseOpsByAccount.get(o.account_id);if(rows)rows.push(o);else baseOpsByAccount.set(o.account_id,[o]);}
- const safeSurplus45=(checkingId:string,threshold:number,fromMonth:string)=>{
-  let simulated=Number(balances.get(checkingId)??0);let minimum=simulated;const from=monthEnd(fromMonth);const through=addDays(from,45);
-  for(const o of baseOpsByAccount.get(checkingId)??[]){if(o.movement_date<=from||o.movement_date>through)continue;simulated=round(simulated+delta(o));minimum=Math.min(minimum,simulated);}
-  return round(Math.max(0,minimum-threshold));
- };
 
  for(let mi=0;mi<months;mi++){
   const m=shiftMonth(startMonth,mi),rows=(monthOps.get(m)??[]).filter(o=>o.source!=='savings').sort((a,b)=>a.movement_date.localeCompare(b.movement_date)||a.id.localeCompare(b.id));
   const audit:RPMonthAudit={month:m,opening:Object.fromEntries([...balances].map(([k,v])=>[k,round(v)])),credits:{},debits:{},budgetDebits:{},savingsUsed:{},savingsDeposited:{},closing:{}};
-  const opening=new Map(balances);
   const rowsByAccount=new Map<string,RPOperation[]>();for(const o of rows){const accountRows=rowsByAccount.get(o.account_id);if(accountRows)accountRows.push(o);else rowsByAccount.set(o.account_id,[o]);}
-  const needInfo=(checkingId:string,threshold:number)=>{
-   let bal=Number(opening.get(checkingId)??0),minimum=bal,first:string|null=bal<threshold-0.009?`${m}-01`:null;
-   for(const o of rowsByAccount.get(checkingId)??[]){bal=round(bal+delta(o));if(bal<minimum)minimum=bal;if(first===null&&bal<threshold-0.009)first=o.movement_date;}
-   return {minimum,first,required:round(Math.max(0,threshold-minimum))};
+  const windowMinimum=(checkingId:string,from:string,through:string)=>{
+   let simulated=Number(balances.get(checkingId)??0),minimum=simulated;
+   for(const o of rowsByAccount.get(checkingId)??[]){if(o.movement_date<from||o.movement_date>through)continue;simulated=round(simulated+delta(o));minimum=Math.min(minimum,simulated);}
+   return round(minimum);
   };
 
-  // 1. Flux du mois, une seule fois et dans l'ordre chronologique.
-  for(const o of rows)apply(o,audit);
+  // Deux décisions de trésorerie par mois : début de mois puis le 15.
+  // Chaque décision regarde uniquement la quinzaine qui suit : 1 -> 14, puis 15 -> fin du mois.
+  const decisions=[{date:`${m}-01`,through:`${m}-14`},{date:`${m}-15`,through:monthEnd(m)}];
+  let rowIndex=0;
+  for(const decision of decisions){
+   // Les flux antérieurs à la date de décision sont d'abord intégrés au solde réel de la projection.
+   while(rowIndex<rows.length&&rows[rowIndex].movement_date<decision.date)apply(rows[rowIndex++],audit);
 
-  // 2. Protection du seuil : au maximum un mouvement de secours le 15 du mois.
-  // Le besoin est recalculé à chaque exécution à partir des soldes/mouvements réellement enregistrés.
-  for(const checking of checkingAccounts){
-   const p=profileByChecking.get(checking.id);if(!p?.destinationAccountId)continue;const threshold=Math.max(0,Number(p.threshold||0));const info=needInfo(checking.id,threshold);if(info.required<=0.009)continue;
-   const savings=p.destinationAccountId;const avail=mobilizableSavingsForAccount(Number(balances.get(savings)??0),savings,input.savingsBudgets,SAVINGS_FLOOR);
-   if(avail+0.009<info.required)savingsWarnings.push({month:m,checkingAccountId:checking.id,savingsAccountId:savings,required:info.required,available:round(avail),missing:round(info.required-avail)});
-   if(avail<=0.009)continue;
-   // Deux fenêtres seulement : le 15 pour le secours, la fin de mois pour la régularisation.
-   // Pour le mois courant après le 15, on ne crée pas rétroactivement un nouveau secours :
-   // les mouvements quotidiens réels seront repris au recalcul suivant.
-   const useDate=`${m}-15`;
-   if(m===startMonth&&input.todayIso>useDate)continue;
-   synthetic(m,useDate,savings,checking.id,Math.min(info.required,avail),'use',`Utilisation d'épargne · ${p.label}`,audit);
+   // Dans le mois courant, aucune proposition n'est créée rétroactivement pour une date déjà passée.
+   if(m===startMonth&&decision.date<input.todayIso)continue;
+
+   for(const checking of checkingAccounts){
+    const p=profileByChecking.get(checking.id);if(!p?.destinationAccountId)continue;
+    const threshold=Math.max(0,Number(p.threshold||0));
+    const minimum=windowMinimum(checking.id,decision.date,decision.through);
+
+    if(minimum<threshold-0.009){
+     const required=round(threshold-minimum);
+     const savings=p.destinationAccountId;
+     const avail=mobilizableSavingsForAccount(Number(balances.get(savings)??0),savings,input.savingsBudgets,SAVINGS_FLOOR);
+     if(avail+0.009<required)savingsWarnings.push({month:m,checkingAccountId:checking.id,savingsAccountId:savings,required,available:round(avail),missing:round(required-avail)});
+     if(avail>0.009)synthetic(m,decision.date,savings,checking.id,Math.min(required,avail),'use',`Utilisation d'épargne · ${p.label}`,audit);
+     continue;
+    }
+
+    // Si toute la quinzaine reste au-dessus du seuil, seul l'excédent réellement sûr
+    // sur cette fenêtre peut être proposé à l'épargne dès la date de décision.
+    const surplus=round(Math.max(0,minimum-threshold));
+    if(surplus>0.009)synthetic(m,decision.date,checking.id,p.destinationAccountId,surplus,'deposit',`Versement épargne proposé · ${p.label}`,audit);
+   }
   }
 
-  // 3. Mise de côté prudente : un seul mouvement en fin de mois, après analyse des 45 jours suivants.
-  for(const checking of checkingAccounts){
-   const p=profileByChecking.get(checking.id);if(!p?.destinationAccountId)continue;const threshold=Math.max(0,Number(p.threshold||0));const balance=Number(balances.get(checking.id)??0);if(balance<=threshold+0.009)continue;
-   const safe45=safeSurplus45(checking.id,threshold,m);const surplus=round(Math.min(balance-threshold,safe45));
-   if(surplus>0.009)synthetic(m,monthEnd(m),checking.id,p.destinationAccountId,surplus,'deposit',`Versement épargne proposé · ${p.label}`,audit);
-  }
+  // Intègre ensuite les flux restant jusqu'à la fin du mois.
+  while(rowIndex<rows.length)apply(rows[rowIndex++],audit);
 
-  // 4. Invariants physiques : l'épargne ne peut jamais être négative.
+  // Invariant physique : l'épargne ne peut jamais être négative.
   for(const a of savingsAccounts)if(Number(balances.get(a.id)??0)<0)balances.set(a.id,0);
   const copy=Object.fromEntries([...balances].map(([k,v])=>[k,round(v)]));audit.closing=copy;audits.push(audit);
   const checking=checkingAccounts.reduce((s,a)=>s+Number(copy[a.id]??0),0);const savings=savingsAccounts.reduce((s,a)=>s+Number(copy[a.id]??0),0);const crypto=input.accounts.filter(a=>a.account_type==='crypto').reduce((s,a)=>s+Number(copy[a.id]??0),0);
