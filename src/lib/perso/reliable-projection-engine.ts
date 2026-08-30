@@ -148,8 +148,11 @@ export function buildReliableProjection(input:Input){
  const allOps:RPOperation[]=[...baseOps];const points:RPPoint[]=[];const audits:RPMonthAudit[]=[];const savingsWarnings:{month:string;checkingAccountId:string;savingsAccountId:string;required:number;available:number;missing:number}[]=[];
  const monthOps=new Map<string,RPOperation[]>();for(const o of baseOps){const m=o.movement_date.slice(0,7);monthOps.set(m,[...(monthOps.get(m)??[]),o])}
  const profileByChecking=new Map(input.profiles.filter(p=>p.sourceAccountId&&p.destinationAccountId).map(p=>[p.sourceAccountId!,p]));
- const pendingProposalByKey=new Map(input.savingsProposals.filter(p=>p.status==='pending').map(p=>[`${p.source_account_id}:${p.destination_account_id}:${String(p.source_month).slice(0,7)}`,p]));
- const pendingProposal=(source:string,dest:string,m:string)=>pendingProposalByKey.get(`${source}:${dest}:${m}`);
+ const proposalKey=(source:string,dest:string,m:string)=>`${source}:${dest}:${m}`;
+ const pendingProposalByKey=new Map(input.savingsProposals.filter(p=>p.status==='pending').map(p=>[proposalKey(p.source_account_id,p.destination_account_id,String(p.source_month).slice(0,7)),p]));
+ const acceptedProposalByKey=new Map(input.savingsProposals.filter(p=>p.status==='accepted'&&p.transfer_group_id).map(p=>[proposalKey(p.source_account_id,p.destination_account_id,String(p.source_month).slice(0,7)),p]));
+ const pendingProposal=(source:string,dest:string,m:string)=>pendingProposalByKey.get(proposalKey(source,dest,m));
+ const acceptedProposal=(source:string,dest:string,m:string)=>acceptedProposalByKey.get(proposalKey(source,dest,m));
 
  const transferCaps=new Map<string,number>();
  const apply=(o:RPOperation,audit?:RPMonthAudit)=>{
@@ -169,7 +172,8 @@ export function buildReliableProjection(input:Input){
   if(amount<0.01)return 0;
   const stored=pendingProposal(source,dest,m);if(stored)amount=Math.min(amount,Number(stored.amount));
   if(amount<0.01)return 0;
-  const meta:RPSavingsMeta={sourceAccountId:source,destinationAccountId:dest,sourceMonth:m,automaticAmount:amount,status:stored?'pending':'automatic',kind};
+  const accepted=acceptedProposal(source,dest,m);
+  const meta:RPSavingsMeta={sourceAccountId:source,destinationAccountId:dest,sourceMonth:m,automaticAmount:amount,status:stored?'pending':'automatic',kind,previousTransferGroupId:accepted?.transfer_group_id??null};
   const group=`auto-${kind}-${source}-${dest}-${date}`;
   const out:RPOperation={id:`${group}-out`,projected:true,transfer_group_id:group,account_id:source,category_id:null,movement_type:'transfer_out',label,amount,movement_date:date,status:'planned',source:'savings',savingsProposal:meta};
   const inn:RPOperation={...out,id:`${group}-in`,account_id:dest,movement_type:'transfer_in'};

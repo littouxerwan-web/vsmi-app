@@ -141,11 +141,7 @@ export default async function PersoPage({searchParams}:{searchParams:Promise<SP>
  const monthEndByAccount=new Map<string,number>((accounts as any[]).map(a=>[a.id,futureBalances.get(a.id)??live(a.id)]));
  const monthEndAvailable=checking.reduce((s,a)=>s+(monthEndByAccount.get(a.id)??0),0), monthEndSavings=savings.reduce((s,a)=>s+(monthEndByAccount.get(a.id)??0),0);
  const currentBalances=Object.fromEntries((accounts as any[]).map(account=>[account.id,live(account.id)]));
- // Projection serveur uniquement pour les vues qui l'affichent réellement.
- // Projection possède son propre moteur client (nécessaire aux simulations interactives) :
- // le recalculer aussi ici doublait inutilement le coût à chaque ouverture de cette page.
- // Paramètres n'utilise aucun résultat de projection. Les calculs métier restent inchangés.
- const needsServerProjection=vue==="finances"||vue==="analyse"||vue==="budgets-epargne";
+ const needsServerProjection=vue==="finances"||vue==="projection"||vue==="analyse"||vue==="budgets-epargne";
  const analysisProjection=needsServerProjection?buildReliableProjection({
   accounts:accounts as any,categories:categories as any,movements:projectionMovements as any,
   recurrences:(recurrences as any[]).filter(r=>r.is_active),overrides:overrides as any,exclusions:exclusions as any,

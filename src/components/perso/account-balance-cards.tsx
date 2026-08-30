@@ -51,7 +51,16 @@ export function AccountBalanceCards({accounts,audits,operations,currentMonth,ini
  const chart=useMemo(()=>{
   if(!selected)return null;
   const audit=auditByMonth.get(month);if(!audit)return null;
-  const opening=Number(audit.opening[selected.id]??0);
+  // Pour un mois futur, l'ouverture affichée doit être exactement la clôture du mois
+  // précédent. Cela garantit que les débits/crédits prévus jusqu'au dernier jour du
+  // mois courant (ex. un débit prévu le 31) sont bien intégrés avant le 1er suivant.
+  const [yearValue,monthValue]=month.split("-").map(Number);
+  const previousMonthDate=new Date(yearValue,monthValue-2,1);
+  const previousMonth=`${previousMonthDate.getFullYear()}-${String(previousMonthDate.getMonth()+1).padStart(2,"0")}`;
+  const previousAudit=auditByMonth.get(previousMonth);
+  const opening=month>currentMonth&&previousAudit
+   ?Number(previousAudit.closing[selected.id]??audit.opening[selected.id]??0)
+   :Number(audit.opening[selected.id]??0);
   let balance=opening;
   const rows=operations
    .filter(o=>o.account_id===selected.id&&o.movement_date.startsWith(month))

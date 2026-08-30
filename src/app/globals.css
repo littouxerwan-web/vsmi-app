@@ -1669,3 +1669,47 @@ html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .p
 html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-savings-budget-view .savings-project-funding :is(.text-violet-950,.text-violet-900,.text-violet-700) {
   color: #5b21b6 !important;
 }
+/* VSMI src-166 — Contraste du bloc « Contrôle du calcul » en mode White Spirit.
+   Correctif volontairement limité à la projection PERSO en mode clair. */
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit {
+  background: #eef6fa !important;
+  border-color: #9fc8db !important;
+  color: #183847 !important;
+}
+
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit summary,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit summary *,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit table,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit thead,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit tbody,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit th,
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit td {
+  color: #183847 !important;
+  -webkit-text-fill-color: #183847 !important;
+  opacity: 1 !important;
+}
+
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit .projection-control-title {
+  color: #102f3e !important;
+  -webkit-text-fill-color: #102f3e !important;
+}
+
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit .projection-control-copy {
+  color: #355f73 !important;
+  -webkit-text-fill-color: #355f73 !important;
+}
+
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit td[class*="text-emerald"] {
+  color: #047857 !important;
+  -webkit-text-fill-color: #047857 !important;
+}
+
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit td[class*="text-red"] {
+  color: #b91c1c !important;
+  -webkit-text-fill-color: #b91c1c !important;
+}
+
+html.vsmi-light-mode .vsmi-lux-theme #app-private-content .perso-ledger-theme .perso-projection-view .projection-control-audit td[class*="text-violet"] {
+  color: #6d28d9 !important;
+  -webkit-text-fill-color: #6d28d9 !important;
+}
