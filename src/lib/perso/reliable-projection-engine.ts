@@ -206,6 +206,11 @@ export function buildReliableProjection(input:Input){
   // signalé, mais il ne doit pas interdire une mise en épargne plus tard si des
   // revenus ont depuis recréé un surplus réellement disponible.
   const decisions=[{date:`${m}-01`,through:`${m}-14`},{date:`${m}-15`,through:monthEnd(m)}];
+  // Besoin de protection détecté mais non couvert par l'épargne liée au compte.
+  // Il reste réservé sur le compte courant et réduit toute mise en épargne
+  // ultérieure du même mois, afin de ne jamais proposer de sortir une somme dont
+  // le moteur sait déjà qu'elle est nécessaire à la sécurité de trésorerie.
+  const unresolvedProtectionByChecking=new Map<string,number>();
   let rowIndex=0;
   for(const decision of decisions){
    // Les flux antérieurs à la date de décision sont d'abord intégrés au solde réel de la projection.
@@ -224,7 +229,12 @@ export function buildReliableProjection(input:Input){
      const savings=p.destinationAccountId;
      const avail=mobilizableSavingsForAccount(Number(balances.get(savings)??0),savings,input.savingsBudgets,SAVINGS_FLOOR);
      if(avail+0.009<required){
-      savingsWarnings.push({month:m,checkingAccountId:checking.id,savingsAccountId:savings,required,available:round(avail),missing:round(required-avail)});
+      const missing=round(required-avail);
+      savingsWarnings.push({month:m,checkingAccountId:checking.id,savingsAccountId:savings,required,available:round(avail),missing});
+      unresolvedProtectionByChecking.set(
+       checking.id,
+       round((unresolvedProtectionByChecking.get(checking.id)??0)+missing),
+      );
      }
      if(avail>0.009)synthetic(m,decision.date,savings,checking.id,Math.min(required,avail),'use',`Utilisation d'épargne · ${p.label}`,audit);
      continue;
@@ -235,7 +245,8 @@ export function buildReliableProjection(input:Input){
     // uniquement au vrai surplus mensuel qui peut quitter le compte sans provoquer
     // ensuite une utilisation d'épargne ou une alerte de découvert.
     const safeMinimumToMonthEnd=windowMinimum(checking.id,decision.date,monthEnd(m));
-    const surplus=round(Math.max(0,safeMinimumToMonthEnd-threshold));
+    const unresolvedProtection=Number(unresolvedProtectionByChecking.get(checking.id)??0);
+    const surplus=round(Math.max(0,safeMinimumToMonthEnd-threshold-unresolvedProtection));
     if(surplus>0.009)synthetic(m,decision.date,checking.id,p.destinationAccountId,surplus,'deposit',`Versement épargne proposé · ${p.label}`,audit);
    }
   }
