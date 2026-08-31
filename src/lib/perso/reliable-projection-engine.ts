@@ -202,13 +202,10 @@ export function buildReliableProjection(input:Input){
   };
 
   // Deux décisions de trésorerie par mois : début de mois puis le 15.
-  // Les utilisations d'épargne protègent la quinzaine qui suit. En revanche, une
-  // mise en épargne doit rester sûre jusqu'à la fin du mois : on évite ainsi de
-  // sortir de l'argent d'un compte pour devoir ensuite le renflouer quelques jours
-  // plus tard. Si un besoin n'a pas pu être couvert, ce compte est bloqué pour les
-  // nouvelles mises en épargne jusqu'au mois suivant.
+  // Chaque décision est autonome. Un besoin non couvert au début du mois reste
+  // signalé, mais il ne doit pas interdire une mise en épargne plus tard si des
+  // revenus ont depuis recréé un surplus réellement disponible.
   const decisions=[{date:`${m}-01`,through:`${m}-14`},{date:`${m}-15`,through:monthEnd(m)}];
-  const depositBlockedChecking=new Set<string>();
   let rowIndex=0;
   for(const decision of decisions){
    // Les flux antérieurs à la date de décision sont d'abord intégrés au solde réel de la projection.
@@ -228,15 +225,10 @@ export function buildReliableProjection(input:Input){
      const avail=mobilizableSavingsForAccount(Number(balances.get(savings)??0),savings,input.savingsBudgets,SAVINGS_FLOOR);
      if(avail+0.009<required){
       savingsWarnings.push({month:m,checkingAccountId:checking.id,savingsAccountId:savings,required,available:round(avail),missing:round(required-avail)});
-      depositBlockedChecking.add(checking.id);
      }
      if(avail>0.009)synthetic(m,decision.date,savings,checking.id,Math.min(required,avail),'use',`Utilisation d'épargne · ${p.label}`,audit);
      continue;
     }
-
-    // Une alerte de protection non résolue dans ce mois interdit toute proposition
-    // contradictoire de mise en épargne depuis ce même compte.
-    if(depositBlockedChecking.has(checking.id))continue;
 
     // Pour une mise en épargne, on protège non seulement la quinzaine courante mais
     // toute la période restante jusqu'à la fin du mois. Le versement correspond donc
