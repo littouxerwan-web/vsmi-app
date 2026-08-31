@@ -84,7 +84,10 @@ export function MonthlyOperations({accounts,categories,movements,recurrences,ove
  const normalizedQuery=query.trim().toLocaleLowerCase("fr");
  const visibleOps=sortOps(baseVisibleOps.filter(o=>(!normalizedQuery||`${o.label} ${accounts.find(a=>a.id===o.account_id)?.name??""} ${categories.find(c=>c.id===o.category_id)?.name??""}`.toLocaleLowerCase("fr").includes(normalizedQuery))&&matchesType(o)&&matchesStatus(o.status)));
  const visiblePhotos=photos.filter(p=>(accountFilter==="all"||(p.personal_account_id??photoDefaultAccountId)===accountFilter)&&(!normalizedQuery||photoLabel(p).toLocaleLowerCase("fr").includes(normalizedQuery))&&(typeFilter==="all"||typeFilter==="credit")&&matchesStatus(p.status==="received"?"completed":"planned"));
- const showUrssaf=urssafAmount>0&&(accountFilter==="all"||urssafAccountId===accountFilter);
+ const urssafStatus=urssafChecked?"completed":"planned";
+ const urssafMatchesQuery=!normalizedQuery||`URSSAF 21,6 % CA photo ${accounts.find(a=>a.id===urssafAccountId)?.name??""}`.toLocaleLowerCase("fr").includes(normalizedQuery);
+ const urssafMatchesType=typeFilter==="all"||typeFilter==="debit";
+ const showUrssaf=urssafAmount>0&&(accountFilter==="all"||urssafAccountId===accountFilter)&&urssafMatchesQuery&&urssafMatchesType&&matchesStatus(urssafStatus);
  // Les filtres de recherche/type/statut sont strictement visuels : ils ne doivent jamais
  // modifier le budget consommé ni, indirectement, la prévision de solde.
  const budgetOps=accountFilter==="all"?ops:ops.filter(o=>o.account_id===accountFilter);
