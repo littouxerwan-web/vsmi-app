@@ -7,7 +7,7 @@ export type SavingsRecurrence = { id:string; account_id:string; destination_acco
 export type SavingsOverride={recurrence_id:string;occurrence_month:string;amount:number};
 export type SavingsExclusion={recurrence_id:string;occurrence_date:string};
 export type SavingsPhotoPayment={amount:number;expected_date:string|null;received_date:string|null;status:string;personal_account_id:string|null;accounting_status?:string};
-export type SavingsUrssafState={contribution_month:string;account_id:string|null;is_completed:boolean};
+export type SavingsUrssafState={contribution_month:string;account_id:string|null;is_completed:boolean;amount_override?:number|null};
 
 export type SavingsBudgetAllocation={
  id:string; account_id:string; name:string; kind:"project"|"reserve"; allocation_mode:"amount"|"percent"; allocation_value:number; protection:"free"|"preserve"|"untouchable"; allow_recovery:boolean; critical_threshold?:number|null; target_amount?:number|null; target_date?:string|null; priority?:number|null;
@@ -167,7 +167,7 @@ export function calculateSavingsPlan(input:Input):SavingsPlanRow[]{
   if(last<simulationStart)continue;
   const photoRevenue=(input.photoPayments??[]).filter(p=>p.status!=="cancelled"&&((p.accounting_status==="received"?(p.received_date??p.expected_date):p.expected_date)??"").startsWith(prev)).reduce((s,p)=>s+Number(p.amount),0);
   const state=(input.urssafStates??[]).find(s=>String(s.contribution_month).slice(0,7)===month);
-  if(photoRevenue>0&&!state?.is_completed&&(state?.account_id??input.urssafDefaultAccountId)===input.sourceAccountId&&last>=simulationStart)expense(last,roundMoney(photoRevenue*.216));
+  if(photoRevenue>0&&!state?.is_completed&&(state?.account_id??input.urssafDefaultAccountId)===input.sourceAccountId&&last>=simulationStart)expense(last,state?.amount_override!=null?roundMoney(Number(state.amount_override)):roundMoney(photoRevenue*.216));
   for(const b of budgetRoots)if(isBudgetActiveForMonth(b,month)){
    const remaining=calculateBudgetRemaining(Number(b.monthly_budget),spent.get(`${month}:${b.id}`)??0);
    if(remaining>0&&last>=simulationStart){if(b.movement_type==="income")income(last,remaining);else expense(last,remaining,b.id,true);}

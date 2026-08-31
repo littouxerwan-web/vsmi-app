@@ -8,7 +8,7 @@ export type RPRecurrence={id:string;account_id:string;destination_account_id:str
 export type RPOverride={recurrence_id:string;occurrence_month:string;amount:number};
 export type RPExclusion={recurrence_id:string;occurrence_date:string};
 export type RPPhoto={id:string;display_name:string;wedding_date:string|null;payment_type:'deposit'|'balance';amount:number;expected_date:string|null;received_date:string|null;status:'expected'|'received'|'cancelled';accounting_status?:'expected'|'received'|'cancelled';personal_account_id:string|null};
-export type RPUrssaf={contribution_month:string;account_id:string|null;is_completed:boolean;completed_date:string|null};
+export type RPUrssaf={contribution_month:string;account_id:string|null;is_completed:boolean;completed_date:string|null;amount_override?:number|null};
 export type RPProfile={id:string;label:string;sourceAccountId:string|null;destinationAccountId:string|null;threshold:number};
 export type RPSavingsMeta={sourceAccountId:string;destinationAccountId:string;sourceMonth:string;automaticAmount:number;status:'automatic'|'pending'|'accepted';kind:'deposit'|'use';previousTransferGroupId?:string|null};
 export type RPOperation={id:string;projected:boolean;recurrence_id?:string|null;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;transfer_group_id?:string|null;source_type?:string|null;source_key?:string|null;virtual_source?:boolean;photo?:boolean;photoPayment?:RPPhoto;savingsProposal?:RPSavingsMeta;source?:'movement'|'recurrence'|'photo'|'urssaf'|'budget'|'savings'};
@@ -87,7 +87,7 @@ export function buildReliableProjection(input:Input){
  const urssafStateByMonth=new Map(input.urssafStates.map(s=>[String(s.contribution_month).slice(0,7),s]));
  for(let i=0;i<months;i++){
   const m=shiftMonth(startMonth,i),state=urssafStateByMonth.get(m);if(state?.is_completed)continue;
-  const amount=round(Number(photoAmountByMonth.get(shiftMonth(m,-1))??0)*0.216),account=state?.account_id??input.urssafDefaultAccountId;if(amount>0&&account)ops.push({id:`urssaf-${m}`,projected:true,account_id:account,category_id:null,movement_type:'expense',label:`URSSAF · 21,6 % CA photo`,amount,movement_date:monthEnd(m),status:'planned',source:'urssaf'});
+  const calculatedAmount=round(Number(photoAmountByMonth.get(shiftMonth(m,-1))??0)*0.216),amount=state?.amount_override!=null?round(Number(state.amount_override)):calculatedAmount,account=state?.account_id??input.urssafDefaultAccountId;if(amount>0&&account)ops.push({id:`urssaf-${m}`,projected:true,account_id:account,category_id:null,movement_type:'expense',label:`URSSAF · 21,6 % CA photo`,amount,movement_date:monthEnd(m),status:'planned',source:'urssaf'});
  }
 
  // Budgets : on réserve uniquement le VRAI reliquat du mois.

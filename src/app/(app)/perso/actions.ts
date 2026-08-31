@@ -910,6 +910,21 @@ export async function updateSavingsProfile2(fd: FormData) {
   return saveSavingsProfile(fd, 2);
 }
 
+export async function updateUrssafAmount(fd: FormData) {
+  const { supabase, user } = await auth();
+  const month = String(fd.get("month") ?? "");
+  const amount = Number(fd.get("amount"));
+  const accountId = String(fd.get("account_id") ?? "") || null;
+  if (!/^\d{4}-\d{2}$/.test(month)) fail("Mois URSSAF incorrect.");
+  if (!Number.isFinite(amount) || amount <= 0) fail("Montant URSSAF incorrect.");
+  const { error } = await supabase.from("personal_urssaf_states").upsert(
+    { owner_id: user.id, contribution_month: `${month}-01`, account_id: accountId, amount_override: Math.round(amount * 100) / 100 },
+    { onConflict: "owner_id,contribution_month" }
+  );
+  if (error) fail(error.message);
+  await refresh("Montant URSSAF modifié pour cette échéance.");
+}
+
 export async function toggleUrssafContribution(month: string, completed: boolean, fallbackAccountId?: string | null) {
   const { supabase, user } = await auth();
   if (!/^\d{4}-\d{2}$/.test(month)) fail("Mois URSSAF incorrect.");

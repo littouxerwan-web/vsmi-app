@@ -94,7 +94,7 @@ export default async function TodayPage() {
     supabase.from("personal_savings_budgets").select("id,account_id,name,kind,allocation_mode,allocation_value,protection,allow_recovery,critical_threshold,target_amount,target_date,priority").eq("owner_id", user.id),
     personalOnly ? Promise.resolve({ data: [] }) : supabase.from("wedding_payments").select("id,display_name,wedding_date,payment_type,amount,expected_date,received_date,status").eq("owner_id", user.id).neq("status", "cancelled").order("expected_date"),
     personalOnly ? Promise.resolve({ data: [] }) : supabase.from("personal_photo_payment_states").select("payment_id,account_id,is_completed,completed_date").eq("owner_id", user.id),
-    personalOnly ? Promise.resolve({ data: [] }) : supabase.from("personal_urssaf_states").select("contribution_month,account_id,is_completed,completed_date").eq("owner_id", user.id),
+    personalOnly ? Promise.resolve({ data: [] }) : supabase.from("personal_urssaf_states").select("contribution_month,account_id,is_completed,completed_date,amount_override").eq("owner_id", user.id),
     supabase.from("common_settings").select("account_name").eq("singleton", true).maybeSingle(),
     supabase.from("common_balance_snapshots").select("balance,snapshot_date,created_at").order("snapshot_date", { ascending: false }).limit(1),
     supabase.from("common_movements").select("id,movement_type,amount,movement_date,status,completed_date,completed_at,recurrence_id").neq("status", "cancelled"),
@@ -178,7 +178,7 @@ export default async function TodayPage() {
     return N(snapshot?.balance)
       + (completedByAccount.get(accountId) ?? []).reduce((sum, movement) => sum + (["income", "transfer_in"].includes(movement.movement_type) ? N(movement.amount) : -N(movement.amount)), 0)
       + (receivedPhotoByAccount.get(accountId) ?? []).filter((payment: any) => payment.received_date > snapshotDate).reduce((sum: number, payment: any) => sum + N(payment.amount), 0)
-      - (completedUrssafByAccount.get(accountId) ?? []).filter((state) => (state.completed_date ?? "") > snapshotDate && (state.completed_date ?? "") <= today).reduce((sum, state) => sum + urssafForMonth(String(state.contribution_month).slice(0, 7)), 0);
+      - (completedUrssafByAccount.get(accountId) ?? []).filter((state) => (state.completed_date ?? "") > snapshotDate && (state.completed_date ?? "") <= today).reduce((sum, state) => sum + (state.amount_override != null ? Number(state.amount_override) : urssafForMonth(String(state.contribution_month).slice(0, 7))), 0);
   };
   const currentBalances = Object.fromEntries(((accounts ?? []) as any[]).map((account) => [account.id, liveBalance(account.id)]));
 
