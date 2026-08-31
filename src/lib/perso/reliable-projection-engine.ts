@@ -202,8 +202,13 @@ export function buildReliableProjection(input:Input){
   };
 
   // Deux décisions de trésorerie par mois : début de mois puis le 15.
-  // Chaque décision regarde uniquement la quinzaine qui suit : 1 -> 14, puis 15 -> fin du mois.
+  // Les utilisations d'épargne protègent la quinzaine qui suit. En revanche, une
+  // mise en épargne doit rester sûre jusqu'à la fin du mois : on évite ainsi de
+  // sortir de l'argent d'un compte pour devoir ensuite le renflouer quelques jours
+  // plus tard. Si un besoin n'a pas pu être couvert, ce compte est bloqué pour les
+  // nouvelles mises en épargne jusqu'au mois suivant.
   const decisions=[{date:`${m}-01`,through:`${m}-14`},{date:`${m}-15`,through:monthEnd(m)}];
+  const depositBlockedChecking=new Set<string>();
   let rowIndex=0;
   for(const decision of decisions){
    // Les flux antérieurs à la date de décision sont d'abord intégrés au solde réel de la projection.
@@ -221,14 +226,24 @@ export function buildReliableProjection(input:Input){
      const required=round(threshold-minimum);
      const savings=p.destinationAccountId;
      const avail=mobilizableSavingsForAccount(Number(balances.get(savings)??0),savings,input.savingsBudgets,SAVINGS_FLOOR);
-     if(avail+0.009<required)savingsWarnings.push({month:m,checkingAccountId:checking.id,savingsAccountId:savings,required,available:round(avail),missing:round(required-avail)});
+     if(avail+0.009<required){
+      savingsWarnings.push({month:m,checkingAccountId:checking.id,savingsAccountId:savings,required,available:round(avail),missing:round(required-avail)});
+      depositBlockedChecking.add(checking.id);
+     }
      if(avail>0.009)synthetic(m,decision.date,savings,checking.id,Math.min(required,avail),'use',`Utilisation d'épargne · ${p.label}`,audit);
      continue;
     }
 
-    // Si toute la quinzaine reste au-dessus du seuil, seul l'excédent réellement sûr
-    // sur cette fenêtre peut être proposé à l'épargne dès la date de décision.
-    const surplus=round(Math.max(0,minimum-threshold));
+    // Une alerte de protection non résolue dans ce mois interdit toute proposition
+    // contradictoire de mise en épargne depuis ce même compte.
+    if(depositBlockedChecking.has(checking.id))continue;
+
+    // Pour une mise en épargne, on protège non seulement la quinzaine courante mais
+    // toute la période restante jusqu'à la fin du mois. Le versement correspond donc
+    // uniquement au vrai surplus mensuel qui peut quitter le compte sans provoquer
+    // ensuite une utilisation d'épargne ou une alerte de découvert.
+    const safeMinimumToMonthEnd=windowMinimum(checking.id,decision.date,monthEnd(m));
+    const surplus=round(Math.max(0,safeMinimumToMonthEnd-threshold));
     if(surplus>0.009)synthetic(m,decision.date,checking.id,p.destinationAccountId,surplus,'deposit',`Versement épargne proposé · ${p.label}`,audit);
    }
   }
