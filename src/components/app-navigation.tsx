@@ -14,18 +14,26 @@ import {
   Stethoscope,
 } from "lucide-react";
 
-const currentMonthLabel = new Intl.DateTimeFormat("fr-FR", { month: "long", timeZone: "Europe/Paris" }).format(new Date()).replace(/^./, c => c.toUpperCase());
+function getCurrentMonthLabel() {
+  return new Intl.DateTimeFormat("fr-FR", { month: "long", timeZone: "Europe/Paris" })
+    .format(new Date())
+    .replace(/^./, (c) => c.toUpperCase());
+}
 
-const basePersoNavigation = [
-  { href: "/perso?vue=finances", label: currentMonthLabel, icon: CircleDollarSign },
-  { href: "/perso?vue=projection", label: "Projection", icon: TrendingUp },
-  { href: "/perso?vue=analyse", label: "Analyse", icon: BarChart3 },
-];
+function getBasePersoNavigation(currentMonthLabel: string) {
+  return [
+    { href: "/perso?vue=finances", label: currentMonthLabel, icon: CircleDollarSign },
+    { href: "/perso?vue=projection", label: "Projection", icon: TrendingUp },
+    { href: "/perso?vue=analyse", label: "Analyse", icon: BarChart3 },
+  ];
+}
 
-const commonNavigation = [
-  { href: "/commun?vue=encours", label: currentMonthLabel, icon: WalletCards },
-  { href: "/commun?vue=budget", label: "Budget", icon: CircleDollarSign },
-];
+function getCommonNavigation(currentMonthLabel: string) {
+  return [
+    { href: "/commun?vue=encours", label: currentMonthLabel, icon: WalletCards },
+    { href: "/commun?vue=budget", label: "Budget", icon: CircleDollarSign },
+  ];
+}
 
 const photoNavigation = [
   { href: "/mariages", label: "Mes Mariages", icon: HeartHandshake },
@@ -66,6 +74,11 @@ function NavLink({
 }
 
 export function AppNavigation({ photoAccess = false, childrenAccess = false, osteoAccess = false }: { photoAccess?: boolean; childrenAccess?: boolean; osteoAccess?: boolean }) {
+  // Calculé à chaque rendu serveur : le menu bascule automatiquement au nouveau mois
+  // sans rester figé sur le mois du dernier build/déploiement.
+  const currentMonthLabel = getCurrentMonthLabel();
+  const basePersoNavigation = getBasePersoNavigation(currentMonthLabel);
+  const commonNavigation = getCommonNavigation(currentMonthLabel);
   const persoNavigation = childrenAccess
     ? [...basePersoNavigation, { href: "/enfants", label: "Enfants", icon: Baby }]
     : basePersoNavigation;
