@@ -59,22 +59,7 @@ export default async function AccountingPage({
 
   const receivedCurrentYear = received.filter((p) => p.received_date?.startsWith(String(currentYear))).reduce((s, p) => s + Number(p.amount), 0);
   const expectedCurrentYear = expected.filter((p) => p.expected_date?.startsWith(String(currentYear))).reduce((s, p) => s + Number(p.amount), 0);
-
-  const currentYearWeddingKeys = new Set([
-    ...weddings.filter((w) => w.wedding_date.startsWith(String(currentYear))).map((w) => `w:${w.id}`),
-    ...payments
-      .filter((p) => p.wedding_date?.startsWith(String(currentYear)))
-      .map(weddingKey),
-  ]);
-  const currentYearBookedWeddingKeys = new Set(
-    received
-      .filter((p) => p.payment_type === "deposit" && p.wedding_date?.startsWith(String(currentYear)))
-      .map(weddingKey),
-  );
-  const weddingsCurrentYear = currentYearWeddingKeys.size;
-  const weddingsBookedCurrentYear = currentYearBookedWeddingKeys.size;
-
-  const automaticDone = weddings
+const automaticDone = weddings
     .filter((w) => w.wedding_date.startsWith(String(currentYear)) && (w.wedding_date < today || Boolean(w.archived_at)))
     .map((w) => `w:${w.id}`);
   const manualDone = received
@@ -94,11 +79,34 @@ export default async function AccountingPage({
     const yearPayments = payments.filter((p) => (p.received_date ?? p.expected_date ?? p.wedding_date)?.startsWith(year));
     const yearReceived = yearPayments.filter((p) => p.status === "received").reduce((s, p) => s + Number(p.amount), 0);
     const yearExpected = yearPayments.filter((p) => p.status === "expected").reduce((s, p) => s + Number(p.amount), 0);
+
+    const yearWeddingKeys = new Set([
+      ...weddings
+        .filter((w) => w.wedding_date.startsWith(year))
+        .map((w) => `w:${w.id}`),
+      ...payments
+        .filter((p) => p.wedding_date?.startsWith(year))
+        .map(weddingKey),
+    ]);
+
+    const yearBookedWeddingKeys = new Set(
+      received
+        .filter((p) => p.payment_type === "deposit" && p.wedding_date?.startsWith(year))
+        .map(weddingKey),
+    );
     const months = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`).map((key) => {
       const lines = yearPayments.filter((p) => (p.status === "received" ? p.received_date : p.expected_date)?.startsWith(key));
       return { key, lines, total: lines.reduce((s, p) => s + Number(p.amount), 0) };
     });
-    return { year, yearReceived, yearExpected, total: yearReceived + yearExpected, weddings: new Set(yearPayments.map(weddingKey)).size, months };
+    return {
+      year,
+      yearReceived,
+      yearExpected,
+      total: yearReceived + yearExpected,
+      weddings: yearWeddingKeys.size,
+      booked: yearBookedWeddingKeys.size,
+      months,
+    };
   });
 
   return (
@@ -113,10 +121,8 @@ export default async function AccountingPage({
         <Messages {...messages} />
         {error ? <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800">Les données comptables n’ont pas pu être chargées.</div> : null}
 
-        <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-7">
-          <Metric icon={CircleDollarSign} label={`Mariages ${currentYear}`} value={String(weddingsCurrentYear)} />
-          <Metric icon={CheckCircle2} label="Mariages commandés" value={String(weddingsBookedCurrentYear)} highlight />
-          <Metric icon={CheckCircle2} label={`Encaissé ${currentYear}`} value={money(receivedCurrentYear)} />
+        <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+<Metric icon={CheckCircle2} label={`Encaissé ${currentYear}`} value={money(receivedCurrentYear)} />
           <Metric icon={Clock3} label={`À venir ${currentYear}`} value={money(expectedCurrentYear)} highlight />
           <Metric icon={WalletCards} label={`Total ${currentYear}`} value={money(receivedCurrentYear + expectedCurrentYear)} dark />
           <Metric icon={CircleDollarSign} label="Mariages effectués" value={String(weddingsDone)} />
@@ -140,7 +146,12 @@ export default async function AccountingPage({
           {yearData.map((data, index) => (
             <details key={data.year} open={index === 0} className="overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-5 bg-neutral-50 px-6 py-5">
-                <div><h2 className="text-xl font-semibold">Année {data.year}</h2><p className="mt-1 text-xs text-neutral-500">{data.weddings} mariage{data.weddings > 1 ? "s" : ""}</p></div>
+                <div>
+                  <h2 className="text-xl font-semibold">Année {data.year}</h2>
+                  <p className="mt-1 text-xs text-neutral-500">
+                    {data.weddings} mariage{data.weddings > 1 ? "s" : ""} · {data.booked} commandé{data.booked > 1 ? "s" : ""}
+                  </p>
+                </div>
                 <div className="text-right"><p className="font-semibold">{money(data.total)}</p><p className="mt-1 text-xs text-neutral-500">{money(data.yearReceived)} encaissé · {money(data.yearExpected)} à venir</p></div>
               </summary>
               <div className="space-y-3 p-6">
