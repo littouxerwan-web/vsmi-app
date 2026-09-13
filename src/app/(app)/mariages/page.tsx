@@ -53,7 +53,15 @@ export default async function WeddingsPage({
 
   const activeWeddings = allWeddings.filter((wedding) => !wedding.archived_at);
   const archivedWeddings = allWeddings.filter((wedding) => wedding.archived_at);
-  const years = Array.from(new Set(activeWeddings.map((wedding) => wedding.wedding_date.slice(0, 4)))).sort((a, b) => b.localeCompare(a));
+  const currentYear = String(new Date().getFullYear());
+  const years = Array.from(new Set(activeWeddings.map((wedding) => wedding.wedding_date.slice(0, 4)))).sort((a, b) => {
+    if (a === currentYear) return -1;
+    if (b === currentYear) return 1;
+    const aFuture = a > currentYear;
+    const bFuture = b > currentYear;
+    if (aFuture !== bFuture) return aFuture ? -1 : 1;
+    return aFuture ? a.localeCompare(b) : b.localeCompare(a);
+  });
 
   const money = new Intl.NumberFormat("fr-FR", {
     style: "currency",

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Save, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { MomentPresenceRow } from "@/components/moment-presence-row";
+import { WeddingMomentsEditor } from "@/components/wedding-moments-editor";
 import { WeddingAttachmentUploader } from "@/components/wedding-attachment-uploader";
 import { deleteWedding, updateWedding } from "../actions";
 
@@ -78,7 +78,9 @@ export default async function WeddingPage({
   const wedding = weddingData as Wedding;
   const moments = (momentsData ?? []) as Moment[];
   const payments = (paymentsData ?? []) as Payment[];
-  const momentMap = new Map(moments.map((moment) => [moment.moment_type, moment]));
+  const visibleMoments = moments
+    .filter((moment) => Boolean(moment.scheduled_time || moment.location || moment.photographer_present))
+    .sort((a, b) => (a.scheduled_time || "99:99").localeCompare(b.scheduled_time || "99:99"));
   const updateAction = updateWedding.bind(null, id);
   const deleteAction = deleteWedding.bind(null, id);
   const deposit = payments.find((payment) => payment.payment_type === "deposit");
@@ -140,13 +142,16 @@ export default async function WeddingPage({
             </div>
           </Card>
 
-          <Card title="Lieux, horaires et présence">
-            <div className="space-y-4">
-              {MOMENT_TYPES.map(([type, label]) => {
-                const moment = momentMap.get(type);
-                return <MomentPresenceRow key={type} type={type} label={label} location={moment?.location ?? ""} time={moment?.scheduled_time ?? ""} present={moment?.photographer_present ?? false} />;
-              })}
-            </div>
+          <Card title="Lieux et horaires">
+            <WeddingMomentsEditor
+              options={MOMENT_TYPES.map(([type, label]) => ({ type, label }))}
+              initialMoments={visibleMoments.map((moment) => ({
+                type: moment.moment_type,
+                label: moment.label,
+                location: moment.location ?? "",
+                time: moment.scheduled_time?.slice(0, 5) ?? "",
+              }))}
+            />
           </Card>
 
           <Card title="Solde">

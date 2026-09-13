@@ -184,15 +184,25 @@ function validateCore(formData: FormData, returnPath: string) {
 }
 
 function momentRows(formData: FormData, ownerId: string, weddingId: string) {
+  if (formData.get("dynamic_moments") === "1") {
+    const types = formData.getAll("moment_type").map(String);
+    const locations = formData.getAll("moment_location").map(String);
+    const times = formData.getAll("moment_time").map(String);
+    return types.flatMap((type, index) => {
+      const definition = MOMENTS.find(([candidate]) => candidate === type);
+      if (!definition) return [];
+      const [, label, position] = definition;
+      return [{
+        owner_id: ownerId, wedding_id: weddingId, moment_type: type, label,
+        location: locations[index]?.trim() || null, scheduled_time: times[index]?.trim() || null,
+        photographer_present: true, position,
+      }];
+    });
+  }
   return MOMENTS.map(([type, label, position]) => ({
-    owner_id: ownerId,
-    wedding_id: weddingId,
-    moment_type: type,
-    label,
-    location: optionalText(formData, `${type}_location`),
-    scheduled_time: optionalText(formData, `${type}_time`),
-    photographer_present: checked(formData, `${type}_present`),
-    position,
+    owner_id: ownerId, wedding_id: weddingId, moment_type: type, label,
+    location: optionalText(formData, `${type}_location`), scheduled_time: optionalText(formData, `${type}_time`),
+    photographer_present: checked(formData, `${type}_present`), position,
   }));
 }
 
@@ -288,7 +298,18 @@ export async function updateWedding(weddingId: string, formData: FormData) {
   if (error) redirect(`/mariages/${weddingId}?erreur=${encodeURIComponent(error.message)}`);
 
   const rows = momentRows(formData, user.id, weddingId);
-  const { error: momentError } = await supabase.from("wedding_moments").upsert(rows, { onConflict: "wedding_id,moment_type" });
+  let momentError: { message: string } | null = null;
+  if (formData.get("dynamic_moments") === "1") {
+    const { error: deleteMomentError } = await supabase.from("wedding_moments").delete().eq("wedding_id", weddingId).eq("owner_id", user.id);
+    momentError = deleteMomentError;
+    if (!momentError && rows.length > 0) {
+      const result = await supabase.from("wedding_moments").insert(rows);
+      momentError = result.error;
+    }
+  } else {
+    const result = await supabase.from("wedding_moments").upsert(rows, { onConflict: "wedding_id,moment_type" });
+    momentError = result.error;
+  }
   if (momentError) redirect(`/mariages/${weddingId}?erreur=${encodeURIComponent(momentError.message)}`);
 
   const { data: deposit } = await supabase
