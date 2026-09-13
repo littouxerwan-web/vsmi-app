@@ -91,11 +91,11 @@ const automaticDone = weddings
 
     const yearBookedWeddingKeys = new Set(
       payments
-        .filter((p) =>
-          p.payment_type === "deposit" &&
-          p.wedding_date?.startsWith(year) &&
-          (p.status === "expected" || p.status === "received")
-        )
+        .filter((p) => {
+          if (p.payment_type !== "deposit") return false;
+          const depositDate = p.status === "received" ? p.received_date : p.expected_date;
+          return depositDate?.startsWith(year);
+        })
         .map(weddingKey),
     );
     const months = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`).map((key) => {
