@@ -1044,11 +1044,43 @@ export async function acceptSavingsProposal(fd: FormData) {
       if (error) fail(error.message); category = created;
     }
   }
-  const movementDate = key.proposalDate; const group = crypto.randomUUID();
+  const movementDate = key.proposalDate;
+  const group = crypto.randomUUID();
+  const completedAt = new Date().toISOString();
+  const completedDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
   const label = isSavingsUse ? `Utilisation d'épargne conseillée · ${key.sourceMonth}` : `Versement épargne proposé · ${key.sourceMonth}`;
   const { error: movementError } = await supabase.from("personal_movements").insert([
-    { owner_id: user.id, account_id: key.sourceAccountId, category_id: isSavingsUse ? null : category?.id ?? null, movement_type: "transfer_out", label, amount, movement_date: movementDate, status: "planned", transfer_group_id: group },
-    { owner_id: user.id, account_id: key.destinationAccountId, category_id: null, movement_type: "transfer_in", label, amount, movement_date: movementDate, status: "planned", transfer_group_id: group },
+    {
+      owner_id: user.id,
+      account_id: key.sourceAccountId,
+      category_id: isSavingsUse ? null : category?.id ?? null,
+      movement_type: "transfer_out",
+      label,
+      amount,
+      movement_date: movementDate,
+      status: "completed",
+      completed_date: completedDate,
+      completed_at: completedAt,
+      transfer_group_id: group,
+    },
+    {
+      owner_id: user.id,
+      account_id: key.destinationAccountId,
+      category_id: null,
+      movement_type: "transfer_in",
+      label,
+      amount,
+      movement_date: movementDate,
+      status: "completed",
+      completed_date: completedDate,
+      completed_at: completedAt,
+      transfer_group_id: group,
+    },
   ]);
   if (movementError) fail(movementError.message);
   const payload = { owner_id: user.id, source_account_id: key.sourceAccountId, destination_account_id: key.destinationAccountId, source_month: key.sourceMonthDate, amount, status: "accepted", transfer_group_id: group, accepted_at: new Date().toISOString(), updated_at: new Date().toISOString() };
@@ -1057,7 +1089,7 @@ export async function acceptSavingsProposal(fd: FormData) {
     await supabase.from("personal_movements").delete().eq("owner_id", user.id).eq("transfer_group_id", group);
     fail(error.message);
   }
-  savingsSuccess(fd, existingGroups.length===1&&!isSavingsUse?"Deuxième versement d’épargne accepté et ajouté aux prévisions.":"Proposition d’épargne acceptée et ajoutée aux prévisions.");
+  savingsSuccess(fd, existingGroups.length===1&&!isSavingsUse?"Deuxième versement d’épargne effectué.":"Proposition d’épargne acceptée et virement effectué.");
 }
 
 export async function updateSavingsProposalAmount(fd: FormData) {
