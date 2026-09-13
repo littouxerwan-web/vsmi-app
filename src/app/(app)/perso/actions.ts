@@ -1044,7 +1044,6 @@ export async function acceptSavingsProposal(fd: FormData) {
       if (error) fail(error.message); category = created;
     }
   }
-  const movementDate = key.proposalDate;
   const group = crypto.randomUUID();
   const completedAt = new Date().toISOString();
   const completedDate = new Intl.DateTimeFormat("en-CA", {
@@ -1053,6 +1052,7 @@ export async function acceptSavingsProposal(fd: FormData) {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+  const movementDate = completedDate;
   const label = isSavingsUse ? `Utilisation d'épargne conseillée · ${key.sourceMonth}` : `Versement épargne proposé · ${key.sourceMonth}`;
   const { error: movementError } = await supabase.from("personal_movements").insert([
     {
