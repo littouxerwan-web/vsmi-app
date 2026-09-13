@@ -90,8 +90,12 @@ const automaticDone = weddings
     ]);
 
     const yearBookedWeddingKeys = new Set(
-      received
-        .filter((p) => p.payment_type === "deposit" && p.wedding_date?.startsWith(year))
+      payments
+        .filter((p) =>
+          p.payment_type === "deposit" &&
+          p.wedding_date?.startsWith(year) &&
+          (p.status === "expected" || p.status === "received")
+        )
         .map(weddingKey),
     );
     const months = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`).map((key) => {
