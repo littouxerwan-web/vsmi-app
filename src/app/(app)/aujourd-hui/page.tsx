@@ -59,7 +59,7 @@ export default async function TodayPage() {
   const [
     { data: accounts = [] },
     { data: snapshots = [] },
-    { data: movements = [] },
+    { data: allMovements = [], error: movementsError },
     { data: categories = [] },
     { data: recurrences = [] },
     { data: overrides = [] },
@@ -84,7 +84,7 @@ export default async function TodayPage() {
   ] = await Promise.all([
     supabase.from("personal_accounts").select("id,name,account_type,is_default,color,display_order").eq("owner_id", user.id).eq("is_active", true).order("display_order", { ascending: true }).order("name"),
     supabase.from("personal_balance_snapshots").select("account_id,balance,snapshot_date,created_at").eq("owner_id", user.id).order("snapshot_date", { ascending: false }),
-    supabase.from("personal_movements").select("id,account_id,category_id,movement_type,label,amount,movement_date,status,completed_date,completed_at,recurrence_id,transfer_group_id,source_type,source_key").eq("owner_id", user.id).neq("status", "cancelled"),
+    supabase.from("personal_movements").select("id,account_id,category_id,movement_type,label,amount,movement_date,status,completed_date,completed_at,recurrence_id,transfer_group_id,source_type,source_key").eq("owner_id", user.id),
     supabase.from("personal_categories").select("id,name,movement_type,parent_id,monthly_budget,account_id,budget_period,budget_month,budget_start_date,budget_end_date").eq("owner_id", user.id).eq("is_active", true).order("name"),
     supabase.from("personal_recurrences").select("id,account_id,destination_account_id,category_id,movement_type,label,amount,frequency,interval_count,start_date,end_date,annual_change_percent,is_active").eq("owner_id", user.id).eq("is_active", true).order("start_date"),
     supabase.from("personal_recurrence_overrides").select("recurrence_id,occurrence_month,amount").eq("owner_id", user.id),
@@ -107,6 +107,9 @@ export default async function TodayPage() {
     photoAccess ? supabase.from("weddings").select("id,partner1_first_name,partner1_last_name,partner2_first_name,partner2_last_name,wedding_date,city").eq("owner_id", user.id).gte("wedding_date", today).order("wedding_date").limit(6) : Promise.resolve({ data: [] }),
     photoAccess ? supabase.from("wedding_payments").select("amount,expected_date,received_date,status").eq("owner_id", user.id).neq("status", "cancelled") : Promise.resolve({ data: [] }),
   ] as any);
+
+  if (movementsError) throw new Error(movementsError.message);
+  const movements = ((allMovements ?? []) as any[]).filter(movement => movement.status !== "cancelled");
 
   const latest = new Map<string, any>();
   for (const snapshot of ((snapshots ?? []) as any[])) if (!latest.has(snapshot.account_id)) latest.set(snapshot.account_id, snapshot);
@@ -186,7 +189,7 @@ export default async function TodayPage() {
   const childrenSyncAccountId = (personalSettings as any)?.children_sync_account_id ?? null;
   const childrenSyncDay = Math.min(28, Math.max(1, N((personalSettings as any)?.children_sync_day ?? 5)));
   const childrenSyncPerson = ((personalSettings as any)?.children_sync_person === "person_1" ? "person_1" : "person_2") as "person_1" | "person_2";
-  const existingChildrenKeys = new Set(((movements ?? []) as any[]).filter((movement) => movement.source_type === "children" && movement.source_key).map((movement) => String(movement.source_key)));
+  const existingChildrenKeys = new Set(((allMovements ?? []) as any[]).filter((movement) => movement.source_type === "children" && movement.source_key).map((movement) => String(movement.source_key)));
   const childrenProjected = buildChildrenProjectedMovements({
     settings: childrenSettings as any,
     expenses: childrenExpenses as any,

@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
+import { buildChildrenProjectedMovements } from "@/lib/perso/children-sync";
+
 const PATH = "/perso";
 function text(fd: FormData, key: string) { return String(fd.get(key) ?? "").trim(); }
 function optional(fd: FormData, key: string) { return text(fd, key) || null; }
@@ -16,6 +18,43 @@ async function auth() {
   if (!user) redirect("/connexion");
   return { supabase, user };
 }
+// Materialize only on the first monthly action. Never write to children_*.
+// INSERT uses the existing partial unique index; concurrent requests reuse its winner.
+async function resolveMonthlyMovementId(supabase: Awaited<ReturnType<typeof createClient>>, ownerId: string, id: string) {
+  const match = /^children-virtual-(\d{4}-(?:0[1-9]|1[0-2]))$/.exec(id);
+  if (!match) return id;
+  const sourceKey = `children:${match[1]}`;
+  const findExisting = () => supabase.from("personal_movements").select("id,status")
+    .eq("owner_id", ownerId).eq("source_type", "children").eq("source_key", sourceKey).maybeSingle();
+  const existing = await findExisting();
+  if (existing.error) fail(existing.error.message);
+  if (existing.data?.status === "cancelled") fail("Ce mouvement a été supprimé.");
+  if (existing.data) return existing.data.id;
+  const [personal, settings, expenses] = await Promise.all([
+    supabase.from("personal_settings").select("children_sync_enabled,children_sync_account_id,children_sync_day,children_sync_person").eq("owner_id", ownerId).maybeSingle(),
+    supabase.from("children_settings").select("person_1_name,person_2_name,income_person_1,income_person_2").eq("owner_id", ownerId).maybeSingle(),
+    supabase.from("children_expenses").select("label,amount,annual_amount,smooth_annual,start_month,end_month,paid_by").eq("owner_id", ownerId).eq("school_year_start", 2026),
+  ]);
+  for (const result of [personal, settings, expenses]) if (result.error) fail(result.error.message);
+  const config = personal.data;
+  const projected = buildChildrenProjectedMovements({
+    settings: settings.data, expenses: expenses.data ?? [],
+    accountId: config?.children_sync_account_id ?? null,
+    day: config?.children_sync_day ?? 5,
+    self: config?.children_sync_person === "person_1" ? "person_1" : "person_2",
+    enabled: Boolean(config?.children_sync_enabled), existingSourceKeys: new Set(),
+  }).find(row => row.source_key === sourceKey);
+  if (!projected) fail("Régularisation ENFANTS introuvable. Actualise la page.");
+  const { id: virtualId, virtual_source, ...row } = projected;
+  const inserted = await supabase.from("personal_movements").insert({ ...row, owner_id: ownerId }).select("id").single();
+  if (!inserted.error) return inserted.data.id;
+  if (inserted.error.code !== "23505") fail(inserted.error.message);
+  const winner = await findExisting();
+  if (winner.error) fail(winner.error.message);
+  if (!winner.data || winner.data.status === "cancelled") fail("Ce mouvement a été supprimé ou est indisponible.");
+  return winner.data.id;
+}
+
 async function refresh(message: string): Promise<never> {
   revalidatePath(PATH);
   const referer = (await headers()).get("referer");
@@ -203,6 +242,7 @@ export async function deleteCategoryFromSettings(id: string) {
 }
 
 export async function deleteItem(table: "personal_movements" | "personal_recurrences" | "personal_categories" | "personal_accounts" | "personal_savings_goals", id: string) {
+  if (table === "personal_movements") return deleteMovement(id);
   const { supabase, user } = await auth();
   const { error } = await supabase.from(table).delete().eq("id", id).eq("owner_id", user.id);
   if (error) fail(error.message); await refresh("Élément supprimé.");
@@ -211,9 +251,18 @@ export async function deleteItem(table: "personal_movements" | "personal_recurre
 export async function deleteMovement(id: string) {
   const { supabase, user } = await auth();
   if (!id) fail("Mouvement introuvable.");
-  const { data: movement, error: readError } = await supabase.from("personal_movements").select("id,transfer_group_id,recurrence_id,movement_date").eq("id", id).eq("owner_id", user.id).maybeSingle();
+  id = await resolveMonthlyMovementId(supabase, user.id, id);
+  const { data: movement, error: readError } = await supabase.from("personal_movements").select("id,transfer_group_id,recurrence_id,movement_date,source_type").eq("id", id).eq("owner_id", user.id).maybeSingle();
   if (readError) fail(readError.message);
   if (!movement) fail("Mouvement introuvable.");
+  if (movement.source_type === "children") {
+    // Keep the original source key as a tombstone, even if the date was edited.
+    const { error } = await supabase.from("personal_movements")
+      .update({ status: "cancelled", completed_date: null, completed_at: null })
+      .eq("owner_id", user.id).eq("id", id);
+    if (error) fail(error.message);
+    await refresh("Mouvement supprimé.");
+  }
   let deleteQuery = supabase.from("personal_movements").delete().eq("owner_id", user.id);
   deleteQuery = movement.transfer_group_id ? deleteQuery.eq("transfer_group_id", movement.transfer_group_id) : deleteQuery.eq("id", movement.id);
   const { error: deleteError } = await deleteQuery;
@@ -387,8 +436,9 @@ export async function createSavingsGoal(fd: FormData) {
 
 export async function toggleMovement(id: string, completed: boolean, transferGroupId?: string | null) {
   const { supabase, user } = await auth();
+  id = await resolveMonthlyMovementId(supabase, user.id, id);
   const completedDate = completed ? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()) : null;
-  let query = supabase.from("personal_movements").update({ status: completed ? "completed" : "planned", completed_date: completedDate, completed_at: completed ? new Date().toISOString() : null }).eq("owner_id", user.id);
+  let query = supabase.from("personal_movements").update({ status: completed ? "completed" : "planned", completed_date: completedDate, completed_at: completed ? new Date().toISOString() : null }).eq("owner_id", user.id).neq("status", "cancelled");
   query = transferGroupId ? query.eq("transfer_group_id", transferGroupId) : query.eq("id", id);
   const { error } = await query;
   if (error) fail(error.message); await refresh(completed ? "Mouvement pointé et intégré au solde à date." : "Mouvement replacé en prévision.");
@@ -586,7 +636,7 @@ export async function setRecurrenceOverride(fd: FormData) {
 
 export async function updateMovement(fd: FormData) {
   const { supabase, user } = await auth();
-  const id = text(fd, "id");
+  let id = text(fd, "id");
   const label = text(fd, "label");
   const amount = number(fd, "amount");
   const movementDate = text(fd, "movement_date");
@@ -595,11 +645,12 @@ export async function updateMovement(fd: FormData) {
   const excludeFromAnalysis = text(fd, "exclude_from_analysis") === "on";
   if (!id || !label || !accountId || !movementDate || !Number.isFinite(amount) || amount <= 0) fail("Mouvement incomplet.");
 
+  id = await resolveMonthlyMovementId(supabase, user.id, id);
   const { data: current, error: readError } = await supabase
     .from("personal_movements")
     .select("id,movement_type,transfer_group_id")
     .eq("id", id)
-    .eq("owner_id", user.id)
+    .eq("owner_id", user.id).neq("status", "cancelled")
     .maybeSingle();
   if (readError) fail(readError.message);
   if (!current) fail("Mouvement introuvable.");
@@ -610,7 +661,7 @@ export async function updateMovement(fd: FormData) {
     const { error: pairError } = await supabase
       .from("personal_movements")
       .update({ label, amount, movement_date: movementDate, category_id: categoryId, exclude_from_analysis: excludeFromAnalysis })
-      .eq("owner_id", user.id)
+      .eq("owner_id", user.id).neq("status", "cancelled")
       .eq("transfer_group_id", current.transfer_group_id);
     if (pairError) fail(pairError.message);
 
@@ -619,14 +670,14 @@ export async function updateMovement(fd: FormData) {
       .from("personal_movements")
       .update({ account_id: accountId })
       .eq("id", id)
-      .eq("owner_id", user.id);
+      .eq("owner_id", user.id).neq("status", "cancelled");
     if (accountError) fail(accountError.message);
   } else {
     const { error } = await supabase
       .from("personal_movements")
       .update({ label, amount, movement_date: movementDate, account_id: accountId, category_id: categoryId, exclude_from_analysis: excludeFromAnalysis })
       .eq("id", id)
-      .eq("owner_id", user.id);
+      .eq("owner_id", user.id).neq("status", "cancelled");
     if (error) fail(error.message);
   }
 
@@ -735,35 +786,6 @@ export async function saveChildrenSyncSettings(fd: FormData) {
   }, { onConflict: "owner_id" });
   if (error) fail(error.message);
   await refresh("Intégration ENFANTS mise à jour.");
-}
-
-export async function completeChildrenProjectedMovement(
-  sourceKey: string,
-  accountId: string,
-  movementType: "income" | "expense",
-  label: string,
-  amount: number,
-  movementDate: string,
-) {
-  const { supabase, user } = await auth();
-  if (!sourceKey.startsWith("children:") || !accountId || !["income","expense"].includes(movementType) || !/^\d{4}-\d{2}-\d{2}$/.test(movementDate) || !Number.isFinite(amount) || amount <= 0) fail("Régularisation ENFANTS incorrecte.");
-  const completedDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  const { error } = await supabase.from("personal_movements").upsert({
-    owner_id: user.id, account_id: accountId, category_id: null, movement_type: movementType,
-    label, amount, movement_date: movementDate, status: "completed", completed_date: completedDate,
-    completed_at: new Date().toISOString(), source_type: "children", source_key: sourceKey,
-  }, { onConflict: "owner_id,source_type,source_key" });
-  if (error) fail(error.message);
-  await refresh("Régularisation ENFANTS pointée. Son montant est désormais figé dans l'historique.");
-}
-
-export async function resetChildrenMovement(id: string) {
-  const { supabase, user } = await auth();
-  if (!id) fail("Mouvement ENFANTS introuvable.");
-  const { error } = await supabase.from("personal_movements").delete()
-    .eq("id", id).eq("owner_id", user.id).eq("source_type", "children");
-  if (error) fail(error.message);
-  await refresh("Régularisation ENFANTS replacée en prévision et resynchronisée.");
 }
 
 export async function deleteRecurrenceFromSettings(id: string) {
