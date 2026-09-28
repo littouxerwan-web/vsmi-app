@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
+import { occurrenceDate as originalOccurrenceDate, decisionSlot, recurrenceOccurrences } from "@/lib/perso/calendar";
 import { buildChildrenProjectedMovements } from "@/lib/perso/children-sync";
 
 const PATH = "/perso";
@@ -252,7 +253,7 @@ export async function deleteMovement(id: string) {
   const { supabase, user } = await auth();
   if (!id) fail("Mouvement introuvable.");
   id = await resolveMonthlyMovementId(supabase, user.id, id);
-  const { data: movement, error: readError } = await supabase.from("personal_movements").select("id,transfer_group_id,recurrence_id,movement_date,source_type").eq("id", id).eq("owner_id", user.id).maybeSingle();
+  const { data: movement, error: readError } = await supabase.from("personal_movements").select("id,transfer_group_id,recurrence_id,occurrence_date,movement_date,source_type").eq("id", id).eq("owner_id", user.id).maybeSingle();
   if (readError) fail(readError.message);
   if (!movement) fail("Mouvement introuvable.");
   if (movement.source_type === "children") {
@@ -263,14 +264,14 @@ export async function deleteMovement(id: string) {
     if (error) fail(error.message);
     await refresh("Mouvement supprimé.");
   }
+  if (movement.recurrence_id && movement.movement_date) {
+    const { error: exclusionError } = await supabase.from("personal_recurrence_exclusions").upsert({ owner_id: user.id, recurrence_id: movement.recurrence_id, occurrence_date: originalOccurrenceDate(movement) }, { onConflict: "recurrence_id,occurrence_date" });
+    if (exclusionError) fail(exclusionError.message);
+  }
   let deleteQuery = supabase.from("personal_movements").delete().eq("owner_id", user.id);
   deleteQuery = movement.transfer_group_id ? deleteQuery.eq("transfer_group_id", movement.transfer_group_id) : deleteQuery.eq("id", movement.id);
   const { error: deleteError } = await deleteQuery;
   if (deleteError) fail(deleteError.message);
-  if (movement.recurrence_id && movement.movement_date) {
-    const { error: exclusionError } = await supabase.from("personal_recurrence_exclusions").upsert({ owner_id: user.id, recurrence_id: movement.recurrence_id, occurrence_date: movement.movement_date }, { onConflict: "recurrence_id,occurrence_date" });
-    if (exclusionError) fail(exclusionError.message);
-  }
   await refresh("Mouvement supprimé.");
 }
 
@@ -284,6 +285,13 @@ export async function deleteMovementOccurrence(
 
   if (!recurrenceId || !occurrenceDate) {
     fail("Échéance récurrente introuvable.");
+  }
+
+  if (movementId) {
+    const { data: stored, error } = await supabase.from("personal_movements")
+      .select("recurrence_id,occurrence_date,movement_date").eq("owner_id",user.id).eq("id",movementId).single();
+    if(error||!stored||stored.recurrence_id!==recurrenceId) fail(error?.message??"Échéance introuvable.");
+    occurrenceDate=originalOccurrenceDate(stored);
   }
 
   const { error: exclusionError } = await supabase
@@ -389,7 +397,7 @@ export async function deleteRecurrenceSeriesFrom(
     .eq("owner_id", user.id)
     .eq("recurrence_id", recurrenceId)
     .eq("status", "completed")
-    .gte("movement_date", occurrenceDate);
+    .gte("occurrence_date", occurrenceDate);
   if (detachCompletedError) fail(detachCompletedError.message);
 
   const { error: movementError } = await supabase
@@ -398,7 +406,7 @@ export async function deleteRecurrenceSeriesFrom(
     .eq("owner_id", user.id)
     .eq("recurrence_id", recurrenceId)
     .neq("status", "completed")
-    .gte("movement_date", occurrenceDate);
+    .gte("occurrence_date", occurrenceDate);
 
   if (movementError) fail(movementError.message);
 
@@ -450,20 +458,25 @@ export async function completeRecurrenceOccurrence(recurrenceId: string, occurre
 
   const { data: recurrence, error: recurrenceError } = await supabase
     .from("personal_recurrences")
-    .select("id,account_id,destination_account_id,category_id,movement_type,label,amount,notes,savings_budget_id")
+    .select("id,account_id,destination_account_id,category_id,movement_type,label,amount,notes,savings_budget_id,start_date,end_date,frequency,interval_count,annual_change_percent")
     .eq("id", recurrenceId)
     .eq("owner_id", user.id)
     .single();
   if (recurrenceError || !recurrence) fail(recurrenceError?.message ?? "Récurrence introuvable.");
 
-  const { data: existing } = await supabase
+  if(!recurrenceOccurrences(recurrence,occurrenceDate,occurrenceDate).includes(occurrenceDate)) fail("Date d’origine de l’échéance incorrecte.");
+  const {data:excluded,error:excludedError}=await supabase.from("personal_recurrence_exclusions").select("id").eq("owner_id",user.id).eq("recurrence_id",recurrenceId).eq("occurrence_date",occurrenceDate).maybeSingle();
+  if(excludedError) fail(excludedError.message);
+  if(excluded) fail("Cette échéance a été supprimée.");
+  const { data: existing, error: existingError } = await supabase
     .from("personal_movements")
     .select("id,transfer_group_id")
     .eq("owner_id", user.id)
     .eq("recurrence_id", recurrenceId)
-    .eq("movement_date", occurrenceDate)
+    .eq("occurrence_date", occurrenceDate)
     .limit(1)
     .maybeSingle();
+  if(existingError) fail(existingError.message);
   if (existing) {
     const completedDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
     let query = supabase.from("personal_movements").update({ status: "completed", completed_date: completedDate, completed_at: new Date().toISOString() }).eq("owner_id", user.id);
@@ -481,14 +494,15 @@ export async function completeRecurrenceOccurrence(recurrenceId: string, occurre
     .eq("recurrence_id", recurrenceId)
     .eq("occurrence_month", month)
     .maybeSingle();
-  const amount = Number(override?.amount ?? recurrence.amount);
+  const years=Math.max(0,Number(occurrenceDate.slice(0,4))-Number(recurrence.start_date.slice(0,4)));
+  const amount = Number(override?.amount ?? Math.round(Number(recurrence.amount)*Math.pow(1+Number(recurrence.annual_change_percent||0)/100,years)*100)/100);
 
   if (recurrence.movement_type === "transfer") {
     if (!recurrence.destination_account_id) fail("Le compte destinataire du virement interne est manquant.");
     const group = crypto.randomUUID();
     const { error } = await supabase.from("personal_movements").insert([
-      { owner_id: user.id, account_id: recurrence.account_id, category_id: recurrence.category_id, movement_type: "transfer_out", label: recurrence.label, amount, movement_date: occurrenceDate, status: "completed", completed_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()), completed_at: new Date().toISOString(), notes: recurrence.notes, transfer_group_id: group, recurrence_id: recurrenceId },
-      { owner_id: user.id, account_id: recurrence.destination_account_id, category_id: recurrence.category_id, movement_type: "transfer_in", label: recurrence.label, amount, movement_date: occurrenceDate, status: "completed", completed_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()), completed_at: new Date().toISOString(), notes: recurrence.notes, transfer_group_id: group, recurrence_id: recurrenceId, savings_budget_id: recurrence.savings_budget_id },
+      { owner_id: user.id, account_id: recurrence.account_id, category_id: recurrence.category_id, movement_type: "transfer_out", label: recurrence.label, amount, movement_date: occurrenceDate, occurrence_date: occurrenceDate, status: "completed", completed_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()), completed_at: new Date().toISOString(), notes: recurrence.notes, transfer_group_id: group, recurrence_id: recurrenceId },
+      { owner_id: user.id, account_id: recurrence.destination_account_id, category_id: recurrence.category_id, movement_type: "transfer_in", label: recurrence.label, amount, movement_date: occurrenceDate, occurrence_date: occurrenceDate, status: "completed", completed_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()), completed_at: new Date().toISOString(), notes: recurrence.notes, transfer_group_id: group, recurrence_id: recurrenceId, savings_budget_id: recurrence.savings_budget_id },
     ]);
     if (error) fail(error.message);
     if(recurrence.savings_budget_id){ const {data:b}=await supabase.from("personal_savings_budgets").select("allocation_value").eq("id",recurrence.savings_budget_id).eq("owner_id",user.id).single(); const {error:e}=await supabase.from("personal_savings_budgets").update({allocation_value:Number(b?.allocation_value??0)+amount}).eq("id",recurrence.savings_budget_id).eq("owner_id",user.id); if(e) fail(e.message); }
@@ -500,7 +514,7 @@ export async function completeRecurrenceOccurrence(recurrenceId: string, occurre
       movement_type: recurrence.movement_type,
       label: recurrence.label,
       amount,
-      movement_date: occurrenceDate,
+      movement_date: occurrenceDate, occurrence_date: occurrenceDate,
       status: "completed",
       completed_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()), completed_at: new Date().toISOString(),
       notes: recurrence.notes,
@@ -642,7 +656,8 @@ export async function updateMovement(fd: FormData) {
   const movementDate = text(fd, "movement_date");
   const accountId = text(fd, "account_id");
   const categoryId = optional(fd, "category_id");
-  const excludeFromAnalysis = text(fd, "exclude_from_analysis") === "on";
+  const analysisPatch = fd.has("exclude_from_analysis_present") || fd.has("exclude_from_analysis")
+    ? { exclude_from_analysis: text(fd, "exclude_from_analysis") === "on" } : {};
   if (!id || !label || !accountId || !movementDate || !Number.isFinite(amount) || amount <= 0) fail("Mouvement incomplet.");
 
   id = await resolveMonthlyMovementId(supabase, user.id, id);
@@ -660,7 +675,7 @@ export async function updateMovement(fd: FormData) {
     // toujours rester identiques sur les deux jambes du transfert.
     const { error: pairError } = await supabase
       .from("personal_movements")
-      .update({ label, amount, movement_date: movementDate, category_id: categoryId, exclude_from_analysis: excludeFromAnalysis })
+      .update({ label, amount, movement_date: movementDate, category_id: categoryId, ...analysisPatch })
       .eq("owner_id", user.id).neq("status", "cancelled")
       .eq("transfer_group_id", current.transfer_group_id);
     if (pairError) fail(pairError.message);
@@ -675,7 +690,7 @@ export async function updateMovement(fd: FormData) {
   } else {
     const { error } = await supabase
       .from("personal_movements")
-      .update({ label, amount, movement_date: movementDate, account_id: accountId, category_id: categoryId, exclude_from_analysis: excludeFromAnalysis })
+      .update({ label, amount, movement_date: movementDate, account_id: accountId, category_id: categoryId, ...analysisPatch })
       .eq("id", id)
       .eq("owner_id", user.id).neq("status", "cancelled");
     if (error) fail(error.message);
@@ -1006,162 +1021,29 @@ function savingsProposalKey(fd: FormData) {
   const sourceAccountId = text(fd, "source_account_id");
   const destinationAccountId = text(fd, "destination_account_id");
   const sourceMonth = text(fd, "source_month");
-  if (!sourceAccountId || !destinationAccountId || sourceAccountId === destinationAccountId || !/^\d{4}-\d{2}$/.test(sourceMonth)) fail("Proposition d’épargne incorrecte.");
-  const proposalDateRaw = optional(fd, "proposal_date");
-  const proposalDate = proposalDateRaw && /^\d{4}-\d{2}-\d{2}$/.test(proposalDateRaw) ? proposalDateRaw : `${sourceMonth}-28`;
-  return { sourceAccountId, destinationAccountId, sourceMonth, sourceMonthDate: `${sourceMonth}-01`, proposalDate };
+  const proposalDate = optional(fd,"proposal_date") ?? `${sourceMonth}-01`;
+  const slot = fd.has("decision_slot") ? number(fd,"decision_slot") : decisionSlot(proposalDate);
+  if (!sourceAccountId || !destinationAccountId || sourceAccountId===destinationAccountId ||
+      !/^\d{4}-(0[1-9]|1[0-2])$/.test(sourceMonth) || ![1,15].includes(slot) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(proposalDate) || !proposalDate.startsWith(sourceMonth)) fail("Proposition d’épargne incorrecte.");
+  return { sourceAccountId, destinationAccountId, sourceMonth, slot };
 }
 
-async function verifySavingsAccounts(supabase: any, ownerId: string, sourceAccountId: string, destinationAccountId: string) {
-  const { data: rows, error } = await supabase.from("personal_accounts").select("id,account_type").eq("owner_id", ownerId).in("id", [sourceAccountId, destinationAccountId]).eq("is_active", true);
-  if (error) fail(error.message);
-  const source = rows?.find((a: { id: string; account_type: string }) => a.id === sourceAccountId);
-  const destination = rows?.find((a: { id: string; account_type: string }) => a.id === destinationAccountId);
-  const isSavingsDeposit = source?.account_type === "checking" && destination?.account_type === "savings";
-  const isSavingsUse = source?.account_type === "savings" && destination?.account_type === "checking";
-  if (!source || !destination || (!isSavingsDeposit && !isSavingsUse)) fail("Les comptes de la proposition d’épargne sont incorrects.");
+async function mutateSavingsDecision(fd: FormData, operation: "accept" | "update" | "delete") {
+  const {supabase}=await auth();
+  const key=savingsProposalKey(fd), amount=operation==="delete"?0:number(fd,"amount");
+  if(!Number.isFinite(amount)||(operation!=="delete"&&amount<=0)) fail("Montant incorrect.");
+  // The decision and BOTH transfer legs are changed atomically, under RLS, in SQL.
+  const {error}=await supabase.rpc("mutate_personal_savings_decision",{
+    p_source:key.sourceAccountId,p_destination:key.destinationAccountId,p_month:`${key.sourceMonth}-01`,
+    p_slot:key.slot,p_action:operation,p_amount:amount,
+  });
+  if(error) fail(error.message);
+  savingsSuccess(fd,operation==="delete"?"Proposition d’épargne supprimée.":operation==="accept"?"Proposition acceptée et virement enregistré.":"Proposition d’épargne modifiée.");
 }
-
-async function savingsTransferGroupsForMonth(supabase:any, ownerId:string, sourceAccountId:string, destinationAccountId:string, sourceMonth:string, isSavingsUse:boolean){
-  const start=`${sourceMonth}-01`;
-  const next=(()=>{const d=new Date(`${start}T12:00:00`);d.setMonth(d.getMonth()+1);return d.toISOString().slice(0,10)})();
-  const prefix=isSavingsUse?"Utilisation d'épargne conseillée":"Versement épargne proposé";
-  const {data:outs,error:outError}=await supabase.from("personal_movements").select("transfer_group_id").eq("owner_id",ownerId).eq("account_id",sourceAccountId).eq("movement_type","transfer_out").gte("movement_date",start).lt("movement_date",next).like("label",`${prefix}%`).not("transfer_group_id","is",null).neq("status","cancelled");
-  if(outError) fail(outError.message);
-  const groups=[...new Set((outs??[]).map((row:{transfer_group_id:string|null})=>row.transfer_group_id).filter(Boolean))] as string[];
-  if(groups.length===0)return [] as string[];
-  const {data:ins,error:inError}=await supabase.from("personal_movements").select("transfer_group_id").eq("owner_id",ownerId).eq("account_id",destinationAccountId).eq("movement_type","transfer_in").in("transfer_group_id",groups).neq("status","cancelled");
-  if(inError) fail(inError.message);
-  const valid=new Set((ins??[]).map((row:{transfer_group_id:string|null})=>row.transfer_group_id).filter(Boolean));
-  return groups.filter(group=>valid.has(group));
-}
-
-export async function acceptSavingsProposal(fd: FormData) {
-  const { supabase, user } = await auth();
-  const key = savingsProposalKey(fd); const amount = number(fd, "amount");
-  const previousTransferGroupId = optional(fd,"previous_transfer_group_id");
-  if (!Number.isFinite(amount) || amount <= 0) fail("Le montant proposé doit être supérieur à zéro.");
-  await verifySavingsAccounts(supabase, user.id, key.sourceAccountId, key.destinationAccountId);
-  const { data: accountRows, error: accountError } = await supabase.from("personal_accounts").select("id,account_type").eq("owner_id", user.id).in("id", [key.sourceAccountId, key.destinationAccountId]);
-  if (accountError) fail(accountError.message);
-  const sourceType = accountRows?.find((row: { id: string; account_type: string }) => row.id === key.sourceAccountId)?.account_type;
-  const isSavingsUse = sourceType === "savings";
-  const { data: existing, error: existingError } = await supabase.from("personal_savings_proposals").select("id,status,transfer_group_id").eq("owner_id", user.id).eq("source_account_id", key.sourceAccountId).eq("destination_account_id", key.destinationAccountId).eq("source_month", key.sourceMonthDate).maybeSingle();
-  if (existingError) fail(existingError.message);
-  const existingGroups=await savingsTransferGroupsForMonth(supabase,user.id,key.sourceAccountId,key.destinationAccountId,key.sourceMonth,isSavingsUse);
-  if(existing?.status==="accepted"&&existing.transfer_group_id){
-    const materialized=existingGroups.includes(existing.transfer_group_id);
-    // Un second versement n'est accepté que depuis une carte recalculée après le premier.
-    // Cela empêche un double-clic sur « Accepter » de créer deux virements identiques.
-    if(!materialized||previousTransferGroupId!==existing.transfer_group_id) savingsSuccess(fd,"Ce versement d’épargne est déjà accepté.");
-  }
-  if(!isSavingsUse&&existingGroups.length>=2)savingsSuccess(fd,"Deux versements d’épargne sont déjà enregistrés pour ce mois.");
-  let category: { id: string } | null = null;
-  if (!isSavingsUse) {
-    const { data, error: categoryError } = await supabase.from("personal_categories").select("id").eq("owner_id", user.id).eq("name", "Épargne").eq("movement_type", "expense").is("parent_id", null).maybeSingle();
-    if (categoryError) fail(categoryError.message);
-    category = data;
-    if (!category) {
-      const { data: created, error } = await supabase.from("personal_categories").insert({ owner_id: user.id, name: "Épargne", movement_type: "expense", parent_id: null, monthly_budget: 0, account_id: key.sourceAccountId, is_active: true }).select("id").single();
-      if (error) fail(error.message); category = created;
-    }
-  }
-  const group = crypto.randomUUID();
-  const completedAt = new Date().toISOString();
-  const completedDate = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Paris",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-  const movementDate = completedDate;
-  const label = isSavingsUse ? `Utilisation d'épargne conseillée · ${key.sourceMonth}` : `Versement épargne proposé · ${key.sourceMonth}`;
-  const { error: movementError } = await supabase.from("personal_movements").insert([
-    {
-      owner_id: user.id,
-      account_id: key.sourceAccountId,
-      category_id: isSavingsUse ? null : category?.id ?? null,
-      movement_type: "transfer_out",
-      label,
-      amount,
-      movement_date: movementDate,
-      status: "completed",
-      completed_date: completedDate,
-      completed_at: completedAt,
-      transfer_group_id: group,
-    },
-    {
-      owner_id: user.id,
-      account_id: key.destinationAccountId,
-      category_id: null,
-      movement_type: "transfer_in",
-      label,
-      amount,
-      movement_date: movementDate,
-      status: "completed",
-      completed_date: completedDate,
-      completed_at: completedAt,
-      transfer_group_id: group,
-    },
-  ]);
-  if (movementError) fail(movementError.message);
-  const payload = { owner_id: user.id, source_account_id: key.sourceAccountId, destination_account_id: key.destinationAccountId, source_month: key.sourceMonthDate, amount, status: "accepted", transfer_group_id: group, accepted_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-  const { error } = await supabase.from("personal_savings_proposals").upsert(payload, { onConflict: "owner_id,source_account_id,destination_account_id,source_month" });
-  if (error) {
-    await supabase.from("personal_movements").delete().eq("owner_id", user.id).eq("transfer_group_id", group);
-    fail(error.message);
-  }
-  savingsSuccess(fd, existingGroups.length===1&&!isSavingsUse?"Deuxième versement d’épargne effectué.":"Proposition d’épargne acceptée et virement effectué.");
-}
-
-export async function updateSavingsProposalAmount(fd: FormData) {
-  const { supabase, user } = await auth();
-  const key = savingsProposalKey(fd); const amount = number(fd, "amount");
-  if (!Number.isFinite(amount) || amount <= 0) fail("Le montant doit être supérieur à zéro.");
-  await verifySavingsAccounts(supabase, user.id, key.sourceAccountId, key.destinationAccountId);
-  const { data: existing, error: readError } = await supabase.from("personal_savings_proposals").select("amount,status,transfer_group_id").eq("owner_id", user.id).eq("source_account_id", key.sourceAccountId).eq("destination_account_id", key.destinationAccountId).eq("source_month", key.sourceMonthDate).maybeSingle();
-  if (readError) fail(readError.message);
-
-  const previousTransferGroupId=optional(fd,"previous_transfer_group_id");
-  const editingSecondProposal=existing?.status==="accepted"&&existing.transfer_group_id&&previousTransferGroupId===existing.transfer_group_id;
-  const nextStatus = existing?.status === "accepted"&&!editingSecondProposal ? "accepted" : "pending";
-  const proposalPayload = { owner_id: user.id, source_account_id: key.sourceAccountId, destination_account_id: key.destinationAccountId, source_month: key.sourceMonthDate, amount, status: nextStatus, transfer_group_id: editingSecondProposal?null:(existing?.transfer_group_id ?? null), updated_at: new Date().toISOString() };
-  const { error: proposalError } = await supabase.from("personal_savings_proposals").upsert(proposalPayload, { onConflict: "owner_id,source_account_id,destination_account_id,source_month" });
-  if (proposalError) fail(proposalError.message);
-
-  if (existing?.status === "accepted" && existing.transfer_group_id && !editingSecondProposal) {
-    const { error: movementError } = await supabase.from("personal_movements").update({ amount }).eq("owner_id", user.id).eq("transfer_group_id", existing.transfer_group_id);
-    if (movementError) {
-      // Restaure la proposition précédente : pas de montant incohérent entre carte et virement.
-      await supabase.from("personal_savings_proposals").upsert({ ...proposalPayload, amount: Number(existing.amount), status: existing.status, updated_at: new Date().toISOString() }, { onConflict: "owner_id,source_account_id,destination_account_id,source_month" });
-      fail(movementError.message);
-    }
-  }
-  savingsSuccess(fd, "Montant du versement d’épargne modifié.");
-}
-
-export async function deleteSavingsProposal(fd: FormData) {
-  const { supabase, user } = await auth();
-  const key = savingsProposalKey(fd);
-  const previousTransferGroupId=optional(fd,"previous_transfer_group_id");
-  const { data: existing, error: readError } = await supabase.from("personal_savings_proposals").select("amount,status,transfer_group_id,accepted_at").eq("owner_id", user.id).eq("source_account_id", key.sourceAccountId).eq("destination_account_id", key.destinationAccountId).eq("source_month", key.sourceMonthDate).maybeSingle();
-  if (readError) fail(readError.message);
-
-  const deletedPayload = { owner_id: user.id, source_account_id: key.sourceAccountId, destination_account_id: key.destinationAccountId, source_month: key.sourceMonthDate, amount: 0, status: "deleted", transfer_group_id: null, accepted_at: null, updated_at: new Date().toISOString() };
-  const { error: proposalError } = await supabase.from("personal_savings_proposals").upsert(deletedPayload, { onConflict: "owner_id,source_account_id,destination_account_id,source_month" });
-  if (proposalError) fail(proposalError.message);
-
-  const deletingSecondSuggestion=existing?.status==="accepted"&&existing.transfer_group_id&&previousTransferGroupId===existing.transfer_group_id;
-  if (existing?.transfer_group_id && !deletingSecondSuggestion) {
-    const { error: movementError } = await supabase.from("personal_movements").delete().eq("owner_id", user.id).eq("transfer_group_id", existing.transfer_group_id);
-    if (movementError) {
-      // Si la suppression du virement échoue, restaure la décision précédente.
-      await supabase.from("personal_savings_proposals").upsert({ owner_id: user.id, source_account_id: key.sourceAccountId, destination_account_id: key.destinationAccountId, source_month: key.sourceMonthDate, amount: Number(existing.amount), status: existing.status, transfer_group_id: existing.transfer_group_id, accepted_at: existing.accepted_at ?? null, updated_at: new Date().toISOString() }, { onConflict: "owner_id,source_account_id,destination_account_id,source_month" });
-      fail(movementError.message);
-    }
-  }
-  savingsSuccess(fd, "Proposition d’épargne supprimée.");
-}
+export async function acceptSavingsProposal(fd: FormData) { await mutateSavingsDecision(fd,"accept"); }
+export async function updateSavingsProposalAmount(fd: FormData) { await mutateSavingsDecision(fd,"update"); }
+export async function deleteSavingsProposal(fd: FormData) { await mutateSavingsDecision(fd,"delete"); }
 
 
 function savingsBudgetRedirect(message:string){

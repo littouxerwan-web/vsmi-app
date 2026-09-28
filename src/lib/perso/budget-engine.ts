@@ -1,3 +1,5 @@
+import { accountingDate } from "./calendar";
+
 export type BudgetCategory = {
   id: string;
   parent_id: string | null;
@@ -92,3 +94,49 @@ export function calculateBudgetRemaining(
 ): number {
   return Math.max(0, Number(monthlyBudget || 0) - Number(spentAmount || 0));
 }
+
+export type BudgetStatement = {
+  id: string; name: string; month: string; account_id: string | null;
+  movement_type: string; initial: number; realized: number; committed: number;
+  uncommitted: number; overrun: number; futureTotal: number;
+};
+type BudgetMovement = BudgetFlow & {
+  category_id: string | null; status: string; movement_date: string;
+  completed_date?: string | null; completed_at?: string | null;
+};
+
+/** One global envelope across all PERSO accounts. Transfers never consume it. */
+export function buildBudgetStatements(input: {
+  months: string[]; today: string; categories: (BudgetCategory & { name?: string })[];
+  accounts: BudgetAccount[]; movementDefaultAccountId: string | null;
+  movements: BudgetMovement[]; futureOperations: BudgetMovement[];
+}): BudgetStatement[] {
+  const root = createCategoryRootResolver(input.categories);
+  const realized = new Map<string, BudgetFlow[]>(), committed = new Map<string, BudgetFlow[]>();
+  const register = (map: Map<string, BudgetFlow[]>, row: BudgetMovement, day: string) => {
+    if (!["expense", "income"].includes(row.movement_type)) return;
+    const id = root(row.category_id); if (!id) return;
+    const key = `${day.slice(0, 7)}:${id}`;
+    const rows = map.get(key) ?? []; rows.push(row); map.set(key, rows);
+  };
+  for (const row of input.movements) {
+    if (row.status === "completed" && accountingDate(row) <= input.today) register(realized, row, accountingDate(row));
+  }
+  for (const row of input.futureOperations) {
+    if (row.status === "planned") register(committed, row, row.movement_date);
+  }
+  return input.months.flatMap(month => input.categories
+    .filter(category => !category.parent_id && Number(category.monthly_budget) > 0 && isBudgetActiveForMonth(category, month))
+    .map(category => {
+      const key = `${month}:${category.id}`, type = category.movement_type ?? "expense";
+      const initial = cents(category.monthly_budget);
+      const paid = cents(calculateBudgetUsage(initial, realized.get(key) ?? [], type).spent);
+      const planned = cents(calculateBudgetUsage(initial, committed.get(key) ?? [], type).spent);
+      const uncommitted = cents(Math.max(0, initial - paid - planned));
+      return { id: category.id, name: category.name ?? "Budget", month,
+        account_id: resolveBudgetAccountId(category, input.movementDefaultAccountId, input.accounts), movement_type: type,
+        initial, realized: paid, committed: planned, uncommitted,
+        overrun: cents(Math.max(0, paid + planned - initial)), futureTotal: cents(planned + uncommitted) };
+    }));
+}
+const cents = (amount: number) => Math.round(Number(amount) * 100) / 100;

@@ -76,6 +76,7 @@ function setup(self = 'person_1') {
     'next/headers': { headers: async () => new Headers({ referer: 'http://localhost/perso?vue=finances&month=2026-09' }) },
     '@/lib/supabase/server': { createClient: async () => client },
     '@/lib/perso/children-sync': generator,
+    '@/lib/perso/calendar': require('./helpers/load-typescript.cjs')('src/lib/perso/calendar.ts'),
   });
   const projected = () => generator.buildChildrenProjectedMovements({
     settings: db.children_settings[0], expenses: db.children_expenses, accountId: 'account', day: 5, self, enabled: true,
@@ -203,4 +204,16 @@ test('les mouvements ordinaires conservent leur pointage et leur suppression phy
   await invoke(s.actions.deleteMovement('ordinary'));
   assert.equal(s.db.personal_movements.length, 1);
   assert.equal(s.db.personal_movements[0].id, children.id);
+});
+
+test('modifier depuis Projection préserve exclude_from_analysis absent du formulaire', async () => {
+  const s = setup();
+  await invoke(s.actions.updateMovement(edit(virtualId)));
+  const row = s.db.personal_movements[0];
+  const form = edit(row.id); form.delete('exclude_from_analysis'); form.set('label', 'Nouveau libellé');
+  await invoke(s.actions.updateMovement(form));
+  assert.equal(row.exclude_from_analysis, true);
+  form.set('exclude_from_analysis_present', '1');
+  await invoke(s.actions.updateMovement(form));
+  assert.equal(row.exclude_from_analysis, false);
 });

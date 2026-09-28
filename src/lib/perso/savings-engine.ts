@@ -65,7 +65,7 @@ export function savingsAvailabilityForAccount(savingsBalance:number,accountId:st
 export function mobilizableSavingsForAccount(savingsBalance:number,accountId:string,budgets:SavingsBudgetAllocation[]|undefined,floor=30){
  return savingsAvailabilityForAccount(savingsBalance,accountId,budgets,floor).totalUsable;
 }
-export type SavingsProposalDecision={source_account_id:string;destination_account_id:string;source_month:string;amount:number;status:"pending"|"accepted"|"deleted";transfer_group_id?:string|null};
+export type SavingsProposalDecision={source_account_id:string;destination_account_id:string;source_month:string;amount:number;status:"pending"|"accepted"|"deleted";decision_slot?:number|null;transfer_group_id?:string|null};
 export type SavingsPlanRow={
  month:string; openingChecking:number; checking:number; savings:number; proposal:number; savingsUsed:number;
  balanceAfterSavingsUse:number; income:number; expense:number; debitExcludingBudgetRemaining:number; budgetRemaining:number;

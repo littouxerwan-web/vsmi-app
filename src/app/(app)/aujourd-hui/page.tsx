@@ -1,3 +1,4 @@
+import { accountingDate } from "@/lib/perso/calendar";
 import { createClient } from "@/lib/supabase/server";
 import { TodayDashboard } from "@/components/today-dashboard";
 import { buildReliableProjection } from "@/lib/perso/reliable-projection-engine";
@@ -84,13 +85,13 @@ export default async function TodayPage() {
   ] = await Promise.all([
     supabase.from("personal_accounts").select("id,name,account_type,is_default,color,display_order").eq("owner_id", user.id).eq("is_active", true).order("display_order", { ascending: true }).order("name"),
     supabase.from("personal_balance_snapshots").select("account_id,balance,snapshot_date,created_at").eq("owner_id", user.id).order("snapshot_date", { ascending: false }),
-    supabase.from("personal_movements").select("id,account_id,category_id,movement_type,label,amount,movement_date,status,completed_date,completed_at,recurrence_id,transfer_group_id,source_type,source_key").eq("owner_id", user.id),
+    supabase.from("personal_movements").select("id,account_id,category_id,movement_type,label,amount,movement_date,status,completed_date,completed_at,occurrence_date,recurrence_id,transfer_group_id,source_type,source_key").eq("owner_id", user.id),
     supabase.from("personal_categories").select("id,name,movement_type,parent_id,monthly_budget,account_id,budget_period,budget_month,budget_start_date,budget_end_date").eq("owner_id", user.id).eq("is_active", true).order("name"),
     supabase.from("personal_recurrences").select("id,account_id,destination_account_id,category_id,movement_type,label,amount,frequency,interval_count,start_date,end_date,annual_change_percent,is_active").eq("owner_id", user.id).eq("is_active", true).order("start_date"),
     supabase.from("personal_recurrence_overrides").select("recurrence_id,occurrence_month,amount").eq("owner_id", user.id),
     supabase.from("personal_recurrence_exclusions").select("recurrence_id,occurrence_date").eq("owner_id", user.id),
     supabase.from("personal_settings").select("photo_default_account_id,movement_default_account_id,urssaf_default_account_id,savings_source_account_id,savings_destination_account_id,savings_threshold,savings_source_account_2_id,savings_destination_account_2_id,savings_threshold_2,children_sync_enabled,children_sync_account_id,children_sync_day,children_sync_person").eq("owner_id", user.id).maybeSingle(),
-    supabase.from("personal_savings_proposals").select("source_account_id,destination_account_id,source_month,amount,status,transfer_group_id").eq("owner_id", user.id),
+    supabase.from("personal_savings_proposals").select("source_account_id,destination_account_id,source_month,decision_slot,amount,status,transfer_group_id").eq("owner_id", user.id),
     supabase.from("personal_savings_budgets").select("id,account_id,name,kind,allocation_mode,allocation_value,protection,allow_recovery,critical_threshold,target_amount,target_date,priority").eq("owner_id", user.id),
     personalOnly ? Promise.resolve({ data: [] }) : supabase.from("wedding_payments").select("id,display_name,wedding_date,payment_type,amount,expected_date,received_date,status").eq("owner_id", user.id).neq("status", "cancelled").order("expected_date"),
     personalOnly ? Promise.resolve({ data: [] }) : supabase.from("personal_photo_payment_states").select("payment_id,account_id,is_completed,completed_date").eq("owner_id", user.id),
@@ -117,7 +118,7 @@ export default async function TodayPage() {
   const completedMovements = ((movements ?? []) as any[]).filter((movement) => {
     if (movement.status !== "completed") return false;
     const snapshot = latest.get(movement.account_id);
-    const effectiveDate = movement.completed_date ?? movement.movement_date;
+    const effectiveDate = accountingDate(movement);
     if (effectiveDate > today) return false;
     if (!snapshot) return true;
     if (!movement.completed_at) return effectiveDate > snapshot.snapshot_date;
@@ -144,7 +145,7 @@ export default async function TodayPage() {
       ...payment,
       accounting_status: payment.status,
       status: state?.is_completed ? "received" : "expected",
-      received_date: state?.completed_date ?? null,
+      received_date: state?.completed_date ?? payment.received_date ?? null,
       personal_account_id: state?.account_id ?? null,
     };
   });
@@ -200,7 +201,7 @@ export default async function TodayPage() {
     enabled: childrenSyncEnabled,
     throughYear: 2032,
   });
-  const projectionMovements = [...(movements as any[]), ...childrenProjected];
+  const projectionMovements = [...((allMovements ?? []) as any[]), ...childrenProjected];
 
   const projection = buildReliableProjection({
     accounts: accounts as any,
