@@ -30,7 +30,7 @@ m AS (
 p AS (
  SELECT row_number() OVER (ORDER BY j->>'id') AS ref,j,
  j->>'owner_id' owner_id,j->>'source_account_id' src,j->>'destination_account_id' dst,
- j->>'source_month' month,j->>'status' status,j->>'transfer_group_id' grp,
+ j->>'source_month' source_month,j->>'status' status,j->>'transfer_group_id' grp,
  CASE WHEN j ? 'decision_slot' THEN j->>'decision_slot' ELSE '0' END slot,
  (j->>'amount')::numeric amount
  FROM (SELECT to_jsonb(x) j FROM public.personal_savings_proposals x) x
@@ -88,7 +88,7 @@ rec_dups AS (
 ),
 proposal_dups AS (
  SELECT count(*) n,min(ref) sample_ref FROM p
- GROUP BY owner_id,src,dst,month,slot HAVING count(*)>1
+ GROUP BY owner_id,src,dst,source_month,slot HAVING count(*)>1
 ),
 g AS (
  SELECT row_number() OVER (ORDER BY grp) ref,grp,count(*) n,
@@ -121,10 +121,10 @@ rec_rows AS (
 proposal_check AS (
  SELECT p.*,g.ref group_ref,
  ARRAY_REMOVE(ARRAY[
- CASE WHEN p.owner_id IS NULL OR p.src IS NULL OR p.dst IS NULL OR p.month IS NULL THEN 'cle_nulle' END,
+ CASE WHEN p.owner_id IS NULL OR p.src IS NULL OR p.dst IS NULL OR p.source_month IS NULL THEN 'cle_nulle' END,
  CASE WHEN p.src=p.dst THEN 'meme_compte' END,
  CASE WHEN p.slot IS NULL OR p.slot NOT IN ('0','1','15') THEN 'creneau_incompatible' END,
- CASE WHEN p.month IS NOT NULL AND p.month::date<>date_trunc('month',p.month::date)::date THEN 'mois_non_premier_jour' END,
+ CASE WHEN p.source_month IS NOT NULL AND p.source_month::date<>date_trunc('month',p.source_month::date)::date THEN 'mois_non_premier_jour' END,
  CASE WHEN p.status IS NULL OR p.status NOT IN ('pending','accepted','deleted') THEN 'statut_inattendu' END,
  CASE WHEN p.amount IS NULL OR p.amount::text IN ('NaN','Infinity','-Infinity') OR p.amount<0
     OR (p.status IN ('accepted','pending') AND p.amount<=0) THEN 'montant_incompatible' END,
@@ -242,10 +242,10 @@ report AS (
  SELECT '15_decisions_historiques',jsonb_build_object(
  'anomalies',(SELECT count(*) FROM proposal_check WHERE cardinality(problems)>0),
  'par_diagnostic',(SELECT jsonb_object_agg(problem,n) FROM (SELECT problem,count(*) n FROM proposal_check CROSS JOIN LATERAL unnest(problems) problem GROUP BY problem) x),
- 'exemples',(SELECT coalesce(jsonb_agg(to_jsonb(x)),'[]'::jsonb) FROM (SELECT ref AS proposition_ref,month,status,slot,group_ref,problems FROM proposal_check WHERE cardinality(problems)>0 ORDER BY ref LIMIT 30) x),
+ 'exemples',(SELECT coalesce(jsonb_agg(to_jsonb(x)),'[]'::jsonb) FROM (SELECT ref AS proposition_ref,source_month,status,slot,group_ref,problems FROM proposal_check WHERE cardinality(problems)>0 ORDER BY ref LIMIT 30) x),
  'historiques_mensuelles_acceptees_ou_supprimees',(SELECT count(*) FROM p WHERE slot='0' AND status IN ('accepted','deleted')),
  'groupes_partages_par_plusieurs_decisions',(SELECT count(*) FROM (SELECT grp FROM p WHERE grp IS NOT NULL GROUP BY grp HAVING count(*)>1) x),
- 'mois_melangeant_legacy_et_nouveaux_creneaux',(SELECT count(*) FROM (SELECT owner_id,src,dst,month FROM p GROUP BY owner_id,src,dst,month HAVING bool_or(slot='0') AND bool_or(slot IN ('1','15'))) x))
+ 'mois_melangeant_legacy_et_nouveaux_creneaux',(SELECT count(*) FROM (SELECT owner_id,src,dst,source_month FROM p GROUP BY owner_id,src,dst,source_month HAVING bool_or(slot='0') AND bool_or(slot IN ('1','15'))) x))
  UNION ALL
  SELECT '16_integrite_mouvements',jsonb_build_object(
  'cles_nulles',(SELECT count(*) FROM m WHERE owner_id IS NULL OR account_id IS NULL OR id IS NULL),
