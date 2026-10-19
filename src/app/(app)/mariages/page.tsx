@@ -70,13 +70,13 @@ export default async function WeddingsPage({
   });
 
   return (
-    <main className="mariages-ledger-theme px-4 py-5 sm:px-5 sm:py-8 lg:px-8">
+    <main className="premium-photo mariages-ledger-theme px-4 py-5 sm:px-5 sm:py-8 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="premium-page-intro flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-medium text-neutral-500">Réservations confirmées</p>
+            <p className="premium-eyebrow">PHOTO · VOTRE STUDIO</p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight">Mes Mariages</h1>
-            <p className="mt-2 text-neutral-600">Tous les mariages réservés avec acompte reçu.</p>
+            <p className="mt-2 text-neutral-600">Vos mariages, vos clients et les moments à venir.</p>
           </div>
           <Link href="/mariages/nouveau" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-black px-5 py-3 text-sm font-medium text-white hover:bg-neutral-800">
             <Plus size={18} /> Nouveau mariage
@@ -98,7 +98,7 @@ export default async function WeddingsPage({
             years.map((year, index) => {
               const weddings = activeWeddings.filter((wedding) => wedding.wedding_date.startsWith(year));
               return (
-                <details key={year} open={index === 0} className="overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm">
+                <details key={year} open={index === 0} className="premium-photo-year overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm">
                   <summary className="flex cursor-pointer list-none items-center justify-between bg-neutral-50 px-6 py-5">
                     <div>
                       <h2 className="text-xl font-semibold">{year}</h2>
@@ -107,14 +107,14 @@ export default async function WeddingsPage({
                     <p className="font-semibold">{money.format(weddings.reduce((sum, wedding) => sum + Number(wedding.total_amount), 0))}</p>
                   </summary>
 
-                  <div className="hidden grid-cols-[140px_1.3fr_1fr_140px_110px] gap-4 border-y border-black/10 bg-white px-6 py-3 text-xs font-medium uppercase tracking-[0.12em] text-neutral-500 md:grid">
+                  <div className="hidden grid-cols-[120px_minmax(0,1.3fr)_minmax(0,1fr)_110px_100px] gap-4 border-y border-black/10 bg-white px-6 py-3 text-xs font-medium uppercase tracking-[0.12em] text-neutral-500 lg:grid">
                     <span>Date</span><span>Nom</span><span>Ville</span><span className="text-right">Budget</span><span />
                   </div>
 
                   {weddings.map((wedding) => {
                     const archiveAction = archiveWedding.bind(null, wedding.id);
                     return (
-                      <div key={wedding.id} className="grid gap-3 border-b border-black/5 px-4 py-5 last:border-0 sm:px-6 md:grid-cols-[140px_1.3fr_1fr_140px_110px] md:items-center">
+                      <div key={wedding.id} className="premium-photo-row grid gap-3 border-b border-black/5 px-4 py-5 last:border-0 sm:px-6 lg:grid-cols-[120px_minmax(0,1.3fr)_minmax(0,1fr)_110px_100px] lg:items-center">
                         <Link href={`/mariages/${wedding.id}`} className="contents">
                           <p className="flex items-center gap-2 text-sm font-medium"><CalendarDays size={17} />{new Intl.DateTimeFormat("fr-FR").format(new Date(`${wedding.wedding_date}T12:00:00`))}</p>
                           <p className="flex items-center gap-2 font-semibold">

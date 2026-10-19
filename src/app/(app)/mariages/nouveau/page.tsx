@@ -11,7 +11,7 @@ export default async function NewWeddingPage({
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <main className="px-4 py-5 sm:px-5 sm:py-8 lg:px-8">
+    <main className="premium-photo px-4 py-5 sm:px-5 sm:py-8 lg:px-8">
       <div className="mx-auto max-w-5xl">
         <Link href="/mariages" className="inline-flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-black">
           <ArrowLeft size={17} /> Retour à Mes Mariages

@@ -1,3 +1,6 @@
+"use client";
+
+import { usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Baby,
@@ -55,6 +58,10 @@ function NavLink({
   accent?: "perso" | "common" | "neutral";
 }) {
   const Icon = item.icon;
+  const pathname = usePathname(), params = useSearchParams();
+  const [route, query] = item.href.split("?");
+  const targetView = new URLSearchParams(query).get("vue");
+  const active = (pathname === route || pathname.startsWith(`${route}/`)) && (!targetView || (params.get("vue") ?? (route === "/commun" ? "encours" : "finances")) === targetView);
   const hover =
     accent === "perso"
       ? "hover:bg-[#C7A45A]/14 hover:text-[#E0C27E]"
@@ -65,6 +72,7 @@ function NavLink({
   return (
     <Link
       href={item.href}
+      aria-current={active ? "page" : undefined}
       className={`vsmi-press flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-neutral-200 transition ${hover}`}
     >
       <Icon size={19} strokeWidth={1.8} />
@@ -83,8 +91,8 @@ export function AppNavigation({ photoAccess = false, childrenAccess = false, ost
     ? [...basePersoNavigation, { href: "/enfants", label: "Enfants", icon: Baby }]
     : basePersoNavigation;
   return (
-    <aside className="hidden min-h-screen w-64 shrink-0 bg-black text-white lg:flex lg:flex-col">
-      <div className="h-18 border-b border-white/10" aria-hidden="true" />
+    <aside className="premium-sidebar hidden min-h-screen w-60 shrink-0 text-white lg:flex lg:flex-col">
+      <Link href="/aujourd-hui" className="premium-brand"><span className="premium-monogram" aria-hidden="true">V</span><span>VSMI<small>Votre quotidien, en équilibre.</small></span></Link>
 
       <nav className="flex-1 px-4 py-6">
         <Link

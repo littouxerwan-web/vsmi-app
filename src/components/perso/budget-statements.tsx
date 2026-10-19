@@ -6,7 +6,9 @@ export function BudgetStatements({ rows, editable = false }: { rows: BudgetState
   if (!rows.length) return null;
   return <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{rows.map(row =>
     <div key={`${row.id}:${row.month}`} className="perso-budget-card rounded-xl border border-amber-200 bg-amber-50 p-4">
-      <p className="font-semibold">{row.name} · {money(row.initial)}</p>
+      <div className="premium-budget-heading"><p className="font-semibold">{row.name}</p><span>{money(row.initial)}</span></div>
+      <div className="premium-budget-balance"><strong>{money(row.uncommitted)}</strong><span>non engagé</span></div>
+      <div className={`premium-budget-track ${row.overrun>0?"is-overrun":""}`} role="img" aria-label={`Réalisé ${money(row.realized)}, engagé ${money(row.committed)}, non engagé ${money(row.uncommitted)}`}><span style={{width:`${100*row.realized/Math.max(row.initial,row.realized+row.committed,1)}%`}}/><span style={{width:`${100*row.committed/Math.max(row.initial,row.realized+row.committed,1)}%`}}/></div>
       <p className="mt-1 text-xs text-neutral-700">Compte rattaché : <strong>{row.account_name ?? (row.account_id ? "Compte indisponible" : "Aucun compte configuré")}</strong></p>
       {row.has_override ? <p className="mt-1 text-xs font-medium text-amber-800">Montant ajusté pour ce mois · habituellement {money(row.base_amount)}</p> : null}
       <dl className="mt-2 grid grid-cols-2 gap-1 text-xs">

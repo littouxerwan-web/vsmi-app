@@ -48,13 +48,13 @@ export default async function AppLayout({ children }: AppLayoutProps) {
   return (
     <>
       <InteractionFeedback />
-      <div className="vsmi-lux-theme min-h-screen bg-[#0B0B0B] text-[#F4F4F2]">
+      <div className="vsmi-premium-theme min-h-screen">
       <div className="flex min-h-screen">
         <AppNavigation photoAccess={photoAccess} childrenAccess={childrenAccess} osteoAccess={osteoAccess} />
 
         <div className="min-w-0 flex-1">
-          <header className="sticky top-0 z-30 border-b border-white/10 bg-[#101010]/95 text-white shadow-[0_8px_28px_rgba(0,0,0,.18)] backdrop-blur">
-            <div className="relative grid h-18 grid-cols-[1fr_auto_1fr] items-center px-4 sm:px-5 lg:px-8">
+          <header className="premium-topbar sticky top-0 z-30 backdrop-blur-xl">
+            <div className="relative grid h-18 grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 sm:px-6 lg:px-8">
               <div className="flex items-center justify-start gap-2">
                 <PrivacyModeToggle />
                 <ThemeModeToggle />
@@ -110,7 +110,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
             </div>
           </header>
 
-          <div id="app-private-content" className="relative pb-24 lg:pb-0">
+          <div id="app-private-content" className="relative pb-28 lg:pb-8">
             {children}
           </div>
           <MobileNavigation photoAccess={photoAccess} osteoAccess={osteoAccess} />

@@ -6,10 +6,10 @@ import { useEffect, useState } from "react";
 const STORAGE_KEY = "vsmi-theme-mode";
 
 export function ThemeModeToggle() {
-  const [lightMode, setLightMode] = useState(false);
+  const [lightMode, setLightMode] = useState(true);
 
   useEffect(() => {
-    const enabled = window.localStorage.getItem(STORAGE_KEY) === "light";
+    const enabled = window.localStorage.getItem(STORAGE_KEY) !== "dark";
     document.documentElement.classList.toggle("vsmi-light-mode", enabled);
     setLightMode(enabled);
   }, []);

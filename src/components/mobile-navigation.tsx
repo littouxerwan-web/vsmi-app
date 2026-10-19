@@ -136,7 +136,7 @@ export function MobileNavigation({ photoAccess = false, osteoAccess = false }: {
 
       <nav
         aria-label="Navigation mobile"
-        className="fixed inset-x-0 bottom-0 z-[90] border-t border-white/10 bg-[#111111]/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_30px_rgba(0,0,0,.35)] backdrop-blur lg:hidden"
+        className="premium-mobile-nav fixed inset-x-0 bottom-0 z-[90] border-t border-white/10 bg-[#111111]/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_30px_rgba(0,0,0,.35)] backdrop-blur lg:hidden"
       >
         <div className="mx-auto grid max-w-lg grid-cols-5 items-end gap-1">
           {persoLink(
