@@ -1,3 +1,4 @@
+import { loadMonthlyBudgetOverrides } from "@/lib/perso/monthly-budget-overrides";
 import { accountingDate } from "@/lib/perso/calendar";
 import { createClient } from "@/lib/supabase/server";
 import { TodayDashboard } from "@/components/today-dashboard";
@@ -61,7 +62,7 @@ export default async function TodayPage() {
     { data: accounts = [] },
     { data: snapshots = [] },
     { data: allMovements = [], error: movementsError },
-    { data: categories = [] },
+    { data: categoryRows = [], error: categoriesError },
     { data: recurrences = [] },
     { data: overrides = [] },
     { data: exclusions = [] },
@@ -110,6 +111,10 @@ export default async function TodayPage() {
   ] as any);
 
   if (movementsError) throw new Error(movementsError.message);
+  if (categoriesError) throw new Error(categoriesError.message);
+  const monthlyBudgetOverrides = await loadMonthlyBudgetOverrides(supabase, user.id);
+  const categories = (categoryRows ?? []).map((category: any) => ({ ...category,
+    budget_overrides: monthlyBudgetOverrides.rows.filter(row => row.category_id === category.id) }));
   const movements = ((allMovements ?? []) as any[]).filter(movement => movement.status !== "cancelled");
 
   const latest = new Map<string, any>();

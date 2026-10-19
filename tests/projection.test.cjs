@@ -194,3 +194,47 @@ test('une occurrence annulée conserve son identité sans recréation virtuelle'
   assert.equal(result.operations.filter(o => o.recurrence_id === 'r').length, 0);
   assert.equal(budget(result).committed, 0);
 });
+
+test('montant dérogatoire limité au mois choisi, sans modifier le budget habituel', () => {
+  const input = base();
+  input.months = 3;
+  input.categories[0].budget_overrides = [{ budget_month: '2026-10-01', amount: 800 }];
+  input.movements = [movement(100, 'planned', { movement_date: '2026-10-15' })];
+  const result = build(input);
+  const rows = result.budgetStatements.filter(row => row.id === 'budget');
+  assert.deepEqual(Array.from(rows, row => row.initial), [600, 800, 600]);
+  assert.equal(rows[1].committed, 100);
+  assert.equal(rows[1].uncommitted, 700);
+  assert.equal(rows[1].futureTotal, 800);
+  assert.equal(rows[1].base_amount, 600);
+  assert.equal(rows[1].has_override, true);
+  assert.equal(rows[0].has_override, false);
+  assert.equal(input.categories[0].monthly_budget, 600);
+  invariant(input, result);
+});
+
+test('une dérogation à zéro reste visible et ne supprime pas les dépenses engagées', () => {
+  const input = base();
+  input.categories[0].budget_overrides = [{ budget_month: '2026-09-01', amount: 0 }];
+  input.movements = [movement(250), movement(100, 'planned', { id: 'planned' })];
+  const row = budget(build(input));
+  assert.deepEqual([row.initial, row.realized, row.committed, row.uncommitted, row.overrun, row.futureTotal], [0, 250, 100, 0, 350, 100]);
+});
+
+test('supprimer la dérogation rétablit le montant habituel sans report', () => {
+  const input = base();
+  input.categories[0].budget_overrides = [];
+  const result = build(input);
+  assert.equal(budget(result).initial, 600);
+  assert.equal(budget(result).has_override, false);
+  assert.equal(result.budgetStatements.find(row => row.month === '2026-10').initial, 600);
+});
+
+test('le bilan affiche le compte explicite ou le compte de rattachement par défaut', () => {
+  const input = base();
+  assert.equal(budget(build(input)).account_name, 'Courant A');
+  input.categories[0].account_id = null;
+  input.movementDefaultAccountId = 'b';
+  assert.equal(budget(build(input)).account_id, 'b');
+  assert.equal(budget(build(input)).account_name, 'Courant B');
+});

@@ -3,7 +3,7 @@ import { addDays, monthEnd, shiftMonth, recurrenceOccurrences, occurrenceDate, a
 import { mobilizableSavingsForAccount, type SavingsBudgetAllocation, type SavingsProposalDecision } from './savings-engine';
 
 export type RPAccount={id:string;name:string;account_type:'checking'|'savings'|'crypto';is_default?:boolean};
-export type RPCategory={id:string;name?:string;parent_id:string|null;monthly_budget:number;movement_type?:string;account_id?:string|null;budget_period?:'monthly'|'specific_month';budget_month?:string|null;budget_start_date?:string|null;budget_end_date?:string|null};
+export type RPCategory={id:string;name?:string;parent_id:string|null;monthly_budget:number;budget_overrides?:{budget_month:string;amount:number}[];movement_type?:string;account_id?:string|null;budget_period?:'monthly'|'specific_month';budget_month?:string|null;budget_start_date?:string|null;budget_end_date?:string|null};
 export type RPMovement={id:string;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;completed_date?:string|null;completed_at?:string|null;occurrence_date?:string|null;recurrence_id?:string|null;transfer_group_id?:string|null;source_type?:string|null;source_key?:string|null;virtual_source?:boolean};
 export type RPRecurrence={id:string;account_id:string;destination_account_id:string|null;category_id:string|null;movement_type:'income'|'expense'|'transfer';label:string;amount:number;frequency:'weekly'|'monthly'|'quarterly'|'yearly';interval_count:number;start_date:string;end_date:string|null;annual_change_percent:number};
 export type RPOverride={recurrence_id:string;occurrence_month:string;amount:number};

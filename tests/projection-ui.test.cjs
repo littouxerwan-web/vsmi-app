@@ -7,17 +7,18 @@ const ts = require('typescript');
 const react = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 const loadLib = require('./helpers/load-typescript.cjs');
-function viewModule(accountId) {
+function viewModule(accountId, entry = "src/components/perso/projection-view.tsx") {
   const cache = new Map();
   function load(file) {
     file = path.resolve(file); if (cache.has(file)) return cache.get(file);
     const exports = {}; cache.set(file, exports);
     const source = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText;
     vm.runInNewContext(source, { exports, Date, Intl, Map, Set, console, require: name => {
-      if (name === 'react') return { ...react, useMemo: fn => fn(), useState: initial => [initial === 'all' ? accountId : typeof initial === 'function' ? initial() : initial, () => {}] };
+      if (name === 'react') return { ...react, useMemo: fn => fn(), useTransition: () => [false, () => {}], useState: initial => [initial === 'all' ? accountId : typeof initial === 'function' ? initial() : initial, () => {}] };
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'lucide-react') return new Proxy({}, { get: () => () => null });
-      if (name.includes('/perso/actions')) return new Proxy({}, { get: () => () => {} });
+      if (name === 'next/navigation') return { useRouter: () => ({ push() {} }) };
+      if (name.includes('/perso/actions') || name.includes('/aujourd-hui/actions')) return new Proxy({}, { get: () => () => {} });
       if (name.startsWith('@/lib/perso/')) return loadLib(`src/${name.slice(2)}.ts`);
       if (name.startsWith('@/components/')) return load(`src/${name.slice(2)}.tsx`);
       if (name.startsWith('.')) return load(path.resolve(path.dirname(file), `${name}.tsx`));
@@ -25,7 +26,7 @@ function viewModule(accountId) {
     } }, { filename: file });
     return exports;
   }
-  return load('src/components/perso/projection-view.tsx');
+  return load(entry);
 }
 function nodes(tree, predicate, out = []) {
   if (Array.isArray(tree)) tree.forEach(child => nodes(child, predicate, out));
@@ -53,4 +54,39 @@ test('les vraies cartes et le contrôle reçoivent le même bilan quel que soit 
     const markup = renderToStaticMarkup(cards[0]);
     assert.match(markup, /Réalisé/); assert.match(markup, /250/); assert.match(markup, /350/);
   }
+});
+
+
+test('le formulaire de budget porte le mois exact et affiche son compte et le retour au montant habituel', () => {
+  const { BudgetStatements } = viewModule('all', 'src/components/perso/budget-statements.tsx');
+  const row = { id: 'courses', name: 'Courses', month: '2026-10', account_id: 'a', account_name: 'Compte A',
+    movement_type: 'expense', initial: 800, base_amount: 600, has_override: true,
+    realized: 250, committed: 100, uncommitted: 450, overrun: 0, futureTotal: 550 };
+  const tree = BudgetStatements({ rows: [row], editable: true });
+  const forms = nodes(tree, node => node.type === 'form');
+  assert.equal(forms.length, 2);
+  for (const form of forms) {
+    assert.equal(nodes(form, node => node.type === 'input' && node.props.name === 'budget_month')[0].props.value, '2026-10');
+    assert.equal(nodes(form, node => node.type === 'input' && node.props.name === 'category_id')[0].props.value, 'courses');
+  }
+  assert.equal(nodes(forms[0], node => node.type === 'input' && node.props.name === 'amount')[0].props.defaultValue, 800);
+  assert.equal(nodes(forms[1], node => node.type === 'input' && node.props.name === 'operation')[0].props.value, 'reset');
+  const markup = renderToStaticMarkup(tree);
+  assert.match(markup, /Compte A/);
+  assert.match(markup, /octobre 2026/);
+  assert.match(markup, /Revenir au montant habituel/);
+  assert.equal(nodes(BudgetStatements({ rows: [row], editable: false }), node => node.type === 'form').length, 0);
+});
+
+test('Tous les comptes additionne les soldes à date, même négatifs, et non les soldes projetés', () => {
+  const { AccountBalanceCards } = viewModule('all', 'src/components/perso/account-balance-cards.tsx');
+  const accounts = [{ id: 'a', name: 'Courant', account_type: 'checking' }, { id: 's', name: 'Épargne', account_type: 'savings' }, { id: 'c', name: 'Crypto', account_type: 'crypto' }];
+  const tree = AccountBalanceCards({ accounts, audits: [{ month: '2026-10', opening: { a: 9999 }, closing: { a: 7777 }, credits: {}, debits: {} }],
+    operations: [], currentMonth: '2026-10', currentBalances: { a: -50, s: 1000, c: 25 } });
+  const card = nodes(tree, node => node.type === 'button' && nodes(node, child => child.type === 'p' && child.props.children === 'Tous les comptes').length > 0)[0];
+  assert.ok(card);
+  const markup = renderToStaticMarkup(card);
+  assert.match(markup, /975,00/);
+  assert.match(markup, /Épargne incluse/);
+  assert.doesNotMatch(markup, /7777|9999/);
 });

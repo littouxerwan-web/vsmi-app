@@ -4,6 +4,7 @@ export type BudgetCategory = {
   id: string;
   parent_id: string | null;
   monthly_budget: number;
+  budget_overrides?: { budget_month: string; amount: number }[];
   account_id?: string | null;
   movement_type?: string;
   budget_period?: "monthly" | "specific_month";
@@ -14,6 +15,7 @@ export type BudgetCategory = {
 
 export type BudgetAccount = {
   id: string;
+  name?: string;
   account_type: "checking" | "savings" | "crypto";
   is_default?: boolean;
 };
@@ -97,6 +99,7 @@ export function calculateBudgetRemaining(
 
 export type BudgetStatement = {
   id: string; name: string; month: string; account_id: string | null;
+  account_name: string | null; base_amount: number; has_override: boolean;
   movement_type: string; initial: number; realized: number; committed: number;
   uncommitted: number; overrun: number; futureTotal: number;
 };
@@ -129,12 +132,15 @@ export function buildBudgetStatements(input: {
     .filter(category => !category.parent_id && Number(category.monthly_budget) > 0 && isBudgetActiveForMonth(category, month))
     .map(category => {
       const key = `${month}:${category.id}`, type = category.movement_type ?? "expense";
-      const initial = cents(category.monthly_budget);
+      const override = category.budget_overrides?.find(row => row.budget_month.slice(0, 7) === month);
+      const initial = cents(override?.amount ?? category.monthly_budget);
+      const accountId = resolveBudgetAccountId(category, input.movementDefaultAccountId, input.accounts);
       const paid = cents(calculateBudgetUsage(initial, realized.get(key) ?? [], type).spent);
       const planned = cents(calculateBudgetUsage(initial, committed.get(key) ?? [], type).spent);
       const uncommitted = cents(Math.max(0, initial - paid - planned));
       return { id: category.id, name: category.name ?? "Budget", month,
-        account_id: resolveBudgetAccountId(category, input.movementDefaultAccountId, input.accounts), movement_type: type,
+        account_id: accountId, account_name: input.accounts.find(account => account.id === accountId)?.name ?? null,
+        base_amount: cents(category.monthly_budget), has_override: override != null, movement_type: type,
         initial, realized: paid, committed: planned, uncommitted,
         overrun: cents(Math.max(0, paid + planned - initial)), futureTotal: cents(planned + uncommitted) };
     }));

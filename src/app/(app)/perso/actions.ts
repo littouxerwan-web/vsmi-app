@@ -1151,3 +1151,29 @@ export async function applySavingsBudgetReallocation(fd:FormData){
   const {error:e2}=await supabase.from("personal_savings_budgets").update({allocation_value:Number(destination.allocation_value)+actual,allow_recovery:true}).eq("id",destinationId).eq("owner_id",user.id); if(e2) fail(e2.message);
   savingsBudgetRedirect("Réaffectation appliquée.");
 }
+
+/** Changes one envelope only, never the category's recurring monthly amount. */
+export async function saveMonthlyBudgetAmount(fd: FormData) {
+  const { supabase, user } = await auth();
+  const categoryId = text(fd, "category_id"), month = text(fd, "budget_month");
+  const reset = text(fd, "operation") === "reset";
+  const amount = number(fd, "amount");
+  if (!categoryId || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || month.startsWith("0000")) fail("Budget ou mois incorrect.");
+  if (!reset && (!text(fd, "amount") || !Number.isFinite(amount) || amount < 0 || amount > 999999999999.99)) fail("Indique un montant positif ou nul.");
+  const { data: category, error: readError } = await supabase.from("personal_categories")
+    .select("id,parent_id,monthly_budget,is_active,budget_period,budget_month,budget_start_date,budget_end_date")
+    .eq("id", categoryId).eq("owner_id", user.id).single();
+  if (readError || !category) fail("Budget introuvable.");
+  if (!category.is_active || category.parent_id || Number(category.monthly_budget) <= 0) fail("Cette catégorie n’est pas un budget actif.");
+  if ((category.budget_period === "specific_month" && String(category.budget_month).slice(0,7) !== month) ||
+      (category.budget_period !== "specific_month" && (
+        (category.budget_start_date && month < String(category.budget_start_date).slice(0,7)) ||
+        (category.budget_end_date && month > String(category.budget_end_date).slice(0,7))))) fail("Ce budget n’est pas actif sur ce mois.");
+  const result = reset
+    ? await supabase.from("personal_budget_month_overrides").delete().eq("owner_id", user.id).eq("category_id", categoryId).eq("budget_month", `${month}-01`)
+    : await supabase.from("personal_budget_month_overrides").upsert({ owner_id: user.id, category_id: categoryId, budget_month: `${month}-01`, amount: Math.round(amount * 100) / 100 }, { onConflict: "owner_id,category_id,budget_month" });
+  if (result.error) fail(result.error.message);
+  revalidatePath(PATH);
+  revalidatePath("/aujourd-hui");
+  redirect(`${PATH}?vue=finances&month=${month}&succes=${encodeURIComponent(reset ? "Montant habituel rétabli pour ce mois." : "Budget modifié uniquement pour ce mois.")}`);
+}
