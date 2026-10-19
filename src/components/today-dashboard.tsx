@@ -304,26 +304,26 @@ export function TodayDashboard({
       </section>
 
       {weddingStats ? (
-        <section className="rounded-[1.6rem] border border-[#D2AE57]/30 bg-[#141414] p-4 text-white shadow-[0_18px_50px_rgba(0,0,0,.28)] sm:p-5">
+        <section className="rounded-[1.6rem] border border-[#D2AE57]/30 bg-[#FFFFFF] p-4 text-[#25334A] shadow-[0_18px_50px_rgba(0,0,0,.28)] sm:p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[.2em] text-[#D2AE57]">Photo</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[.2em] text-[#806536]">Photo</p>
               <h2 className="mt-1 text-xl font-semibold">Mariages à venir</h2>
             </div>
-            <Link href="/mariages" className="rounded-full border border-white/15 px-3 py-2 text-xs font-semibold text-white/70 transition hover:bg-white/10">Voir tout</Link>
+            <Link href="/mariages" className="rounded-full border border-[#DCE2EB] px-3 py-2 text-xs font-semibold text-[#526176] transition hover:bg-[#EDF1F6]">Voir tout</Link>
           </div>
           <div className="mt-4 grid grid-cols-3 gap-2">
-            <div className="rounded-2xl bg-white/[.06] p-3"><p className="text-[9px] uppercase tracking-wide text-white/45">À venir</p><p className="mt-1 text-xl font-semibold">{weddingStats.upcoming}</p></div>
-            <div className="rounded-2xl bg-white/[.06] p-3"><p className="text-[9px] uppercase tracking-wide text-white/45">Ce mois</p><p className="mt-1 text-xs font-semibold text-[#D2AE57] sm:text-sm">{money(weddingStats.receivedMonth)}</p></div>
-            <div className="rounded-2xl bg-white/[.06] p-3"><p className="text-[9px] uppercase tracking-wide text-white/45">À venir année</p><p className="mt-1 text-xs font-semibold text-[#D7D9DD] sm:text-sm">{money(weddingStats.expectedYear)}</p></div>
+            <div className="rounded-2xl bg-[#F3F5F8] p-3"><p className="text-[9px] uppercase tracking-wide text-[#647085]">À venir</p><p className="mt-1 text-xl font-semibold">{weddingStats.upcoming}</p></div>
+            <div className="rounded-2xl bg-[#F3F5F8] p-3"><p className="text-[9px] uppercase tracking-wide text-[#647085]">Ce mois</p><p className="mt-1 text-xs font-semibold text-[#806536] sm:text-sm">{money(weddingStats.receivedMonth)}</p></div>
+            <div className="rounded-2xl bg-[#F3F5F8] p-3"><p className="text-[9px] uppercase tracking-wide text-[#647085]">À venir année</p><p className="mt-1 text-xs font-semibold text-[#25334A] sm:text-sm">{money(weddingStats.expectedYear)}</p></div>
           </div>
           <div className="mt-3 space-y-2">
             {weddings.length ? weddings.slice(0, 3).map((wedding) => (
-              <Link key={wedding.id} href={`/mariages/${wedding.id}`} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[.035] px-3.5 py-3 transition hover:bg-white/[.07]">
-                <div className="min-w-0"><p className="truncate text-sm font-semibold">{wedding.name}</p><p className="mt-1 truncate text-[11px] text-white/45">{wedding.city || "Ville à définir"}</p></div>
-                <p className="shrink-0 text-xs font-semibold text-[#D2AE57]">{new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short" }).format(new Date(`${wedding.date}T12:00:00`))}</p>
+              <Link key={wedding.id} href={`/mariages/${wedding.id}`} className="flex items-center justify-between gap-3 rounded-2xl border border-[#DCE2EB] bg-[#F8F9FB] px-3.5 py-3 transition hover:bg-[#EDF1F6]">
+                <div className="min-w-0"><p className="truncate text-sm font-semibold">{wedding.name}</p><p className="mt-1 truncate text-[11px] text-[#647085]">{wedding.city || "Ville à définir"}</p></div>
+                <p className="shrink-0 text-xs font-semibold text-[#806536]">{new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short" }).format(new Date(`${wedding.date}T12:00:00`))}</p>
               </Link>
-            )) : <p className="rounded-2xl bg-white/[.05] p-4 text-sm text-white/55">Aucun mariage à venir.</p>}
+            )) : <p className="rounded-2xl bg-[#F3F5F8] p-4 text-sm text-[#647085]">Aucun mariage à venir.</p>}
           </div>
         </section>
       ) : null}
