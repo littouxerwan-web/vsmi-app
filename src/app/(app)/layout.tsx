@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { BrandMark } from "@/components/brand-mark";
 import Link from "next/link";
 import { LogOut, Settings } from "lucide-react";
 import { redirect } from "next/navigation";
@@ -67,15 +67,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
                 className="vsmi-press flex items-center justify-center rounded-xl px-2"
                 aria-label="Accueil"
               >
-                <Image
-                  src="/vsmi-logo.gif"
-                  alt="Logo"
-                  width={68}
-                  height={54}
-                  className="h-11 w-auto max-w-[7rem] object-contain sm:h-12"
-                  unoptimized
-                  priority
-                />
+                <BrandMark className="premium-topbar-logo"/>
               </Link>
 
               <div className="flex min-w-0 items-center justify-end gap-2 sm:gap-3">

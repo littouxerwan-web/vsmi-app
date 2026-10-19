@@ -237,3 +237,15 @@ html.vsmi-light-mode .vsmi-premium-theme {
 
 /* Shared route and navigation loading screen, including outside the app shell. */
 .vsmi-loading-screen {background:radial-gradient(ellipse at 50% 35%,#344963 0%,#29384f 50%,#202b3d 100%);color:#edf2f8;min-height:100dvh;}
+
+.premium-topbar-logo {display:block;width:40px;height:50px;color:var(--p-ink);}
+.premium-login {color-scheme:dark;background:radial-gradient(ellipse at 50% 20%,#3a506c 0%,#29384f 45%,#202b3d 100%);color:#edf2f8;min-height:100dvh;}
+.premium-login-card {background:#29384fcc;border-color:#94a9c333;box-shadow:0 24px 70px #101b2d55;}
+.premium-login-brand {display:flex;align-items:center;justify-content:center;gap:30px;padding:6px 0;}
+.premium-login-logo {width:88px;height:108px;color:#f2eee5;flex-shrink:0;}
+.premium-login-divider {height:95px;width:1px;background:linear-gradient(transparent,#dcc79d88,transparent);}
+.premium-login-boat {width:94px;height:146px;flex-shrink:0;}
+.premium-login input {font-size:16px;min-height:48px;}
+.premium-login button {min-height:48px;}
+.premium-login :is(input,button):focus-visible {outline:2px solid #dcc79d;outline-offset:3px;}
+@media (max-width:380px) {.premium-login-brand {gap:20px;}.premium-login-logo {width:76px;height:94px;}.premium-login-boat {width:82px;height:127px;}}

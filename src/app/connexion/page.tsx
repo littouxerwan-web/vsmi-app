@@ -1,3 +1,5 @@
+import { BrandMark } from "@/components/brand-mark";
+import { SunFastMark } from "@/components/sun-fast-mark";
 import { login } from "./actions";
 
 type ConnexionPageProps = {
@@ -12,20 +14,16 @@ export default async function ConnexionPage({
   const { erreur } = await searchParams;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-950 px-5">
-      <section className="w-full max-w-md rounded-3xl border border-white/10 bg-neutral-900 p-8 shadow-2xl">
+    <main className="premium-login flex min-h-screen items-center justify-center px-5 py-8">
+      <section className="premium-login-card w-full max-w-md rounded-3xl border p-6 shadow-2xl sm:p-8">
         <div className="mb-8 text-center">
-          <p className="text-sm uppercase tracking-[0.35em] text-neutral-400">
-            Vue sur mer imprenable
-          </p>
-
-          <h1 className="mt-4 text-4xl font-semibold text-white">
-            VSMI
-          </h1>
-
-          <p className="mt-3 text-sm text-neutral-400">
-            Gestion de ton activité photographique
-          </p>
+          <div className="premium-login-brand">
+            <BrandMark className="premium-login-logo"/>
+            <span className="premium-login-divider" aria-hidden="true"/>
+            <SunFastMark className="premium-login-boat"/>
+          </div>
+          <h1 className="mt-6 text-xl font-medium text-white">Bienvenue dans VSMI</h1>
+          <p className="mt-2 text-sm text-[#C1CCDC]">Votre quotidien, en équilibre.</p>
         </div>
 
         {erreur ? (
@@ -49,7 +47,7 @@ export default async function ConnexionPage({
               type="email"
               autoComplete="email"
               required
-              className="w-full rounded-xl border border-white/10 bg-neutral-950 px-4 py-3 text-white outline-none focus:border-white/40"
+              className="w-full rounded-xl border border-white/10 bg-[#202B3D] px-4 py-3 text-white outline-none focus:border-[#DCC79D] focus:ring-2 focus:ring-[#DCC79D]/20"
             />
           </div>
 
@@ -67,13 +65,13 @@ export default async function ConnexionPage({
               type="password"
               autoComplete="current-password"
               required
-              className="w-full rounded-xl border border-white/10 bg-neutral-950 px-4 py-3 text-white outline-none focus:border-white/40"
+              className="w-full rounded-xl border border-white/10 bg-[#202B3D] px-4 py-3 text-white outline-none focus:border-[#DCC79D] focus:ring-2 focus:ring-[#DCC79D]/20"
             />
           </div>
 
           <button
             type="submit"
-            className="w-full rounded-xl bg-white px-4 py-3 font-medium text-black transition hover:bg-neutral-200"
+            className="w-full rounded-xl bg-[#DCC79D] px-4 py-3 font-medium text-[#202B3D] transition hover:bg-[#EAD9B7]"
           >
             Se connecter
           </button>
