@@ -225,3 +225,12 @@ html.vsmi-light-mode .vsmi-premium-theme {
 }
 
 .vsmi-premium-theme #app-private-content main.premium-today {background:#29384f;color:#f3f6fb;}
+
+/* The active filter owns the blue card; all other cards use the neutral surface. */
+.vsmi-premium-theme #app-private-content .premium-total-card[aria-pressed="false"] {background:var(--p-surface);color:var(--p-ink);border:1px solid var(--p-line);box-shadow:var(--p-shadow);}
+.vsmi-premium-theme #app-private-content .premium-total-card[aria-pressed="false"]::after {display:none;}
+.vsmi-premium-theme #app-private-content .premium-total-card[aria-pressed="false"] :is(.text-neutral-500,svg),
+.vsmi-premium-theme #app-private-content .premium-total-card[aria-pressed="false"] > p:last-child {color:var(--p-muted) !important;}
+.vsmi-premium-theme #app-private-content .premium-account-card[aria-pressed="true"] {background:#29384f;color:#faf8f0;border-color:#647996;--p-muted:#c1ccdc;--p-line:#53627a;--p-positive:#a3dfc3;--p-negative:#ffb4ae;--p-soft:#3b4b63;}
+.vsmi-premium-theme #app-private-content .premium-account-card[aria-pressed="true"] .text-emerald-700 {color:var(--p-positive);}
+.vsmi-premium-theme #app-private-content .premium-account-card[aria-pressed="true"] .text-red-500 {color:var(--p-negative);}

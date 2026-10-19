@@ -105,3 +105,17 @@ test('les trois formulaires de complément transmettent son identité distincte'
     assert.equal(nodes(form,node=>node.props?.name==='previous_transfer_group_id')[0].props.value,'previous');
   }
 });
+
+test('la sélection du compte active une seule carte et rend Tous les comptes neutre', () => {
+  const { AccountBalanceCards } = viewModule('all', 'src/components/perso/account-balance-cards.tsx');
+  const accounts = [{ id: 'a', name: 'Courant', account_type: 'checking' }, { id: 's', name: 'Livret', account_type: 'savings' }];
+  for (const selectedAccountId of [null, 'all', 'a', 's', 'inconnu']) {
+    const tree = AccountBalanceCards({ accounts, audits: [], operations: [], currentMonth: '2026-10', currentBalances: {}, selectedAccountId });
+    const cards = nodes(tree, node => node.props?.['aria-pressed'] !== undefined);
+    assert.equal(cards.length, 3);
+    assert.equal(cards.filter(card => card.props['aria-pressed']).length, 1);
+    assert.equal(cards[0].props['aria-pressed'], !['a', 's'].includes(selectedAccountId));
+    assert.equal(cards[1].props['aria-pressed'], selectedAccountId === 'a');
+    assert.equal(cards[2].props['aria-pressed'], selectedAccountId === 's');
+  }
+});
