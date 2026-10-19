@@ -92,16 +92,20 @@ export function AppNavigation({ photoAccess = false, childrenAccess = false, ost
     : basePersoNavigation;
   return (
     <aside className="premium-sidebar hidden min-h-screen w-60 shrink-0 text-white lg:flex lg:flex-col">
-      <Link href="/aujourd-hui" className="premium-brand"><svg className="premium-brand-sailboat" viewBox="0 0 144 104" fill="none" role="img" aria-label="VSMI — voilier" xmlns="http://www.w3.org/2000/svg">
-        <g stroke="#F2EEE5" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M75 12V75"/>
-          <path d="M70 19C57 35 43 54 34 66H70C66 52 67 33 70 19Z"/>
-          <path d="M81 29L107 67H81C85 54 84 40 81 29Z"/>
+      <Link href="/aujourd-hui" className="premium-brand"><svg className="premium-brand-sailboat" viewBox="0 0 160 248" fill="none" role="img" aria-label="VSMI — profil du Jeanneau Sun Fast 32" xmlns="http://www.w3.org/2000/svg">
+        <title>Jeanneau Sun Fast 32 — profil simplifié</title>
+        <g stroke="#F2EEE5" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M91 12C97 65 96 126 95 195L92 195C91 130 96 65 89 12Z"/>
+          <path d="M89 13C71 56 53 107 39 171L92 171"/>
+          <path d="M95 45L143 197M89 12L18 198" opacity=".65"/>
+          <path d="M38 174L94 173M38 171V174M93 86L97 87M93 137L97 138"/>
+          <path d="M72 174L94 190M39 176V195" opacity=".65"/>
         </g>
-        <g stroke="#DCC79D" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M25 75C49 78 82 79 118 73L107 85C87 91 51 91 36 85L25 75Z"/>
-          <path d="M43 96C52 93 59 93 67 96C75 99 82 99 91 96" opacity=".65"/>
-          <path d="M99 96C104 94 109 94 114 95" opacity=".4"/>
+        <g stroke="#DCC79D" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 208L21 198L50 197L52 190L79 190L121 196L147 197L143 213C110 222 60 223 15 211Z"/>
+          <path d="M20 201C58 202 111 202 145 200M13 209L144 210" opacity=".7"/>
+          <path d="M55 194H61Q64 195 61 197H55Q52 196 55 194ZM68 194H83L119 198H68Q65 196 68 194Z" strokeWidth=".8"/>
+          <path d="M78 220L74 237L67 242Q80 245 88 241L95 220M20 212L16 230Q14 236 12 235L14 212"/>
         </g>
       </svg><small>Votre quotidien, en équilibre.</small></Link>
 
