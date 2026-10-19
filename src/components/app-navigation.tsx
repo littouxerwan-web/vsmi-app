@@ -2,6 +2,7 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Baby,
   CalendarDays,
@@ -92,7 +93,7 @@ export function AppNavigation({ photoAccess = false, childrenAccess = false, ost
     : basePersoNavigation;
   return (
     <aside className="premium-sidebar hidden min-h-screen w-60 shrink-0 text-white lg:flex lg:flex-col">
-      <Link href="/aujourd-hui" className="premium-brand"><span className="premium-monogram" aria-hidden="true">V</span><span>VSMI<small>Votre quotidien, en équilibre.</small></span></Link>
+      <Link href="/aujourd-hui" className="premium-brand"><Image src="/vsmi-logo.gif" alt="VSMI" width={100} height={80} unoptimized className="premium-brand-logo"/><small>Votre quotidien, en équilibre.</small></Link>
 
       <nav className="flex-1 px-4 py-6">
         <Link

@@ -61,7 +61,7 @@ html.vsmi-light-mode .vsmi-premium-theme {
 .vsmi-premium-theme #app-private-content .premium-page-intro {padding:8px 0 26px;background:transparent;border:0;}
 
 /* Consistent shell on desktop, tablet and phone. */
-.premium-sidebar {background:#1b2a24;border-right:1px solid #324239;position:sticky;top:0;height:100dvh;min-height:0;overflow-y:auto;}
+.premium-sidebar {background:#202b3d;border-right:1px solid #324239;position:sticky;top:0;height:100dvh;min-height:0;overflow-y:auto;}
 .premium-brand {display:flex;align-items:center;gap:12px;padding:27px 24px 22px;font-size:23px;font-weight:600;letter-spacing:.06em;}
 .premium-brand small {display:block;font-size:9px;font-weight:400;letter-spacing:.02em;color:#b9c6bd;margin-top:2px;}
 .premium-monogram {display:grid;place-items:center;width:37px;height:43px;border:1px solid #baa77d;border-radius:12px 12px 18px 18px;color:#e0cda5;font-family:Georgia,serif;font-size:25px;font-style:italic;}
@@ -83,8 +83,8 @@ html.vsmi-light-mode .vsmi-premium-theme {
 .premium-topbar p {color:var(--p-ink);}
 .premium-topbar > div:last-child {border-color:var(--p-line);}
 .premium-topbar img {filter:none;}
-.premium-mobile-nav {background:#1b2a24f5;border-color:#ffffff15;box-shadow:0 -6px 24px #1b2a2415;}
-.premium-mobile-nav .border-4 {border-color:#1b2a24;background:#e1d1ac;color:#23382b;}
+.premium-mobile-nav {background:#202b3df5;border-color:#ffffff15;box-shadow:0 -6px 24px #1b2a2415;}
+.premium-mobile-nav .border-4 {border-color:#202b3d;background:#e1d1ac;color:#23382b;}
 
 /* Finance hierarchy and unified section rhythm. */
 .vsmi-premium-theme #app-private-content .perso-ledger-theme > div > :is(section,div.bg-white) {border:0;border-radius:var(--p-radius);margin-top:20px;padding:24px;background:var(--p-surface);box-shadow:var(--p-shadow);}
@@ -95,7 +95,7 @@ html.vsmi-light-mode .vsmi-premium-theme {
 .vsmi-premium-theme #app-private-content .premium-accounts-section {background:transparent !important;padding:0 !important;box-shadow:none !important;}
 .vsmi-premium-theme #app-private-content .premium-accounts-section > div:first-child h2 {font-size:15px;color:var(--p-muted);font-weight:500;}
 .premium-account-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;}
-.vsmi-premium-theme #app-private-content .premium-total-card {grid-column:1/-1;position:relative;overflow:hidden;background:#263e34;color:#faf8f0;border:0;border-radius:24px;min-height:180px;padding:28px 32px;box-shadow:0 12px 28px #223b3012;}
+.vsmi-premium-theme #app-private-content .premium-total-card {grid-column:1/-1;position:relative;overflow:hidden;background:#29384f;color:#faf8f0;border:0;border-radius:24px;min-height:180px;padding:28px 32px;box-shadow:0 12px 28px #223b3012;}
 .premium-total-card::after {content:"";position:absolute;width:300px;height:300px;right:-70px;top:-80px;border:1px solid #e1d1ac22;border-radius:50%;box-shadow:0 0 0 40px #e1d1ac06,0 0 0 80px #e1d1ac04;pointer-events:none;}
 .vsmi-premium-theme #app-private-content .premium-total-card > svg {position:absolute;right:30px;top:30px;color:#decca5;}
 .premium-total-card > p.mt-5 {margin-top:0;font-size:13px;font-weight:400;letter-spacing:.03em;}
@@ -194,4 +194,32 @@ html.vsmi-light-mode .vsmi-premium-theme {
 @media (prefers-reduced-motion:reduce) {
  .vsmi-premium-theme *, .vsmi-premium-theme *::before, .vsmi-premium-theme *::after {animation:none !important;transition:none !important;scroll-behavior:auto !important;}
  .vsmi-premium-theme :is(button,a,summary,[role="button"]):active {transform:none;}
+}
+
+/* Compact account overview and optional budget detail. */
+.premium-brand {flex-direction:column;gap:7px;padding:18px 24px 12px;}
+.premium-brand-logo {width:100px;height:80px;object-fit:contain;}
+.premium-brand small {margin:0;color:#c3cbd7;letter-spacing:.02em;font-size:10px;}
+.premium-budget-disclosure {margin-top:16px;}
+.premium-budget-disclosure > summary {cursor:pointer;padding:10px 0;font-size:14px;font-weight:600;}
+.premium-budget-disclosure > summary > span {margin-left:8px;font-size:11px;font-weight:400;color:var(--p-muted);}
+.vsmi-premium-theme #app-private-content .premium-budget-disclosure .perso-budget-card {padding:12px;border-radius:14px;}
+.premium-budget-disclosure .premium-budget-balance {margin-top:6px;}
+.premium-budget-disclosure .premium-budget-balance strong {font-size:20px;}
+.premium-budget-disclosure .premium-budget-track {margin:8px 0;}
+.premium-budget-disclosure .perso-budget-card dl {margin-top:8px;row-gap:3px;}
+@media (min-width:1024px) {
+ .premium-account-grid {grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(155px,1fr);gap:10px;overflow-x:auto;padding-bottom:8px;}
+ .vsmi-premium-theme #app-private-content .premium-total-card {grid-column:auto;min-height:175px;padding:18px 14px;border-radius:18px;}
+ .vsmi-premium-theme #app-private-content .premium-total-card > svg {position:static;width:16px;height:16px;margin-bottom:8px;}
+ .premium-total-card > p.text-2xl {font-size:25px;}
+ .premium-total-card > p:last-child {font-size:10px;margin-top:10px;}
+ .vsmi-premium-theme #app-private-content .premium-account-card {min-height:175px;padding:14px 12px;border-radius:18px;}
+ .premium-account-card > div:first-child {flex-wrap:wrap;gap:6px;min-height:0;}
+ .premium-account-card .premium-current-balance {margin-bottom:6px;}
+ .premium-account-card .premium-current-balance > strong {font-size:21px;}
+ .premium-account-card .premium-current-balance ~ div > span {font-size:9px;}
+ .premium-account-card .premium-current-balance ~ div > strong {font-size:11px;}
+ .vsmi-premium-theme #app-private-content .premium-account-card button,.vsmi-premium-theme #app-private-content .premium-account-card a {width:28px;height:28px;min-height:28px;}
+ .premium-budget-disclosure > div {grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;}
 }
