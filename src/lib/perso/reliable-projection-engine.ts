@@ -11,7 +11,7 @@ export type RPExclusion={recurrence_id:string;occurrence_date:string};
 export type RPPhoto={id:string;display_name:string;wedding_date:string|null;payment_type:'deposit'|'balance';amount:number;expected_date:string|null;received_date:string|null;status:'expected'|'received'|'cancelled';accounting_status?:'expected'|'received'|'cancelled';personal_account_id:string|null};
 export type RPUrssaf={contribution_month:string;account_id:string|null;is_completed:boolean;completed_date:string|null;amount_override?:number|null};
 export type RPProfile={id:string;label:string;sourceAccountId:string|null;destinationAccountId:string|null;threshold:number};
-export type RPSavingsMeta={sourceAccountId:string;destinationAccountId:string;sourceMonth:string;automaticAmount:number;status:'automatic'|'pending'|'accepted';kind:'deposit'|'use';decisionSlot:1|15;previousTransferGroupId?:string|null};
+export type RPSavingsMeta={sourceAccountId:string;destinationAccountId:string;sourceMonth:string;automaticAmount:number;status:'automatic'|'pending'|'accepted';kind:'deposit'|'use';decisionSlot:1|15;previousTransferGroupId?:string|null;parentDecisionId?:string};
 export type RPOperation={id:string;projected:boolean;occurrence_date?:string|null;original_date?:string;requested_amount?:number;unfunded_amount?:number;recurrence_id?:string|null;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;transfer_group_id?:string|null;source_type?:string|null;source_key?:string|null;virtual_source?:boolean;photo?:boolean;photoPayment?:RPPhoto;savingsProposal?:RPSavingsMeta;source?:'movement'|'recurrence'|'photo'|'urssaf'|'budget'|'savings'};
 export type RPPoint={date:string;balances:Record<string,number>;checking:number;savings:number;crypto:number;total:number};
 export type RPSavingsWarning={month:string;date:string;needDate:string;decisionSlot:1|15;checkingAccountId:string;savingsAccountId:string;required:number;available:number;applied:number;missing:number;reason:'accepted'|'deleted'|'limited'|'insufficient'};
@@ -176,16 +176,40 @@ export function buildReliableProjection(input:ProjectionInput){
   return {minimum,firstShortfallDate};
  };
  const windowMinimum=(accountId:string,from:string,through:string)=>windowProjection(accountId,from,through).minimum;
+ const proposedSupplements=new Set<string>();
+ const supplementReasons=new Map<string,RPSavingsWarning["reason"]>();
+ const supplementKey=(source:string,dest:string,month:string,slot:number)=>`${source}:${dest}:${month}:${slot}`;
  const synthetic=(month:string,date:string,slot:1|15,source:string,dest:string,requested:number,kind:'use'|'deposit',audit:RPMonthAudit)=>{
-  const stored=decisionFor(source,dest,month,slot);
+  let stored:Pick<SavingsProposalDecision,'status'|'amount'>|undefined=decisionFor(source,dest,month,slot);
+  let parentDecisionId:string|undefined,previousTransferGroupId:string|undefined;
+  const original=decisionFor(source,dest,month,slot);
+  if(kind==='use'&&original?.status==='accepted'&&original.id&&original.supplements){
+   let parentGroup=original.transfer_group_id,parentAmount=original.amount;
+   const seen=new Set<string>();
+   while(parentGroup&&!seen.has(parentGroup)){
+    seen.add(parentGroup);
+    const pair=input.movements.filter(m=>m.transfer_group_id===parentGroup);
+    // Only a completed, intact parent can produce an independent supplement.
+    if(pair.length!==2||!pair.every(m=>m.status==='completed'&&accountingDate(m)<=input.todayIso&&round(m.amount)===round(parentAmount))||
+      !pair.some(m=>m.account_id===source&&m.movement_type==='transfer_out')||!pair.some(m=>m.account_id===dest&&m.movement_type==='transfer_in'))return 0;
+    const next=original.supplements.find(s=>s.previous_transfer_group_id===parentGroup);
+    if(next?.status==='accepted'){parentGroup=next.transfer_group_id;parentAmount=next.amount;continue;}
+    parentDecisionId=original.id;previousTransferGroupId=parentGroup;stored=next;
+    supplementReasons.set(supplementKey(source,dest,month,slot),next?.status==='deleted'?'deleted':'insufficient');break;
+   }
+   if(!previousTransferGroupId)return 0;
+   if(proposedSupplements.has(previousTransferGroupId)){supplementReasons.set(supplementKey(source,dest,month,slot),'accepted');return 0;}
+  }
   if(stored?.status==='deleted'||stored?.status==='accepted')return 0;
   const available=kind==='use'?mobilizableSavingsForAccount(balances.get(source)??0,source,input.savingsBudgets,SAVINGS_FLOOR):Math.max(0,balances.get(source)??0);
   const automaticAmount=round(Math.max(0,Math.min(requested,available)));
+  if(parentDecisionId&&stored?.status==='pending'&&Number(stored.amount)<automaticAmount-0.009)supplementReasons.set(supplementKey(source,dest,month,slot),'limited');
   const amount=round(Math.min(automaticAmount,stored?.status==='pending'?Number(stored.amount):automaticAmount));if(amount<0.01)return 0;
-  const group=`auto-${kind}-${source}-${dest}-${month}-${slot}`;
-  const meta:RPSavingsMeta={sourceAccountId:source,destinationAccountId:dest,sourceMonth:month,decisionSlot:slot,automaticAmount,status:stored?'pending':'automatic',kind};
+  if(previousTransferGroupId)proposedSupplements.add(previousTransferGroupId);
+  const group=previousTransferGroupId?`auto-supplement-${previousTransferGroupId}`:`auto-${kind}-${source}-${dest}-${month}-${slot}`;
+  const meta:RPSavingsMeta={sourceAccountId:source,destinationAccountId:dest,sourceMonth:month,decisionSlot:slot,automaticAmount,status:stored?'pending':'automatic',kind,...(parentDecisionId?{parentDecisionId,previousTransferGroupId}:{})};
   const out:RPOperation={id:`${group}-out`,projected:true,transfer_group_id:group,account_id:source,category_id:null,movement_type:'transfer_out',
-   label:kind==='use'?"Utilisation d'épargne":"Versement épargne proposé",amount,movement_date:date,status:'planned',source:'savings',savingsProposal:meta};
+   label:parentDecisionId?"Complément d’épargne proposé":kind==='use'?"Utilisation d'épargne":"Versement épargne proposé",amount,movement_date:date,status:'planned',source:'savings',savingsProposal:meta};
   applyJob({date,id:group,rows:[out,{...out,id:`${group}-in`,account_id:dest,movement_type:'transfer_in'}]},audit,kind);
   return amount;
  };
@@ -206,7 +230,7 @@ export function buildReliableProjection(input:ProjectionInput){
      const applied=synthetic(month,decision.date,decision.slot,savings,checking.id,required,'use',audit);
      if(required-applied>0.009){
       const stored=decisionFor(savings,checking.id,month,decision.slot);
-      const reason:RPSavingsWarning['reason']=stored?.status==='accepted'?'accepted':stored?.status==='deleted'?'deleted':stored?.status==='pending'&&Number(stored.amount)<Math.min(required,available)-0.009?'limited':'insufficient';
+      const reason:RPSavingsWarning['reason']=supplementReasons.get(supplementKey(savings,checking.id,month,decision.slot))??(stored?.status==='accepted'?'accepted':stored?.status==='deleted'?'deleted':stored?.status==='pending'&&Number(stored.amount)<Math.min(required,available)-0.009?'limited':'insufficient');
       unresolved.set(checking.id,round(required-applied));
       // Re-evaluate after the proposed transfer: date of the first remaining shortfall.
       const needDate=windowProjection(checking.id,decision.date,through,threshold).firstShortfallDate??decision.date;

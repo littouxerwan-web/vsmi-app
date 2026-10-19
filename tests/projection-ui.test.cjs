@@ -90,3 +90,18 @@ test('Tous les comptes additionne les soldes à date, même négatifs, et non le
   assert.match(markup, /Épargne incluse/);
   assert.doesNotMatch(markup, /7777|9999/);
 });
+
+test('les trois formulaires de complément transmettent son identité distincte', () => {
+  const { ProjectionView }=viewModule('all');
+  const props={todayIso:'2026-10-19',accounts:[{id:'a',name:'Courant',account_type:'checking'},{id:'s',name:'Livret',account_type:'savings'}],categories:[],snapshots:[],recurrences:[],currentBalances:{a:100,s:1000},profiles:[{id:'profile-1',sourceAccountId:'a',destinationAccountId:'s',threshold:100}],
+    savingsProposals:[{id:'parent',source_account_id:'s',destination_account_id:'a',source_month:'2026-10-01',decision_slot:15,status:'accepted',amount:100,transfer_group_id:'previous',supplements:[]}],
+    movements:[{id:'future',account_id:'a',movement_type:'expense',label:'Dépense',amount:30,movement_date:'2026-10-28',status:'planned',category_id:null},
+      ...['transfer_out','transfer_in'].map((type,i)=>({id:`old-${i}`,account_id:i?'a':'s',movement_type:type,label:'Virement',amount:100,movement_date:'2026-10-17',completed_date:'2026-10-17',status:'completed',category_id:null,transfer_group_id:'previous'}))]};
+  const tree=ProjectionView(props);
+  const forms=nodes(tree,node=>node.type==='form').filter(form=>nodes(form,node=>node.type==='input'&&node.props.name==='parent_decision_id').length);
+  assert.equal(forms.length,3);
+  for(const form of forms){
+    assert.equal(nodes(form,node=>node.props?.name==='parent_decision_id')[0].props.value,'parent');
+    assert.equal(nodes(form,node=>node.props?.name==='previous_transfer_group_id')[0].props.value,'previous');
+  }
+});

@@ -1,3 +1,4 @@
+import { withSavingsSupplements } from "@/lib/perso/savings-supplements";
 import { savingsWarningMessage } from "@/lib/perso/savings-warning";
 import { loadMonthlyBudgetOverrides } from "@/lib/perso/monthly-budget-overrides";
 import { accountingDate } from "@/lib/perso/calendar";
@@ -68,7 +69,7 @@ export default async function TodayPage() {
     { data: overrides = [] },
     { data: exclusions = [] },
     { data: personalSettings },
-    { data: savingsProposals = [] },
+    { data: savingsProposalRows = [] },
     { data: savingsBudgets = [] },
     { data: photoPaymentsRaw = [] },
     { data: photoStates = [] },
@@ -93,7 +94,7 @@ export default async function TodayPage() {
     supabase.from("personal_recurrence_overrides").select("recurrence_id,occurrence_month,amount").eq("owner_id", user.id),
     supabase.from("personal_recurrence_exclusions").select("recurrence_id,occurrence_date").eq("owner_id", user.id),
     supabase.from("personal_settings").select("photo_default_account_id,movement_default_account_id,urssaf_default_account_id,savings_source_account_id,savings_destination_account_id,savings_threshold,savings_source_account_2_id,savings_destination_account_2_id,savings_threshold_2,children_sync_enabled,children_sync_account_id,children_sync_day,children_sync_person").eq("owner_id", user.id).maybeSingle(),
-    supabase.from("personal_savings_proposals").select("source_account_id,destination_account_id,source_month,decision_slot,amount,status,transfer_group_id").eq("owner_id", user.id),
+    supabase.from("personal_savings_proposals").select("id,source_account_id,destination_account_id,source_month,decision_slot,amount,status,transfer_group_id").eq("owner_id", user.id),
     supabase.from("personal_savings_budgets").select("id,account_id,name,kind,allocation_mode,allocation_value,protection,allow_recovery,critical_threshold,target_amount,target_date,priority").eq("owner_id", user.id),
     personalOnly ? Promise.resolve({ data: [] }) : supabase.from("wedding_payments").select("id,display_name,wedding_date,payment_type,amount,expected_date,received_date,status").eq("owner_id", user.id).neq("status", "cancelled").order("expected_date"),
     personalOnly ? Promise.resolve({ data: [] }) : supabase.from("personal_photo_payment_states").select("payment_id,account_id,is_completed,completed_date").eq("owner_id", user.id),
@@ -114,6 +115,7 @@ export default async function TodayPage() {
   if (movementsError) throw new Error(movementsError.message);
   if (categoriesError) throw new Error(categoriesError.message);
   const monthlyBudgetOverrides = await loadMonthlyBudgetOverrides(supabase, user.id);
+ const savingsProposals = await withSavingsSupplements(supabase, user.id, (savingsProposalRows ?? []) as any);
   const categories = (categoryRows ?? []).map((category: any) => ({ ...category,
     budget_overrides: monthlyBudgetOverrides.rows.filter(row => row.category_id === category.id) }));
   const movements = ((allMovements ?? []) as any[]).filter(movement => movement.status !== "cancelled");

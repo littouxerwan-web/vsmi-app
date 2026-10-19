@@ -50,3 +50,12 @@ test('un refus SQL de fonds insuffisants est remonté, sans écriture de secours
   await assert.rejects(s.actions.acceptSavingsProposal(form(15)), e => Boolean(e.url?.includes('erreur=')));
   assert.equal(s.calls.length, 1);
 });
+for (const [action, operation] of [['acceptSavingsProposal','accept'],['updateSavingsProposalAmount','update'],['deleteSavingsProposal','delete']]) {
+  test(`complément ${operation} utilise sa propre RPC sans toucher à la décision d’origine`, async () => {
+    const s=setup(),fd=form(15);fd.set('parent_decision_id','parent');fd.set('previous_transfer_group_id','previous');
+    await assert.rejects(s.actions[action](fd),e=>Boolean(e.url?.includes('succes=')));
+    assert.equal(s.calls.length,1);assert.equal(s.calls[0].name,'mutate_personal_savings_supplement');
+    assert.equal(s.calls[0].payload.p_decision,'parent');assert.equal(s.calls[0].payload.p_previous_group,'previous');
+    assert.equal(s.calls[0].payload.p_action,operation);
+  });
+}

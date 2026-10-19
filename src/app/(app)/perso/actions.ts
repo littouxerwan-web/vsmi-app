@@ -1034,7 +1034,11 @@ async function mutateSavingsDecision(fd: FormData, operation: "accept" | "update
   const key=savingsProposalKey(fd), amount=operation==="delete"?0:number(fd,"amount");
   if(!Number.isFinite(amount)||(operation!=="delete"&&amount<=0)) fail("Montant incorrect.");
   // The decision and BOTH transfer legs are changed atomically, under RLS, in SQL.
-  const {error}=await supabase.rpc("mutate_personal_savings_decision",{
+  const parentDecisionId=optional(fd,"parent_decision_id"), previousGroup=optional(fd,"previous_transfer_group_id");
+  if(parentDecisionId&&!previousGroup) fail("Identité du complément manquante.");
+  const {error}=parentDecisionId ? await supabase.rpc("mutate_personal_savings_supplement",{
+    p_decision:parentDecisionId,p_previous_group:previousGroup,p_action:operation,p_amount:amount,
+  }) : await supabase.rpc("mutate_personal_savings_decision",{
     p_source:key.sourceAccountId,p_destination:key.destinationAccountId,p_month:`${key.sourceMonth}-01`,
     p_slot:key.slot,p_action:operation,p_amount:amount,
   });

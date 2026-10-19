@@ -5,7 +5,7 @@ const money = (value: number) => new Intl.NumberFormat("fr-FR", { style: "curren
 /** One explanation for both dashboards; never changes or recreates a stored decision. */
 export function savingsWarningMessage(warning: RPSavingsWarning, checkingName: string, savingsName: string) {
   const explanations = {
-    accepted: "La décision de cette période a déjà été acceptée. Ses mouvements restent pris en compte selon leur statut ; aucun nouveau virement automatique n’est ajouté pour cette décision.",
+    accepted: "Aucun virement supplémentaire n’a été validé pour couvrir ce nouveau besoin. Les virements précédents sont conservés.",
     deleted: "La proposition de cette période a été supprimée. Elle n’est pas recréée automatiquement.",
     limited: "Le montant retenu pour cette proposition ne couvre pas tout le besoin. Il est conservé sans modification automatique.",
     insufficient: "L’épargne mobilisable pour cette proposition ne suffit pas à couvrir tout le besoin.",

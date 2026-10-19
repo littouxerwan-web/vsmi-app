@@ -265,7 +265,7 @@ for (const [status, amount, savings, reason, applied] of [
   assert.equal(message.title.includes('Épargne insuffisante'), reason === 'insufficient');
   assert.ok(message.detail.includes('reste à couvrir')); assert.ok(message.title.includes('28/10/2026'));
   if (reason === 'accepted') {
-    assert.ok(message.detail.includes('déjà été acceptée'));
+    assert.ok(message.detail.includes('Aucun virement supplémentaire'));
     assert.equal(result.operations.filter(o => o.movement_type.startsWith('transfer')).length, 0);
   }
   if (reason === 'deleted') assert.ok(message.detail.includes('supprimée'));
@@ -295,4 +295,47 @@ for (const [name, opening, retained, expected] of [
   assert.equal(result.savingsWarnings[0].needDate, expected);
   assert.equal(result.savingsWarnings[0].date, '2026-10-19');
   invariant(input, result);
+});
+
+function supplementInput(supplements = []) {
+  return { ...base(), categories: [], months: 1, todayIso: '2026-10-19', profiles: [profile], currentBalances: { a: 100, b: 0, s: 1000 },
+    savingsProposals: [{ id: 'decision', source_account_id: 's', destination_account_id: 'a', source_month: '2026-10-01', decision_slot: 15, amount: 800, status: 'accepted', transfer_group_id: 'original', supplements }],
+    movements: [movement(44.84, 'planned', { id: 'future', movement_date: '2026-10-28' }),
+      ...['transfer_out', 'transfer_in'].map((type, i) => movement(800, 'completed', { id: `original-${i}`, account_id: i ? 'a' : 's', movement_type: type, amount: 800, movement_date: '2026-10-17', completed_date: '2026-10-17', transfer_group_id: 'original' }))] };
+}
+test('un nouveau besoin après acceptation produit un complément indépendant', () => {
+  const input = supplementInput(), before = JSON.stringify(input), result = build(input);
+  const rows = result.operations.filter(o => o.savingsProposal);
+  assert.equal(rows.length, 2); assert.equal(rows[0].amount, 44.84);
+  assert.equal(rows[0].savingsProposal.parentDecisionId, 'decision');
+  assert.equal(rows[0].savingsProposal.previousTransferGroupId, 'original');
+  assert.equal(result.savingsWarnings.length, 0); assert.equal(JSON.stringify(input), before); invariant(input, result);
+});
+for (const [status, amount, projected, reason] of [['pending', 20, 20, 'limited'], ['deleted', 0, 0, 'deleted']]) {
+  test(`complément ${status} conserve son identité et respecte la décision`, () => {
+    const input = supplementInput([{ previous_transfer_group_id: 'original', status, amount, transfer_group_id: null }]);
+    for (const todayIso of ['2026-10-19', '2026-10-23']) {
+      const result = build({ ...input, todayIso });
+      assert.equal(result.operations.find(o => o.savingsProposal)?.amount ?? 0, projected);
+      assert.equal(result.savingsWarnings[0].reason, reason); invariant(input, result);
+    }
+  });
+}
+test('un complément accepté est compté dans le solde, jamais projeté deux fois', () => {
+  const input = supplementInput([{ previous_transfer_group_id: 'original', status: 'accepted', amount: 44.84, transfer_group_id: 'supplement-1' }]);
+  input.currentBalances.a += 44.84; input.currentBalances.s -= 44.84;
+  input.movements.push(...['transfer_out', 'transfer_in'].map((type, i) => movement(44.84, 'completed', { id: `supplement-${i}`, account_id: i ? 'a' : 's', movement_type: type, movement_date: '2026-10-18', completed_date: '2026-10-18', transfer_group_id: 'supplement-1' })));
+  assert.equal(build(input).operations.filter(o => o.savingsProposal).length, 0);
+  input.movements[0].amount += 10;
+  const result = build(input), next = result.operations.find(o => o.savingsProposal);
+  assert.equal(next.amount, 10); assert.equal(next.savingsProposal.previousTransferGroupId, 'supplement-1'); invariant(input, result);
+});
+test('aucun complément automatique si migration absente ou ancien virement encore prévu/incomplet', () => {
+  for (const variant of ['migration', 'planned', 'incomplete']) {
+    const input = supplementInput();
+    if (variant === 'migration') delete input.savingsProposals[0].supplements;
+    if (variant === 'planned') input.movements.slice(1).forEach(m => { m.status = 'planned'; });
+    if (variant === 'incomplete') input.movements.pop();
+    assert.equal(build(input).operations.filter(o => o.savingsProposal).length, 0);
+  }
 });
