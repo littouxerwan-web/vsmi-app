@@ -1,3 +1,4 @@
+import { savingsWarningMessage } from "@/lib/perso/savings-warning";
 import { loadMonthlyBudgetOverrides } from "@/lib/perso/monthly-budget-overrides";
 import { accountingDate } from "@/lib/perso/calendar";
 import { createClient } from "@/lib/supabase/server";
@@ -259,10 +260,9 @@ export default async function TodayPage() {
     const checkingName = (accounts as any[]).find((a) => a.id === warning.checkingAccountId)?.name ?? "Compte courant";
     const savingsName = (accounts as any[]).find((a) => a.id === warning.savingsAccountId)?.name ?? "Compte épargne";
     anomalyRows.push({
-      id: `savings-${warning.month}-${warning.checkingAccountId}`,
-      title: `Épargne insuffisante · ${checkingName}`,
-      detail: `${warning.required.toFixed(2)} € nécessaires, ${warning.available.toFixed(2)} € mobilisables sur ${savingsName} (${warning.missing.toFixed(2)} € manquants).`,
-      date: `${warning.month}-15`,
+      id: `savings-${warning.month}-${warning.checkingAccountId}-${warning.decisionSlot}`,
+      ...savingsWarningMessage(warning, checkingName, savingsName),
+      date: warning.date,
       level: "danger",
     });
   }

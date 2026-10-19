@@ -14,6 +14,7 @@ export type RPProfile={id:string;label:string;sourceAccountId:string|null;destin
 export type RPSavingsMeta={sourceAccountId:string;destinationAccountId:string;sourceMonth:string;automaticAmount:number;status:'automatic'|'pending'|'accepted';kind:'deposit'|'use';decisionSlot:1|15;previousTransferGroupId?:string|null};
 export type RPOperation={id:string;projected:boolean;occurrence_date?:string|null;original_date?:string;requested_amount?:number;unfunded_amount?:number;recurrence_id?:string|null;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;transfer_group_id?:string|null;source_type?:string|null;source_key?:string|null;virtual_source?:boolean;photo?:boolean;photoPayment?:RPPhoto;savingsProposal?:RPSavingsMeta;source?:'movement'|'recurrence'|'photo'|'urssaf'|'budget'|'savings'};
 export type RPPoint={date:string;balances:Record<string,number>;checking:number;savings:number;crypto:number;total:number};
+export type RPSavingsWarning={month:string;date:string;decisionSlot:1|15;checkingAccountId:string;savingsAccountId:string;required:number;available:number;applied:number;missing:number;reason:'accepted'|'deleted'|'limited'|'insufficient'};
 export type RPMonthAudit={month:string;opening:Record<string,number>;credits:Record<string,number>;debits:Record<string,number>;budgetDebits:Record<string,number>;savingsUsed:Record<string,number>;savingsDeposited:Record<string,number>;closing:Record<string,number>;budgets:BudgetStatement[];};
 
 export type ProjectionInput={
@@ -99,7 +100,7 @@ export function buildReliableProjection(input:ProjectionInput){
 
  const balances=new Map(input.accounts.map(account=>[account.id,round(input.currentBalances[account.id]??0)]));
  const operations:RPOperation[]=[],points:RPPoint[]=[],trajectory:RPPoint[]=[],audits:RPMonthAudit[]=[];
- const savingsWarnings:{month:string;checkingAccountId:string;savingsAccountId:string;required:number;available:number;missing:number}[]=[];
+ const savingsWarnings:RPSavingsWarning[]=[];
  const snapshot=(date:string):RPPoint=>{
   const sum=(type:string)=>round(input.accounts.filter(a=>a.account_type===type).reduce((total,a)=>total+(balances.get(a.id)??0),0));
   const checking=sum('checking'),savings=sum('savings'),crypto=sum('crypto');
@@ -200,7 +201,12 @@ export function buildReliableProjection(input:ProjectionInput){
     if(minimum<threshold-0.009){
      const required=round(threshold-minimum),available=mobilizableSavingsForAccount(balances.get(savings)??0,savings,input.savingsBudgets,SAVINGS_FLOOR);
      const applied=synthetic(month,decision.date,decision.slot,savings,checking.id,required,'use',audit);
-     if(required-applied>0.009){unresolved.set(checking.id,round(required-applied));savingsWarnings.push({month,checkingAccountId:checking.id,savingsAccountId:savings,required,available:round(available),missing:round(required-applied)});}
+     if(required-applied>0.009){
+      const stored=decisionFor(savings,checking.id,month,decision.slot);
+      const reason:RPSavingsWarning['reason']=stored?.status==='accepted'?'accepted':stored?.status==='deleted'?'deleted':stored?.status==='pending'&&Number(stored.amount)<Math.min(required,available)-0.009?'limited':'insufficient';
+      unresolved.set(checking.id,round(required-applied));
+      savingsWarnings.push({month,date:decision.date,decisionSlot:decision.slot,checkingAccountId:checking.id,savingsAccountId:savings,required,available:round(available),applied,missing:round(required-applied),reason});
+     }
     }else{
      const surplus=round(Math.max(0,windowMinimum(checking.id,decision.date,monthEnd(month))-threshold-(unresolved.get(checking.id)??0)));
      synthetic(month,decision.date,decision.slot,checking.id,savings,surplus,'deposit',audit);

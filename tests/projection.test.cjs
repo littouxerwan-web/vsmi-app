@@ -238,3 +238,45 @@ test('le bilan affiche le compte explicite ou le compte de rattachement par déf
   assert.equal(budget(build(input)).account_id, 'b');
   assert.equal(budget(build(input)).account_name, 'Courant B');
 });
+
+const { savingsWarningMessage } = load('src/lib/perso/savings-warning.ts');
+for (const [status, amount, savings, reason, applied] of [
+  ['accepted', 887.41, 13990.75, 'accepted', 0],
+  ['deleted', 0, 13990.75, 'deleted', 0],
+  ['pending', 20, 13990.75, 'limited', 20],
+  ['pending', 0, 13990.75, 'limited', 0],
+  [null, 0, 50, 'insufficient', 20],
+]) test(`alerte épargne distingue ${reason}, montant retenu ${amount}`, () => {
+  const input = { ...base(), categories: [], months: 1, todayIso: '2026-10-19', profiles: [profile],
+    currentBalances: { a: 100, b: 0, s: savings },
+    savingsProposals: status ? [{ source_account_id: 's', destination_account_id: 'a', source_month: '2026-10-01', decision_slot: 15, amount, status, transfer_group_id: status === 'accepted' ? 'accepted-group' : null }] : [],
+    movements: [movement(44.84, 'planned', { movement_date: '2026-10-28', category_id: null }),
+      ...(status === 'accepted' ? ['transfer_out', 'transfer_in'].map((type, index) => movement(887.41, 'completed', {
+        id: `accepted-${index}`, account_id: index ? 'a' : 's', movement_type: type, category_id: null,
+        movement_date: '2026-10-17', completed_date: '2026-10-17', transfer_group_id: 'accepted-group',
+      })) : [])],
+  };
+  const original = JSON.stringify(input), result = build(input), warning = result.savingsWarnings[0];
+  assert.equal(warning.reason, reason); assert.equal(warning.required, 44.84);
+  assert.equal(warning.available, round(savings - 30)); assert.equal(warning.applied, applied);
+  assert.equal(warning.missing, round(44.84 - applied)); assert.equal(warning.date, '2026-10-19');
+  assert.equal(warning.decisionSlot, 15);
+  const message = savingsWarningMessage(warning, 'Courant', 'Livret');
+  assert.equal(message.title.includes('Épargne insuffisante'), reason === 'insufficient');
+  assert.ok(message.detail.includes('reste à couvrir'));
+  if (reason === 'accepted') {
+    assert.ok(message.detail.includes('déjà été acceptée'));
+    assert.equal(result.operations.filter(o => o.movement_type.startsWith('transfer')).length, 0);
+  }
+  if (reason === 'deleted') assert.ok(message.detail.includes('supprimée'));
+  assert.equal(JSON.stringify(input), original); invariant(input, result);
+});
+
+test('épargne suffisante sans décision antérieure couvre le besoin sans alerte', () => {
+  const input = { ...base(), categories: [], months: 1, profiles: [profile], currentBalances: { a: 100, b: 0, s: 13990.75 },
+    movements: [movement(44.84, 'planned', { movement_date: '2026-09-28' })] };
+  const result = build(input);
+  assert.equal(result.savingsWarnings.length, 0);
+  assert.equal(result.operations.find(o => o.savingsProposal?.kind === 'use').amount, 44.84);
+  invariant(input, result);
+});
