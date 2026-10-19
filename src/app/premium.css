@@ -198,7 +198,7 @@ html.vsmi-light-mode .vsmi-premium-theme {
 
 /* Compact account overview and optional budget detail. */
 .premium-brand {flex-direction:column;gap:7px;padding:18px 24px 12px;}
-.premium-brand-logo {width:100px;height:80px;object-fit:contain;}
+.premium-brand-sailboat {display:block;width:124px;height:90px;flex-shrink:0;}
 .premium-brand small {margin:0;color:#c3cbd7;letter-spacing:.02em;font-size:10px;}
 .premium-budget-disclosure {margin-top:16px;}
 .premium-budget-disclosure > summary {cursor:pointer;padding:10px 0;font-size:14px;font-weight:600;}

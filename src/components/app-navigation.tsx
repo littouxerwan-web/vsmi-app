@@ -2,7 +2,6 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import {
   Baby,
   CalendarDays,
@@ -93,7 +92,18 @@ export function AppNavigation({ photoAccess = false, childrenAccess = false, ost
     : basePersoNavigation;
   return (
     <aside className="premium-sidebar hidden min-h-screen w-60 shrink-0 text-white lg:flex lg:flex-col">
-      <Link href="/aujourd-hui" className="premium-brand"><Image src="/vsmi-logo.gif" alt="VSMI" width={100} height={80} unoptimized className="premium-brand-logo"/><small>Votre quotidien, en équilibre.</small></Link>
+      <Link href="/aujourd-hui" className="premium-brand"><svg className="premium-brand-sailboat" viewBox="0 0 144 104" fill="none" role="img" aria-label="VSMI — voilier" xmlns="http://www.w3.org/2000/svg">
+        <g stroke="#F2EEE5" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M75 12V75"/>
+          <path d="M70 19C57 35 43 54 34 66H70C66 52 67 33 70 19Z"/>
+          <path d="M81 29L107 67H81C85 54 84 40 81 29Z"/>
+        </g>
+        <g stroke="#DCC79D" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M25 75C49 78 82 79 118 73L107 85C87 91 51 91 36 85L25 75Z"/>
+          <path d="M43 96C52 93 59 93 67 96C75 99 82 99 91 96" opacity=".65"/>
+          <path d="M99 96C104 94 109 94 114 95" opacity=".4"/>
+        </g>
+      </svg><small>Votre quotidien, en équilibre.</small></Link>
 
       <nav className="flex-1 px-4 py-6">
         <Link
