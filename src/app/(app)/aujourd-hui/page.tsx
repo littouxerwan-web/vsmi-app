@@ -318,7 +318,7 @@ export default async function TodayPage() {
   const expectedYear = weddingPaymentRows.filter((payment) => payment.status === "expected" && payment.expected_date?.startsWith(year)).reduce((sum, payment) => sum + N(payment.amount), 0);
 
   return (
-    <main className="min-h-screen bg-[#0B0B0B] px-3 pb-24 pt-5 text-white sm:px-5 sm:pt-7 lg:px-8 lg:pb-8 lg:pt-8">
+    <main className="premium-today min-h-screen bg-[#29384F] px-3 pb-24 pt-5 text-white sm:px-5 sm:pt-7 lg:px-8 lg:pb-8 lg:pt-8">
       <div className="mx-auto max-w-[1500px]">
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>

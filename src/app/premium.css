@@ -2,9 +2,9 @@
    The legacy lux theme remains available to old screens; this shell uses explicit tokens. */
 .vsmi-premium-theme {
   color-scheme:dark;
-  --p-bg:#141b1a; --p-surface:#1d2724; --p-soft:#25312d; --p-ink:#eef2ed;
-  --p-muted:#afbbb3; --p-line:#39473f; --p-accent:#ddc59a; --p-accent-soft:#38372d;
-  --p-button:#ddc59a; --p-button-ink:#202821; --p-positive:#86cbb0; --p-negative:#f3a7a0;
+  --p-bg:#171f2c; --p-surface:#202c3d; --p-soft:#29374b; --p-ink:#edf2f8;
+  --p-muted:#b1bfd2; --p-line:#3a4a61; --p-accent:#ddc59a; --p-accent-soft:#38372d;
+  --p-button:#ddc59a; --p-button-ink:#202b3d; --p-positive:#86cbb0; --p-negative:#f3a7a0;
   --p-shadow:0 8px 32px rgb(0 0 0 / .10); --p-radius:22px;
   background:var(--p-bg);color:var(--p-ink);min-height:100dvh;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
@@ -36,8 +36,8 @@ html.vsmi-light-mode .vsmi-premium-theme {
 .vsmi-premium-theme #app-private-content :is(section,article,details,div).bg-black {
   background:var(--p-soft);color:var(--p-ink);
 }
-.vsmi-premium-theme #app-private-content :is(.bg-neutral-950,.bg-neutral-900) {background:#263e34;color:#f7faf5;}
-.vsmi-premium-theme #app-private-content :is(.bg-neutral-950,.bg-neutral-900) :is(.text-neutral-400,.text-neutral-500) {color:#c0d1c5;}
+.vsmi-premium-theme #app-private-content :is(.bg-neutral-950,.bg-neutral-900) {background:#29384f;color:#f3f6fb;}
+.vsmi-premium-theme #app-private-content :is(.bg-neutral-950,.bg-neutral-900) :is(.text-neutral-400,.text-neutral-500) {color:#c1ccdc;}
 .vsmi-premium-theme #app-private-content :is(.bg-red-50,.bg-rose-50) {background:color-mix(in srgb,#c9493d 9%,var(--p-surface));color:var(--p-ink);border-color:color-mix(in srgb,#c9493d 28%,var(--p-line));}
 .vsmi-premium-theme #app-private-content :is(.bg-amber-50,.bg-yellow-50) {background:color-mix(in srgb,#bc9750 11%,var(--p-surface));color:var(--p-ink);border-color:color-mix(in srgb,#bc9750 28%,var(--p-line));}
 .vsmi-premium-theme #app-private-content :is(.bg-violet-50,.bg-purple-50) {background:color-mix(in srgb,#9a81b6 10%,var(--p-surface));color:var(--p-ink);border-color:color-mix(in srgb,#9a81b6 25%,var(--p-line));}
@@ -223,3 +223,5 @@ html.vsmi-light-mode .vsmi-premium-theme {
  .vsmi-premium-theme #app-private-content .premium-account-card button,.vsmi-premium-theme #app-private-content .premium-account-card a {width:28px;height:28px;min-height:28px;}
  .premium-budget-disclosure > div {grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;}
 }
+
+.vsmi-premium-theme #app-private-content main.premium-today {background:#29384f;color:#f3f6fb;}
