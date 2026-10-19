@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { LoadingScreen } from "@/components/loading-screen";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -203,18 +203,13 @@ export function InteractionFeedback() {
 
 
       {navigationPending && showNavigationLoader ? (
-        <div className="fixed inset-0 z-[300] grid place-items-center bg-[#0B0B0B]/96 backdrop-blur-sm" aria-live="polite" aria-label="Chargement de la page">
-          <div className="flex flex-col items-center gap-4">
-            <Image src="/vsmi-logo.gif" alt="VSMI" width={180} height={180} priority unoptimized className="h-auto w-32 object-contain sm:w-40" />
-            <span className="h-1 w-24 overflow-hidden rounded-full bg-white/10"><span className="block h-full w-1/2 animate-pulse rounded-full bg-[#D2AE57]" /></span>
-          </div>
-        </div>
+        <LoadingScreen navigation/>
       ) : null}
 
       {state !== "idle" && !navigationPending ? (
         <div
           aria-live="polite"
-          className="pointer-events-none fixed left-1/2 top-1/2 z-[200] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-[#D2AE57]/40 bg-[#111111]/96 px-5 py-3 text-sm font-semibold text-[#E3C97E] shadow-2xl backdrop-blur"
+          className="pointer-events-none fixed left-1/2 top-1/2 z-[200] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-[#D2AE57]/40 bg-[#29384F]/96 px-5 py-3 text-sm font-semibold text-[#E3C97E] shadow-2xl backdrop-blur"
         >
           {state === "pending" ? "Action en cours…" : "✓ Mise à jour effectuée"}
         </div>

@@ -234,3 +234,6 @@ html.vsmi-light-mode .vsmi-premium-theme {
 .vsmi-premium-theme #app-private-content .premium-account-card[aria-pressed="true"] {background:#29384f;color:#faf8f0;border-color:#647996;--p-muted:#c1ccdc;--p-line:#53627a;--p-positive:#a3dfc3;--p-negative:#ffb4ae;--p-soft:#3b4b63;}
 .vsmi-premium-theme #app-private-content .premium-account-card[aria-pressed="true"] .text-emerald-700 {color:var(--p-positive);}
 .vsmi-premium-theme #app-private-content .premium-account-card[aria-pressed="true"] .text-red-500 {color:var(--p-negative);}
+
+/* Shared route and navigation loading screen, including outside the app shell. */
+.vsmi-loading-screen {background:radial-gradient(ellipse at 50% 35%,#344963 0%,#29384f 50%,#202b3d 100%);color:#edf2f8;min-height:100dvh;}
