@@ -262,7 +262,7 @@ export default async function TodayPage() {
     anomalyRows.push({
       id: `savings-${warning.month}-${warning.checkingAccountId}-${warning.decisionSlot}`,
       ...savingsWarningMessage(warning, checkingName, savingsName),
-      date: warning.date,
+      date: warning.needDate,
       level: "danger",
     });
   }

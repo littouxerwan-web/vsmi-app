@@ -260,10 +260,10 @@ for (const [status, amount, savings, reason, applied] of [
   assert.equal(warning.reason, reason); assert.equal(warning.required, 44.84);
   assert.equal(warning.available, round(savings - 30)); assert.equal(warning.applied, applied);
   assert.equal(warning.missing, round(44.84 - applied)); assert.equal(warning.date, '2026-10-19');
-  assert.equal(warning.decisionSlot, 15);
+  assert.equal(warning.decisionSlot, 15); assert.equal(warning.needDate, '2026-10-28');
   const message = savingsWarningMessage(warning, 'Courant', 'Livret');
   assert.equal(message.title.includes('Épargne insuffisante'), reason === 'insufficient');
-  assert.ok(message.detail.includes('reste à couvrir'));
+  assert.ok(message.detail.includes('reste à couvrir')); assert.ok(message.title.includes('28/10/2026'));
   if (reason === 'accepted') {
     assert.ok(message.detail.includes('déjà été acceptée'));
     assert.equal(result.operations.filter(o => o.movement_type.startsWith('transfer')).length, 0);
@@ -278,5 +278,21 @@ test('épargne suffisante sans décision antérieure couvre le besoin sans alert
   const result = build(input);
   assert.equal(result.savingsWarnings.length, 0);
   assert.equal(result.operations.find(o => o.savingsProposal?.kind === 'use').amount, 44.84);
+  invariant(input, result);
+});
+
+for (const [name, opening, retained, expected] of [
+  ['besoin déjà présent', 80, 0, '2026-10-19'],
+  ['premier creux avant le minimum', 100, 0, '2026-10-22'],
+  ['complément partiel couvrant le premier creux', 100, 20, '2026-10-28'],
+]) test(`date du besoin non couvert : ${name}`, () => {
+  const input = { ...base(), categories: [], months: 1, todayIso: '2026-10-19', profiles: [profile],
+    currentBalances: { a: opening, b: 0, s: 1000 },
+    savingsProposals: [{ source_account_id: 's', destination_account_id: 'a', source_month: '2026-10-01', decision_slot: 15, amount: retained, status: retained ? 'pending' : 'deleted' }],
+    movements: [movement(20, 'planned', { id: 'first', movement_date: '2026-10-22' }), movement(50, 'planned', { id: 'second', movement_date: '2026-10-28' })],
+  };
+  const result = build(input);
+  assert.equal(result.savingsWarnings[0].needDate, expected);
+  assert.equal(result.savingsWarnings[0].date, '2026-10-19');
   invariant(input, result);
 });

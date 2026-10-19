@@ -8,10 +8,10 @@ export function savingsWarningMessage(warning: RPSavingsWarning, checkingName: s
     accepted: "La décision de cette période a déjà été acceptée. Ses mouvements restent pris en compte selon leur statut ; aucun nouveau virement automatique n’est ajouté pour cette décision.",
     deleted: "La proposition de cette période a été supprimée. Elle n’est pas recréée automatiquement.",
     limited: "Le montant retenu pour cette proposition ne couvre pas tout le besoin. Il est conservé sans modification automatique.",
-    insufficient: "L’épargne mobilisable à cette date ne suffit pas à couvrir tout le besoin.",
+    insufficient: "L’épargne mobilisable pour cette proposition ne suffit pas à couvrir tout le besoin.",
   };
   return {
-    title: `${warning.reason === "insufficient" ? "Épargne insuffisante" : "Besoin de trésorerie non couvert"} pour protéger ${checkingName}`,
+    title: `${warning.reason === "insufficient" ? "Épargne insuffisante" : "Besoin de trésorerie non couvert"} pour protéger ${checkingName} — à partir du ${warning.needDate.split("-").reverse().join("/")}`,
     detail: `Besoin : ${money(warning.required)} · mobilisable sur ${savingsName} : ${money(warning.available)} · complément projeté : ${money(warning.applied)} · reste à couvrir : ${money(warning.missing)}. ${explanations[warning.reason]}`,
   };
 }

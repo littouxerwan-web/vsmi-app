@@ -14,7 +14,7 @@ export type RPProfile={id:string;label:string;sourceAccountId:string|null;destin
 export type RPSavingsMeta={sourceAccountId:string;destinationAccountId:string;sourceMonth:string;automaticAmount:number;status:'automatic'|'pending'|'accepted';kind:'deposit'|'use';decisionSlot:1|15;previousTransferGroupId?:string|null};
 export type RPOperation={id:string;projected:boolean;occurrence_date?:string|null;original_date?:string;requested_amount?:number;unfunded_amount?:number;recurrence_id?:string|null;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;transfer_group_id?:string|null;source_type?:string|null;source_key?:string|null;virtual_source?:boolean;photo?:boolean;photoPayment?:RPPhoto;savingsProposal?:RPSavingsMeta;source?:'movement'|'recurrence'|'photo'|'urssaf'|'budget'|'savings'};
 export type RPPoint={date:string;balances:Record<string,number>;checking:number;savings:number;crypto:number;total:number};
-export type RPSavingsWarning={month:string;date:string;decisionSlot:1|15;checkingAccountId:string;savingsAccountId:string;required:number;available:number;applied:number;missing:number;reason:'accepted'|'deleted'|'limited'|'insufficient'};
+export type RPSavingsWarning={month:string;date:string;needDate:string;decisionSlot:1|15;checkingAccountId:string;savingsAccountId:string;required:number;available:number;applied:number;missing:number;reason:'accepted'|'deleted'|'limited'|'insufficient'};
 export type RPMonthAudit={month:string;opening:Record<string,number>;credits:Record<string,number>;debits:Record<string,number>;budgetDebits:Record<string,number>;savingsUsed:Record<string,number>;savingsDeposited:Record<string,number>;closing:Record<string,number>;budgets:BudgetStatement[];};
 
 export type ProjectionInput={
@@ -163,16 +163,19 @@ export function buildReliableProjection(input:ProjectionInput){
   if(amount!==undefined&&out&&amount<out.amount)issues.push({date:job.date,operationId:out.id,message:`Virement limité à ${amount} € ; ${round(out.amount-amount)} € non financés.`});
   trajectory.push(snapshot(job.date));
  };
- const windowMinimum=(accountId:string,from:string,through:string)=>{
+ const windowProjection=(accountId:string,from:string,through:string,threshold=-Infinity)=>{
   const simulated=new Map(balances);let minimum=simulated.get(accountId)??0;
+  let firstShortfallDate:string|null=minimum<threshold-0.009?from:null;
   for(const job of jobs){if(job.date<from||job.date>through||job.rows.some(row=>!accountById.has(row.account_id)))continue;
    const out=job.rows.find(row=>row.movement_type==='transfer_out');
    const cap=out&&accountById.get(out.account_id)?.account_type==='savings'?Math.min(out.amount,Math.max(0,simulated.get(out.account_id)??0)):null;
    for(const row of job.rows)simulated.set(row.account_id,round((simulated.get(row.account_id)??0)+(plus(row)?1:-1)*(cap??row.amount)));
    minimum=Math.min(minimum,simulated.get(accountId)??0);
+   if(firstShortfallDate===null&&(simulated.get(accountId)??0)<threshold-0.009)firstShortfallDate=job.date;
   }
-  return minimum;
+  return {minimum,firstShortfallDate};
  };
+ const windowMinimum=(accountId:string,from:string,through:string)=>windowProjection(accountId,from,through).minimum;
  const synthetic=(month:string,date:string,slot:1|15,source:string,dest:string,requested:number,kind:'use'|'deposit',audit:RPMonthAudit)=>{
   const stored=decisionFor(source,dest,month,slot);
   if(stored?.status==='deleted'||stored?.status==='accepted')return 0;
@@ -205,7 +208,9 @@ export function buildReliableProjection(input:ProjectionInput){
       const stored=decisionFor(savings,checking.id,month,decision.slot);
       const reason:RPSavingsWarning['reason']=stored?.status==='accepted'?'accepted':stored?.status==='deleted'?'deleted':stored?.status==='pending'&&Number(stored.amount)<Math.min(required,available)-0.009?'limited':'insufficient';
       unresolved.set(checking.id,round(required-applied));
-      savingsWarnings.push({month,date:decision.date,decisionSlot:decision.slot,checkingAccountId:checking.id,savingsAccountId:savings,required,available:round(available),applied,missing:round(required-applied),reason});
+      // Re-evaluate after the proposed transfer: date of the first remaining shortfall.
+      const needDate=windowProjection(checking.id,decision.date,through,threshold).firstShortfallDate??decision.date;
+      savingsWarnings.push({month,date:decision.date,needDate,decisionSlot:decision.slot,checkingAccountId:checking.id,savingsAccountId:savings,required,available:round(available),applied,missing:round(required-applied),reason});
      }
     }else{
      const surplus=round(Math.max(0,windowMinimum(checking.id,decision.date,monthEnd(month))-threshold-(unresolved.get(checking.id)??0)));
