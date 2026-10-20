@@ -234,7 +234,7 @@ export function buildReliableProjection(input:ProjectionInput){
   const group=previousTransferGroupId?`auto-supplement-${previousTransferGroupId}`:`auto-${kind}-${source}-${dest}-${month}-${slot}`;
   const meta:RPSavingsMeta={sourceAccountId:source,destinationAccountId:dest,sourceMonth:month,decisionSlot:slot,automaticAmount,status:stored?'pending':'automatic',kind,...(parentDecisionId?{parentDecisionId,previousTransferGroupId}:{})};
   const out:RPOperation={id:`${group}-out`,projected:true,transfer_group_id:group,account_id:source,category_id:null,movement_type:'transfer_out',
-   label:parentDecisionId?"Complément d’épargne proposé":kind==='use'?"Utilisation d'épargne":"Versement épargne proposé",amount,movement_date:date,status:'planned',source:'savings',savingsProposal:meta};
+   label:kind==='use'?"Utilisation d’épargne proposée":parentDecisionId?"Complément d’épargne proposé":"Versement épargne proposé",amount,movement_date:date,status:'planned',source:'savings',savingsProposal:meta};
   applyJob({date,id:group,rows:[out,{...out,id:`${group}-in`,account_id:dest,movement_type:'transfer_in'}]},audit,kind);
   return amount;
  };
