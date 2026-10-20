@@ -41,7 +41,7 @@ type Props = {
   initialOrder: string[];
   initialColors?: Record<string, TileColor>;
   weddings?: Wedding[];
-  weddingStats?: { upcoming: number; receivedMonth: number; expectedYear: number } | null;
+  weddingStats?: { upcoming: number; receivedMonth: number; expectedYear: number; expectedNextYear: number } | null;
   anomalies?: { id: string; title: string; detail: string; date: string; level?: "warning" | "danger" }[];
 };
 
@@ -312,16 +312,17 @@ export function TodayDashboard({
             </div>
             <Link href="/mariages" className="rounded-full border border-[#DCE2EB] px-3 py-2 text-xs font-semibold text-[#526176] transition hover:bg-[#EDF1F6]">Voir tout</Link>
           </div>
-          <div className="mt-4 grid grid-cols-3 gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div className="rounded-2xl bg-[#F3F5F8] p-3"><p className="text-[9px] uppercase tracking-wide text-[#647085]">À venir</p><p className="mt-1 text-xl font-semibold">{weddingStats.upcoming}</p></div>
             <div className="rounded-2xl bg-[#F3F5F8] p-3"><p className="text-[9px] uppercase tracking-wide text-[#647085]">Ce mois</p><p className="mt-1 text-xs font-semibold text-[#806536] sm:text-sm">{money(weddingStats.receivedMonth)}</p></div>
-            <div className="rounded-2xl bg-[#F3F5F8] p-3"><p className="text-[9px] uppercase tracking-wide text-[#647085]">À venir année</p><p className="mt-1 text-xs font-semibold text-[#25334A] sm:text-sm">{money(weddingStats.expectedYear)}</p></div>
+            <div className="rounded-2xl bg-[#F3F5F8] p-3"><p className="text-[9px] uppercase tracking-wide text-[#647085]">À venir cette année</p><p className="mt-1 text-xs font-semibold text-[#25334A] sm:text-sm">{money(weddingStats.expectedYear)}</p></div>
+            <div className="rounded-2xl bg-[#F3F5F8] p-3"><p className="text-[9px] uppercase tracking-wide text-[#647085]">À venir année prochaine</p><p className="mt-1 text-xs font-semibold text-[#25334A] sm:text-sm">{money(weddingStats.expectedNextYear)}</p></div>
           </div>
           <div className="mt-3 space-y-2">
             {weddings.length ? weddings.slice(0, 3).map((wedding) => (
               <Link key={wedding.id} href={`/mariages/${wedding.id}`} className="flex items-center justify-between gap-3 rounded-2xl border border-[#DCE2EB] bg-[#F8F9FB] px-3.5 py-3 transition hover:bg-[#EDF1F6]">
-                <div className="min-w-0"><p className="truncate text-sm font-semibold">{wedding.name}</p><p className="mt-1 truncate text-[11px] text-[#647085]">{wedding.city || "Ville à définir"}</p></div>
-                <p className="shrink-0 text-xs font-semibold text-[#806536]">{new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short" }).format(new Date(`${wedding.date}T12:00:00`))}</p>
+                <p className="shrink-0 text-xs font-semibold text-[#806536]">{new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${wedding.date}T12:00:00`))}</p>
+                <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{wedding.name}</p><p className="mt-1 truncate text-[11px] text-[#647085]">{wedding.city || "Ville à définir"}</p></div>
               </Link>
             )) : <p className="rounded-2xl bg-[#F3F5F8] p-4 text-sm text-[#647085]">Aucun mariage à venir.</p>}
           </div>

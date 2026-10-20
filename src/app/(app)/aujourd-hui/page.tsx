@@ -108,7 +108,7 @@ export default async function TodayPage() {
     supabase.from("common_recurrence_exclusions").select("recurrence_id,occurrence_date"),
     personalOnly ? Promise.resolve({ data: null }) : supabase.from("children_settings").select("person_1_name,person_2_name,income_person_1,income_person_2").eq("owner_id", user.id).maybeSingle(),
     personalOnly ? Promise.resolve({ data: [] }) : supabase.from("children_expenses").select("label,amount,annual_amount,smooth_annual,start_month,end_month,paid_by").eq("owner_id", user.id).eq("school_year_start", 2026),
-    photoAccess ? supabase.from("weddings").select("id,partner1_first_name,partner1_last_name,partner2_first_name,partner2_last_name,wedding_date,city").eq("owner_id", user.id).gte("wedding_date", today).order("wedding_date").limit(6) : Promise.resolve({ data: [] }),
+    photoAccess ? supabase.from("weddings").select("id,partner1_first_name,partner1_last_name,partner2_first_name,partner2_last_name,wedding_date,city", { count: "exact" }).eq("owner_id", user.id).is("archived_at", null).order("wedding_date").limit(3) : Promise.resolve({ data: [] }),
     photoAccess ? supabase.from("wedding_payments").select("amount,expected_date,received_date,status").eq("owner_id", user.id).neq("status", "cancelled") : Promise.resolve({ data: [] }),
   ] as any);
 
@@ -315,6 +315,8 @@ export default async function TodayPage() {
   const weddingRows = ((weddingsResult as any)?.data ?? []) as any[];
   const weddingPaymentRows = ((weddingPaymentsResult as any)?.data ?? []) as any[];
   const receivedMonth = weddingPaymentRows.filter((payment) => payment.status === "received" && payment.received_date?.startsWith(month)).reduce((sum, payment) => sum + N(payment.amount), 0);
+  const nextYear = String(Number(year) + 1);
+  const expectedNextYear = weddingPaymentRows.filter((payment) => payment.status === "expected" && payment.expected_date?.startsWith(nextYear)).reduce((sum, payment) => sum + N(payment.amount), 0);
   const expectedYear = weddingPaymentRows.filter((payment) => payment.status === "expected" && payment.expected_date?.startsWith(year)).reduce((sum, payment) => sum + N(payment.amount), 0);
 
   return (
@@ -334,7 +336,7 @@ export default async function TodayPage() {
           initialOrder={order}
           initialColors={initialColors as any}
           weddings={photoAccess ? weddingRows.map((wedding) => ({ id: wedding.id, name: weddingName(wedding), date: wedding.wedding_date, city: wedding.city })) : []}
-          weddingStats={photoAccess ? { upcoming: weddingRows.length, receivedMonth, expectedYear } : null}
+          weddingStats={photoAccess ? { upcoming: (weddingsResult as any)?.count ?? weddingRows.length, receivedMonth, expectedYear, expectedNextYear } : null}
           anomalies={anomalyRows}
         />
       </div>
