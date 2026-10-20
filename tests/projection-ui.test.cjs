@@ -134,3 +134,19 @@ test('la coche de compensation actualise le graphique puis restitue la projectio
  assert.equal(nodes(tree,n=>n.type==='form').length,originalForms);
  toggle(tree).props.onChange({target:{checked:false}});tree=ProjectionView(props);assert.equal(chart(tree).props.values[0],-100);assert.equal(chart(tree).props.savingsValues[0],1000);
 });
+
+test('la vue tous les comptes inclut chaque épargne et conserve le total lors de la compensation',()=>{
+ const {ProjectionView}=viewModule('all-accounts');
+ const props={todayIso:'2026-10-20',accounts:[{id:'a',name:'Courant',account_type:'checking'},{id:'s',name:'Livret',account_type:'savings'},{id:'t',name:'Second livret',account_type:'savings'}],categories:[],snapshots:[],recurrences:[],currentBalances:{a:50,s:1000,t:200},movements:[{id:'bill',account_id:'a',category_id:null,amount:150,label:'Dépense',movement_type:'expense',movement_date:'2026-10-25',status:'planned'}]};
+ const chart=tree=>nodes(tree,n=>typeof n.type==='function'&&n.type.name==='ProjectionChart')[0].props;
+ let tree=ProjectionView(props);
+ assert.deepEqual(Array.from(chart(tree).series,s=>s.id),['a','s','t']);
+ assert.equal(chart(tree).values[0],1100);
+ nodes(tree,n=>n.type==='input'&&n.props.type==='checkbox')[0].props.onChange({target:{checked:true}});
+ tree=ProjectionView(props);
+ assert.equal(chart(tree).values[0],1100);
+ assert.equal(chart(tree).baselineValues[0],1100);
+ assert.equal(chart(tree).series[0].values[0],0);
+ assert.equal(chart(tree).series[1].values[0],900);
+ assert.equal(chart(tree).baselineLabel,'total de tous les comptes');
+});
