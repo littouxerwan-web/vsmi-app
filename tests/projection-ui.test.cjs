@@ -150,3 +150,15 @@ test('la vue tous les comptes inclut chaque épargne et conserve le total lors d
  assert.equal(chart(tree).series[1].values[0],900);
  assert.equal(chart(tree).baselineLabel,'total de tous les comptes');
 });
+
+test('Projection regroupe les mouvements récurrents et ponctuels par catégorie et date sans perdre leurs formulaires',()=>{
+ const {ProjectionView}=viewModule('all');
+ const movement=(id,date,recurrence_id=null,category_id=null)=>({id,account_id:'a',movement_type:'expense',label:id,amount:20,movement_date:date,status:'planned',recurrence_id,category_id});
+ const tree=ProjectionView({todayIso:'2026-10-20',accounts:[{id:'a',name:'Courant',account_type:'checking'}],categories:[{id:'c',name:'Abonnements',parent_id:null,monthly_budget:0,movement_type:'expense'}],snapshots:[],recurrences:[],currentBalances:{a:1000},movements:[movement('later','2026-10-28','historical','c'),movement('earlier','2026-10-22','historical','c'),movement('once','2026-10-24')]});
+ const groups=nodes(tree,n=>n.props?.className==='premium-operation-group');
+ assert.equal(groups.length,2);
+ const ids=group=>nodes(group,n=>n.type==='input'&&n.props.name==='id').map(n=>n.props.value);
+ assert.deepEqual(ids(groups[0]),['earlier','later']);assert.deepEqual(ids(groups[1]),['once']);
+ assert.equal(nodes(groups[0],n=>n.type==='h3')[0].props.children,'Abonnements');
+ assert.equal(nodes(groups[1],n=>n.type==='h3')[0].props.children,'Divers');
+});
