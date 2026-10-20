@@ -1,3 +1,6 @@
+import { ProfitabilityPanel } from "@/components/photo/profitability-panel";
+import { loadPhotoProfitability } from "@/lib/photo/load-profitability";
+import { todayParis } from "@/lib/perso/calendar";
 import Link from "next/link";
 import { CheckCircle2, CircleDollarSign, Clock3, Plus, Trash2, WalletCards } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -51,9 +54,9 @@ export default async function AccountingPage({
 
   const payments = (paymentsData ?? []) as Payment[];
   const weddings = (weddingsData ?? []) as WeddingCount[];
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const today = now.toISOString().slice(0, 10);
+  const today = todayParis();
+  const currentYear = Number(today.slice(0, 4));
+  const profitabilityData = await loadPhotoProfitability(supabase, today).catch(() => null);
   const received = payments.filter((p) => p.status === "received");
   const expected = payments.filter((p) => p.status === "expected");
 
@@ -132,6 +135,8 @@ const automaticDone = weddings
           <Metric icon={CircleDollarSign} label="Mariages effectués" value={String(weddingsDone)} />
           <Metric icon={CircleDollarSign} label="Mariages restants" value={String(weddingsRemaining)} />
         </section>
+
+        {profitabilityData ? <ProfitabilityPanel {...profitabilityData}/> : <p role="alert" className="mt-7 rounded-xl bg-amber-50 p-4 text-amber-900">Rentabilité indisponible : certaines données de charges ou de revenus n’ont pas pu être chargées. Aucun résultat partiel n’est affiché.</p>}
 
         <section className="mt-7 rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold">Ajouter un mariage passé</h2>
