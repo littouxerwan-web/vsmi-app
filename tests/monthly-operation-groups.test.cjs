@@ -22,3 +22,12 @@ test('les groupes vides restent disponibles avec zéro et aucun élément',()=>{
  const groups=groupMonthlyOperations([],[]);assert.equal(groups.length,2);
  assert.ok(groups.every(g=>g.total===0&&g.count===0&&g.categories.length===0));
 });
+test('crédits et débits : à venir / total restent complets avec un filtre de pointage',()=>{
+ const row=(id,direction,completed,amount)=>({id,date:'2026-10-01',categoryId:null,recurring:true,amount,direction,completed,content:null});
+ const all=[row('a','credit',false,100),row('b','credit',true,200),row('c','debit',false,40),row('d','debit',true,60)];
+ for(const visible of [all,all.filter(r=>!r.completed),all.filter(r=>r.completed)]){
+ const g=groupMonthlyOperations(visible,[],all)[0];
+ assert.equal(g.credits.pending,100);assert.equal(g.credits.total,300);
+ assert.equal(g.debits.pending,40);assert.equal(g.debits.total,100);
+ }
+});
