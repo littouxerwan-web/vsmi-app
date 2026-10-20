@@ -249,3 +249,11 @@ html.vsmi-light-mode .vsmi-premium-theme {
 .premium-login button {min-height:48px;}
 .premium-login :is(input,button):focus-visible {outline:2px solid #dcc79d;outline-offset:3px;}
 @media (max-width:380px) {.premium-login-brand {gap:20px;}.premium-login-logo {width:76px;height:94px;}.premium-login-boat {width:82px;height:127px;}}
+
+.premium-operation-group {background:var(--p-surface);border:1px solid var(--p-line);border-radius:16px;overflow:hidden;}
+.premium-operation-group > summary {cursor:pointer;padding:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:600;}
+.premium-operation-group > summary::before {content:"›";font-size:22px;transition:transform .15s;}
+.premium-operation-group[open] > summary::before {transform:rotate(90deg);}
+.premium-operation-group > summary > span:first-of-type {flex:1;}
+.premium-operation-group small {display:block;font-size:10px;font-weight:400;color:var(--p-muted);margin-top:4px;}
+@media(max-width:600px){.premium-operation-group > summary {flex-wrap:wrap;}.premium-operation-group > summary > span:last-child {width:100%;text-align:left;padding-left:20px;}}
