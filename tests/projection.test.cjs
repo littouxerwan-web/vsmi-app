@@ -339,3 +339,45 @@ test('aucun complément automatique si migration absente ou ancien virement enco
     assert.equal(build(input).operations.filter(o => o.savingsProposal).length, 0);
   }
 });
+
+test('compensation opt-in : compte non rattaché, débit/crédit égaux, aucun effet sur les entrées',()=>{
+ const input={...base(),categories:[],currentBalances:{a:50,b:200,s:1000},movements:[movement(150,'planned',{category_id:null,movement_date:'2026-09-20'})]};
+ const before=JSON.stringify(input),normal=build(input),sim=build({...input,simulateBalanceCompensation:true});
+ assert.equal(normal.points[0].balances.a,-100);assert.equal(normal.compensationTransfers.length,0);
+ assert.equal(sim.points[0].balances.a,0);assert.equal(sim.points[0].balances.s,900);
+ assert.equal(sim.compensationTransfers[0].date,'2026-09-20');assert.equal(sim.compensationTransfers[0].amount,100);
+ assert.equal(sim.operations.filter(o=>o.source==='compensation').length,2);
+ assert.ok(sim.operations.filter(o=>o.source==='compensation').every(o=>!o.savingsProposal));
+ assert.equal(JSON.stringify(input),before);invariant(input,sim);
+ assert.equal(JSON.stringify(build(input)),JSON.stringify(normal));
+});
+test('compensation : épargne insuffisante et plancher conservé, manque visible',()=>{
+ const input={...base(),categories:[],currentBalances:{a:0,b:0,s:80},movements:[movement(100,'planned',{category_id:null,movement_date:'2026-09-20'})],simulateBalanceCompensation:true};
+ const result=build(input);assert.equal(result.points[0].balances.a,-50);assert.equal(result.points[0].balances.s,30);invariant(input,result);
+});
+test('compensation : plusieurs sources et destinations ne dépensent pas deux fois les mêmes fonds',()=>{
+ const input={...base(),categories:[],accounts:[...base().accounts,{id:'t',name:'Autre épargne',account_type:'savings'}],currentBalances:{a:0,b:0,s:100,t:100},movements:[movement(100,'planned',{id:'a',category_id:null,movement_date:'2026-09-20'}),movement(100,'planned',{id:'b',account_id:'b',category_id:null,movement_date:'2026-09-20'})],simulateBalanceCompensation:true};
+ const result=build(input);assert.equal(result.points[0].balances.a,0);assert.equal(result.points[0].balances.b,-60);assert.equal(result.points[0].balances.s,30);assert.equal(result.points[0].balances.t,30);invariant(input,result);
+});
+test('compensation respecte projets intouchables et ne contourne pas le rattachement habituel',()=>{
+ const input={...base(),categories:[],currentBalances:{a:0,b:0,s:1000},savingsBudgets:[{id:'protected',account_id:'s',name:'Projet',kind:'project',allocation_mode:'amount',allocation_value:900,protection:'untouchable',allow_recovery:false}],movements:[movement(100,'planned',{category_id:null,movement_date:'2026-09-20'})],simulateBalanceCompensation:true};
+ const result=build(input);assert.equal(result.points[0].balances.a,-30);assert.equal(result.points[0].balances.s,930);invariant(input,result);
+ const linked=build({...input,profiles:[profile],savingsProposals:[{source_account_id:'s',destination_account_id:'a',source_month:'2026-09-01',decision_slot:15,status:'deleted',amount:0}]});
+ assert.equal(linked.compensationTransfers.length,0);
+});
+test('compensation couvre un creux intramensuel après le 15 et reste conservatrice sur 1, 3 et 5 ans',()=>{
+ for(const months of [12,36,60]){
+ const input={...base(),categories:[],months,currentBalances:{a:100,b:0,s:1000},movements:[movement(500,'planned',{id:'expense',category_id:null,movement_date:'2026-09-20'}),movement(1000,'planned',{id:'income',movement_type:'income',category_id:null,movement_date:'2026-09-28'})],simulateBalanceCompensation:true};
+ const result=build(input);assert.equal(result.compensationTransfers.length,1);assert.equal(result.compensationTransfers[0].amount,400);assert.equal(result.points[0].balances.a,1000);assert.equal(Math.min(...result.trajectory.map(p=>p.balances.a)),0);invariant(input,result);
+ }
+});
+test('compensation respecte les propositions liées existantes puis mobilise uniquement une autre épargne',()=>{
+ const input={...base(),categories:[],profiles:[{...profile,threshold:0}],accounts:[...base().accounts,{id:'t',name:'Autre',account_type:'savings'}],currentBalances:{a:0,b:0,s:80,t:500},movements:[movement(200,'planned',{category_id:null,movement_date:'2026-09-20'})],simulateBalanceCompensation:true};
+ const result=build(input);assert.equal(result.compensationTransfers[0].sourceAccountId,'t');assert.equal(result.compensationTransfers[0].amount,150);assert.equal(result.points[0].balances.s,30);assert.equal(result.points[0].balances.a,0);invariant(input,result);
+});
+test('compensation : découvert initial couvert immédiatement et absence de crédit fictif depuis la crypto',()=>{
+ const input={...base(),categories:[],currentBalances:{a:-100,b:0,s:200},simulateBalanceCompensation:true};
+ const result=build(input);assert.equal(result.compensationTransfers[0].date,input.todayIso);assert.equal(Math.min(...result.trajectory.map(p=>p.balances.a)),0);invariant(input,result);
+ const noSavings=build({...input,accounts:input.accounts.map(a=>a.id==='s'?{...a,account_type:'crypto'}:a)});
+ assert.equal(noSavings.compensationTransfers.length,0);assert.equal(noSavings.points[0].balances.a,-100);
+});

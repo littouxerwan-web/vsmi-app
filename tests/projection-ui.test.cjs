@@ -9,12 +9,13 @@ const { renderToStaticMarkup } = require('react-dom/server');
 const loadLib = require('./helpers/load-typescript.cjs');
 function viewModule(accountId, entry = "src/components/perso/projection-view.tsx") {
   const cache = new Map();
+  const hookStates = new Map(); let hookIndex = 0;
   function load(file) {
     file = path.resolve(file); if (cache.has(file)) return cache.get(file);
     const exports = {}; cache.set(file, exports);
     const source = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText;
     vm.runInNewContext(source, { exports, Date, Intl, Map, Set, console, require: name => {
-      if (name === 'react') return { ...react, useMemo: fn => fn(), useTransition: () => [false, () => {}], useState: initial => [initial === 'all' ? accountId : typeof initial === 'function' ? initial() : initial, () => {}] };
+      if (name === 'react') return { ...react, useMemo: fn => fn(), useTransition: () => [false, () => {}], useState: initial => { const index = hookIndex++; if (!hookStates.has(index)) hookStates.set(index, initial === 'all' ? accountId : typeof initial === 'function' ? initial() : initial); return [hookStates.get(index), next => hookStates.set(index, typeof next === 'function' ? next(hookStates.get(index)) : next)]; } };
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'lucide-react') return new Proxy({}, { get: () => () => null });
       if (name === 'next/navigation') return { useRouter: () => ({ push() {} }) };
@@ -26,7 +27,8 @@ function viewModule(accountId, entry = "src/components/perso/projection-view.tsx
     } }, { filename: file });
     return exports;
   }
-  return load(entry);
+  const result = load(entry);
+  return Object.fromEntries(Object.entries(result).map(([key, value]) => [key, typeof value === "function" ? (...args) => { hookIndex = 0; return value(...args); } : value]));
 }
 function nodes(tree, predicate, out = []) {
   if (Array.isArray(tree)) tree.forEach(child => nodes(child, predicate, out));
@@ -118,4 +120,17 @@ test('la sélection du compte active une seule carte et rend Tous les comptes ne
     assert.equal(cards[1].props['aria-pressed'], selectedAccountId === 'a');
     assert.equal(cards[2].props['aria-pressed'], selectedAccountId === 's');
   }
+});
+
+test('la coche de compensation actualise le graphique puis restitue la projection normale sans formulaire de transfert fictif',()=>{
+ const {ProjectionView}=viewModule('a');
+ const props={todayIso:'2026-10-20',accounts:[{id:'a',name:'Courant',account_type:'checking'},{id:'s',name:'Épargne',account_type:'savings'}],categories:[],snapshots:[],recurrences:[],currentBalances:{a:50,s:1000},movements:[{id:'bill',account_id:'a',category_id:null,amount:150,label:'Dépense',movement_type:'expense',movement_date:'2026-10-25',status:'planned'}]};
+ const chart=tree=>nodes(tree,n=>typeof n.type==='function'&&n.type.name==='ProjectionChart')[0];
+ const toggle=tree=>nodes(tree,n=>n.type==='input'&&n.props.type==='checkbox'&&typeof n.props.checked==='boolean')[0];
+ let tree=ProjectionView(props);assert.equal(chart(tree).props.values[0],-100);assert.equal(toggle(tree).props.checked,false);
+ const originalForms=nodes(tree,n=>n.type==='form').length;
+ toggle(tree).props.onChange({target:{checked:true}});tree=ProjectionView(props);
+ assert.equal(chart(tree).props.values[0],0);assert.equal(chart(tree).props.savingsValues[0],900);assert.equal(chart(tree).props.baselineValues[0],-100);
+ assert.equal(nodes(tree,n=>n.type==='form').length,originalForms);
+ toggle(tree).props.onChange({target:{checked:false}});tree=ProjectionView(props);assert.equal(chart(tree).props.values[0],-100);assert.equal(chart(tree).props.savingsValues[0],1000);
 });

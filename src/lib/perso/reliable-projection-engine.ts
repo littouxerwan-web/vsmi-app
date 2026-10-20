@@ -12,13 +12,13 @@ export type RPPhoto={id:string;display_name:string;wedding_date:string|null;paym
 export type RPUrssaf={contribution_month:string;account_id:string|null;is_completed:boolean;completed_date:string|null;amount_override?:number|null};
 export type RPProfile={id:string;label:string;sourceAccountId:string|null;destinationAccountId:string|null;threshold:number};
 export type RPSavingsMeta={sourceAccountId:string;destinationAccountId:string;sourceMonth:string;automaticAmount:number;status:'automatic'|'pending'|'accepted';kind:'deposit'|'use';decisionSlot:1|15;previousTransferGroupId?:string|null;parentDecisionId?:string};
-export type RPOperation={id:string;projected:boolean;occurrence_date?:string|null;original_date?:string;requested_amount?:number;unfunded_amount?:number;recurrence_id?:string|null;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;transfer_group_id?:string|null;source_type?:string|null;source_key?:string|null;virtual_source?:boolean;photo?:boolean;photoPayment?:RPPhoto;savingsProposal?:RPSavingsMeta;source?:'movement'|'recurrence'|'photo'|'urssaf'|'budget'|'savings'};
+export type RPOperation={id:string;projected:boolean;occurrence_date?:string|null;original_date?:string;requested_amount?:number;unfunded_amount?:number;recurrence_id?:string|null;account_id:string;category_id:string|null;movement_type:string;label:string;amount:number;movement_date:string;status:string;transfer_group_id?:string|null;source_type?:string|null;source_key?:string|null;virtual_source?:boolean;photo?:boolean;photoPayment?:RPPhoto;savingsProposal?:RPSavingsMeta;source?:'movement'|'recurrence'|'photo'|'urssaf'|'budget'|'savings'|'compensation'};
 export type RPPoint={date:string;balances:Record<string,number>;checking:number;savings:number;crypto:number;total:number};
 export type RPSavingsWarning={month:string;date:string;needDate:string;decisionSlot:1|15;checkingAccountId:string;savingsAccountId:string;required:number;available:number;applied:number;missing:number;reason:'accepted'|'deleted'|'limited'|'insufficient'};
 export type RPMonthAudit={month:string;opening:Record<string,number>;credits:Record<string,number>;debits:Record<string,number>;budgetDebits:Record<string,number>;savingsUsed:Record<string,number>;savingsDeposited:Record<string,number>;closing:Record<string,number>;budgets:BudgetStatement[];};
 
 export type ProjectionInput={
- accounts:RPAccount[];categories:RPCategory[];movements:RPMovement[];recurrences:RPRecurrence[];overrides:RPOverride[];exclusions:RPExclusion[];photoPayments:RPPhoto[];photoDefaultAccountId:string|null;movementDefaultAccountId:string|null;urssafDefaultAccountId:string|null;urssafStates:RPUrssaf[];savingsProposals:SavingsProposalDecision[];savingsBudgets:SavingsBudgetAllocation[];profiles:RPProfile[];currentBalances:Record<string,number>;todayIso:string;months?:number;
+ accounts:RPAccount[];categories:RPCategory[];movements:RPMovement[];recurrences:RPRecurrence[];overrides:RPOverride[];exclusions:RPExclusion[];photoPayments:RPPhoto[];photoDefaultAccountId:string|null;movementDefaultAccountId:string|null;urssafDefaultAccountId:string|null;urssafStates:RPUrssaf[];savingsProposals:SavingsProposalDecision[];savingsBudgets:SavingsBudgetAllocation[];profiles:RPProfile[];currentBalances:Record<string,number>;todayIso:string;months?:number;simulateBalanceCompensation?:boolean;
 };
 
 const SAVINGS_FLOOR=30;
@@ -101,12 +101,13 @@ export function buildReliableProjection(input:ProjectionInput){
  const balances=new Map(input.accounts.map(account=>[account.id,round(input.currentBalances[account.id]??0)]));
  const operations:RPOperation[]=[],points:RPPoint[]=[],trajectory:RPPoint[]=[],audits:RPMonthAudit[]=[];
  const savingsWarnings:RPSavingsWarning[]=[];
+ const compensationTransfers:{date:string;sourceAccountId:string;destinationAccountId:string;amount:number}[]=[];
  const snapshot=(date:string):RPPoint=>{
   const sum=(type:string)=>round(input.accounts.filter(a=>a.account_type===type).reduce((total,a)=>total+(balances.get(a.id)??0),0));
   const checking=sum('checking'),savings=sum('savings'),crypto=sum('crypto');
   return {date,balances:Object.fromEntries(balances),checking,savings,crypto,total:round(checking+savings+crypto)};
  };
- trajectory.push(snapshot(input.todayIso));
+ if(!input.simulateBalanceCompensation)trajectory.push(snapshot(input.todayIso));
  // A job is one external flow or a whole internal transfer, never half a transfer.
  type Job={date:string;id:string;rows:RPOperation[]};
  const jobs:Job[]=[],groups=new Map<string,RPOperation[]>();
@@ -143,6 +144,29 @@ export function buildReliableProjection(input:ProjectionInput){
   const firstSlot=month===startMonth?decisionSlot(input.todayIso):1;
   return slot===firstSlot?legacy:undefined;
  };
+ // Explicit opt-in simulation. No proposal metadata and no persistence action.
+ const compensate=(date:string,audit:RPMonthAudit)=>{
+  if(!input.simulateBalanceCompensation)return;
+  for(const checking of [...checkingAccounts].sort((a,b)=>a.id.localeCompare(b.id))){
+   if((balances.get(checking.id)??0)>=-.009)continue;
+   const usual=profileByChecking.get(checking.id)?.destinationAccountId;
+   const sources=input.accounts.filter(a=>a.account_type==='savings'&&a.id!==usual)
+    .sort((a,b)=>mobilizableSavingsForAccount(balances.get(b.id)??0,b.id,input.savingsBudgets,SAVINGS_FLOOR)-mobilizableSavingsForAccount(balances.get(a.id)??0,a.id,input.savingsBudgets,SAVINGS_FLOOR)||a.id.localeCompare(b.id));
+   for(const source of sources){
+    const need=round(Math.max(0,-(balances.get(checking.id)??0)));if(need<.01)break;
+    const available=mobilizableSavingsForAccount(balances.get(source.id)??0,source.id,input.savingsBudgets,SAVINGS_FLOOR);
+    const amount=round(Math.min(need,available));if(amount<.01)continue;
+    const group=`simulation-compensation-${date}-${compensationTransfers.length}`;
+    balances.set(source.id,round((balances.get(source.id)??0)-amount));
+    balances.set(checking.id,round((balances.get(checking.id)??0)+amount));
+    audit.savingsUsed[source.id]=round((audit.savingsUsed[source.id]??0)-amount);
+    audit.savingsUsed[checking.id]=round((audit.savingsUsed[checking.id]??0)+amount);
+    compensationTransfers.push({date,sourceAccountId:source.id,destinationAccountId:checking.id,amount});
+    for(const [id,type] of [[source.id,'transfer_out'],[checking.id,'transfer_in']] as const)
+     operations.push({id:`${group}-${type}`,projected:true,transfer_group_id:group,account_id:id,category_id:null,movement_type:type,label:'Compensation fictive de solde',amount,movement_date:date,status:'planned',source:'compensation'});
+   }
+  }
+ };
  const applyJob=(job:Job,audit:RPMonthAudit,savingsKind?:'use'|'deposit')=>{
   if(job.rows.some(row=>!accountById.has(row.account_id))){issues.push({date:job.date,operationId:job.id,message:'Compte absent : opération non applicable, projection incomplète.'});return;}
   const out=job.rows.find(row=>row.movement_type==='transfer_out');
@@ -161,6 +185,7 @@ export function buildReliableProjection(input:ProjectionInput){
     issues.push({date:job.date,message:'Dépense d’épargne conservée intégralement : solde projeté déficitaire.',operationId:row.id});
   }
   if(amount!==undefined&&out&&amount<out.amount)issues.push({date:job.date,operationId:out.id,message:`Virement limité à ${amount} € ; ${round(out.amount-amount)} € non financés.`});
+  compensate(job.date,audit);
   trajectory.push(snapshot(job.date));
  };
  const windowProjection=(accountId:string,from:string,through:string,threshold=-Infinity)=>{
@@ -241,11 +266,12 @@ export function buildReliableProjection(input:ProjectionInput){
      synthetic(month,decision.date,decision.slot,checking.id,savings,surplus,'deposit',audit);
     }
    }
+   if(input.simulateBalanceCompensation){compensate(decision.date,audit);trajectory.push(snapshot(decision.date));}
   }
   while(jobIndex<jobs.length&&jobs[jobIndex].date<=monthEnd(month))applyJob(jobs[jobIndex++],audit);
   audit.closing=Object.fromEntries(balances);audits.push(audit);points.push(snapshot(monthEnd(month)));
  }
  const operationsByMonth=new Map<string,RPOperation[]>();
  for(const row of operations){const month=row.movement_date.slice(0,7),rows=operationsByMonth.get(month)??[];rows.push(row);operationsByMonth.set(month,rows);}
- return {points,trajectory,operations,operationsByMonth,audits,budgetStatements,savingsWarnings,issues};
+ return {points,trajectory,operations,operationsByMonth,audits,budgetStatements,savingsWarnings,issues,compensationTransfers};
 }
