@@ -1,5 +1,5 @@
 import Link from "next/link";
-import {commonContributions} from "@/lib/commun/budget";
+import {commonContributions,commonEqualCafContributions} from "@/lib/commun/budget";
 import {createClient} from "@/lib/supabase/server";
 import {createCommonCategory,createCommonMovement,createCommonPersonalTransfer,createCommonRecurrence,createCommonSnapshot,deleteCommonCategory,deleteCommonMovement,deleteCommonRecurrence,deleteCommonRecurrenceOccurrence,deleteCommonRecurrenceSeriesFrom,saveCommonSettings,toggleCommonProrata,toggleCommonMovement,toggleCommonRecurrenceOccurrence,updateCommonMovement,updateCommonRecurrenceOccurrence,updateCommonRecurrenceSeries} from "./actions";
 import {AlertTriangle,Check,Equal,Landmark,Percent,Pencil,Trash2,TrendingUp} from "lucide-react";
@@ -127,6 +127,7 @@ export default async function Page({searchParams}:{searchParams:Promise<any>}){
  const cafAllocated=caf1+caf2,cafUnallocated=Math.max(0,caf-cafAllocated);
  const includeCaf=st.include_caf_in_budget!==false;
  const {contribution1:a1,contribution2:a2,appliedCaf1,appliedCaf2}=commonContributions(baseA1,baseA2,caf1,caf2,includeCaf);
+ const equalCaf=commonEqualCafContributions(baseA1,baseA2,caf);
  return <main className="commun-ledger-theme py-4 lg:py-6"><div>{p.erreur?<Notice danger text={p.erreur}/>:p.succes?<Notice text={p.succes}/>:null}
  <header className="border-b border-black/10 bg-white px-3 py-4 sm:px-5 lg:px-6"><p className="text-xs font-semibold uppercase tracking-[.18em] text-neutral-400">Espace partagé</p><h1 className="mt-1 text-2xl font-semibold">COMMUN</h1><p className="text-sm text-neutral-500">Indépendant des espaces PERSO.</p></header>
  <nav className="flex gap-2 border-b bg-neutral-100 px-3 py-1 sm:px-5 lg:px-6">{[["encours","En cours"],["budget","Budget"]].map(([id,l])=><Link key={id} href={`/commun?vue=${id}`} className={`px-4 py-2.5 text-sm font-medium ${vue===id?"bg-black text-white":"text-neutral-600"}`}>{l}</Link>)}</nav>
@@ -151,8 +152,8 @@ export default async function Page({searchParams}:{searchParams:Promise<any>}){
    <h2 className="text-lg font-semibold">À verser chacun chaque mois</h2>
    <div className="mt-4 grid gap-3 sm:grid-cols-2">
     {[
-     {name:st.person_1_name??"Personne 1",base:baseA1,caf:appliedCaf1,amount:a1,prorata:pro*p1},
-     {name:st.person_2_name??"Personne 2",base:baseA2,caf:appliedCaf2,amount:a2,prorata:pro*p2},
+     {name:st.person_1_name??"Personne 1",base:baseA1,caf:appliedCaf1,amount:a1,equalAmount:equalCaf.contribution1,equalCaf:equalCaf.appliedCaf1,prorata:pro*p1},
+     {name:st.person_2_name??"Personne 2",base:baseA2,caf:appliedCaf2,amount:a2,equalAmount:equalCaf.contribution2,equalCaf:equalCaf.appliedCaf2,prorata:pro*p2},
     ].map((person,index)=><div key={index} className="rounded-xl bg-neutral-100 p-4">
      <p className="text-sm font-semibold">{person.name}</p>
      <div className="mt-3 space-y-2 text-sm">
@@ -161,6 +162,10 @@ export default async function Page({searchParams}:{searchParams:Promise<any>}){
      </div>
      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-black/10 pt-3">
       <p className="text-sm font-semibold">À virer sur le compte commun</p><strong className="text-2xl">{money(person.amount)}</strong>
+     </div>
+     <div className="mt-3 border-t border-black/10 pt-3">
+      <p className="flex flex-wrap items-center justify-between gap-2 text-sm"><span className="font-semibold">À virer chacun si CAF 50/50</span><strong className="text-xl">{money(person.equalAmount)}</strong></p>
+      <p className="mt-1 text-xs text-neutral-500">Simulation : {money(person.base)} − {money(person.equalCaf)} de CAF. Les affectations enregistrées restent conservées.</p>
      </div>
      <p className="mt-2 text-xs text-neutral-500">50/50 : {money(half*.5)} · prorata : {money(person.prorata)}</p>
     </div>)}

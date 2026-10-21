@@ -9,3 +9,10 @@ export function commonContributions(base1: number, base2: number, caf1: number, 
     contribution2: Math.max(0, base2 - appliedCaf2),
   };
 }
+
+/** Alternative allocation only; never changes the stored CAF amounts. */
+export function commonEqualCafContributions(base1: number, base2: number, totalCaf: number) {
+  const totalCents = Math.round(totalCaf * 100);
+  const firstCents = Math.floor(totalCents / 2);
+  return commonContributions(base1, base2, firstCents / 100, (totalCents - firstCents) / 100);
+}

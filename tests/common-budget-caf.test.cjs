@@ -49,3 +49,25 @@ for(const include of [true,false]) test(`CAF : enregistrement ${include?'coché'
  assert.equal(saved.caf_person_1_amount,419.82);
  assert.equal(saved.caf_person_2_amount,572.08);
 });
+
+test('CAF 50/50 : simulation indépendante des affectations, montants de la capture',()=>{
+ const {commonEqualCafContributions}=require('./helpers/load-typescript.cjs')('src/lib/commun/budget.ts');
+ const base1=550.68/2+1650*20000/41871,base2=2200.68-base1;
+ const result=commonEqualCafContributions(base1,base2,991.90);
+ assert.equal(result.appliedCaf1,495.95);
+ assert.equal(result.appliedCaf2,495.95);
+ assert.equal(cents(result.contribution1),56752);
+ assert.equal(cents(result.contribution2),64126);
+ assert.equal(cents(result.contribution1+result.contribution2+991.90),220068);
+});
+
+test('CAF 50/50 : centime indivisible conservé, zéro CAF et part plafonnée',()=>{
+ const {commonEqualCafContributions}=require('./helpers/load-typescript.cjs')('src/lib/commun/budget.ts');
+ const odd=commonEqualCafContributions(100,200,99.99);
+ assert.equal(cents(odd.appliedCaf1)+cents(odd.appliedCaf2),9999);
+ assert.equal(Math.abs(cents(odd.appliedCaf1)-cents(odd.appliedCaf2)),1);
+ assert.equal(cents(odd.contribution1)+cents(odd.contribution2),20001);
+ const zero=commonEqualCafContributions(100,200,0);
+ assert.equal(zero.contribution1,100);assert.equal(zero.contribution2,200);
+ assert.equal(commonEqualCafContributions(10,200,100).contribution1,0);
+});
