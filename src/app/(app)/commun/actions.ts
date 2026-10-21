@@ -23,6 +23,7 @@ export async function saveCommonSettings(f:FormData){
    person_2_name:t(f,"person_2_name")||"Personne 2",
    income_n1_person_1:a,
    income_n1_person_2:b,
+   include_caf_in_budget:t(f,"include_caf_in_budget")==="true",
    caf_credit_amount:caf,
    caf_person_1_amount:caf1,
    caf_person_2_amount:caf2,
