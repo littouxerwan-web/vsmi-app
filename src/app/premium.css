@@ -257,3 +257,28 @@ html.vsmi-light-mode .vsmi-premium-theme {
 .premium-operation-group > summary > span:first-of-type {flex:1;}
 .premium-operation-group small {display:block;font-size:10px;font-weight:400;color:var(--p-muted);margin-top:4px;}
 @media(max-width:600px){.premium-operation-group > summary {flex-wrap:wrap;}.premium-operation-group > summary > span:last-child {width:100%;text-align:left;padding-left:20px;}}
+
+/* OSTEO also follows the shared palette; override the old light-mode patches. */
+.vsmi-premium-theme #app-private-content .osteo-page {color:var(--p-ink);}
+.vsmi-premium-theme #app-private-content .osteo-page .osteo-panel {
+ background:var(--p-surface) !important;color:var(--p-ink) !important;border-color:var(--p-line) !important;box-shadow:var(--p-shadow);
+}
+.vsmi-premium-theme #app-private-content .osteo-page :is(.osteo-row,.osteo-metric) {background:var(--p-soft) !important;border-color:var(--p-line) !important;}
+.vsmi-premium-theme #app-private-content .osteo-page :is(h1,h2,strong,td,.text-white) {color:var(--p-ink) !important;}
+.vsmi-premium-theme #app-private-content .osteo-page [class*="text-white/"] {color:var(--p-muted);}
+html .vsmi-premium-theme #app-private-content .osteo-page .osteo-input {
+ background:var(--p-surface) !important;color:var(--p-ink) !important;-webkit-text-fill-color:var(--p-ink) !important;
+ border-color:var(--p-line) !important;color-scheme:inherit !important;
+}
+html .vsmi-premium-theme #app-private-content .osteo-page :is(.osteo-view-link,.osteo-month-link,.osteo-secondary-button) {
+ background:var(--p-soft) !important;color:var(--p-ink) !important;border-color:var(--p-line) !important;
+}
+html .vsmi-premium-theme #app-private-content .osteo-page :is(.osteo-view-link,.osteo-month-link).is-active,
+.vsmi-premium-theme #app-private-content .osteo-page button[class*="bg-[#D2AE57]"] {
+ background:var(--p-button) !important;color:var(--p-button-ink) !important;border-color:var(--p-button) !important;
+}
+.vsmi-premium-theme #app-private-content .osteo-page :is([class*="text-[#D2AE57]"],[class*="text-[#E0C27E]"]) {color:var(--p-accent);}
+html .vsmi-premium-theme #app-private-content .osteo-page .osteo-check {
+ background:var(--p-surface) !important;border-color:var(--p-accent) !important;
+}
+html .vsmi-premium-theme #app-private-content .osteo-page .osteo-check:checked::after {color:var(--p-accent) !important;}

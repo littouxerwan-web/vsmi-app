@@ -23,7 +23,7 @@ function OsteoSkeleton() {
         <p className="mt-1 text-sm text-white/55">La page est ouverte. Chargement des données du mois…</p>
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           {Array.from({ length: 6 }, (_, i) => (
-            <div key={i} className="h-20 animate-pulse rounded-2xl border border-white/10 bg-[#292B28]" />
+            <div key={i} className="h-20 animate-pulse rounded-2xl border border-[var(--p-line)] bg-[var(--p-soft)]" />
           ))}
         </div>
       </section>

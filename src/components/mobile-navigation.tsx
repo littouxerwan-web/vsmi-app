@@ -60,8 +60,8 @@ export function MobileNavigation({ photoAccess = false, osteoAccess = false }: {
       aria-current={active ? "page" : undefined}
       className={`vsmi-press flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-medium leading-none transition ${
         active
-          ? "bg-[#D2AE57] text-black"
-          : "text-white/55"
+          ? "bg-[#e1d1ac] text-black"
+          : "text-[#bfcdc3]"
       }`}
     >
       <Icon size={ICON_SIZE} strokeWidth={1.9} />
@@ -73,7 +73,6 @@ export function MobileNavigation({ photoAccess = false, osteoAccess = false }: {
     ? (osteoAccess ? [...commonItems, { href: "/osteo", label: "OSTEO", icon: Stethoscope }] : commonItems)
     : photoItems;
   const panelTitle = panel === "common" ? "COMMUN" : "PHOTO";
-  const panelColor = panel === "common" ? "text-[#D9DADD]" : "text-[#D2AE57]";
 
   return (
     <>
@@ -84,18 +83,18 @@ export function MobileNavigation({ photoAccess = false, osteoAccess = false }: {
             if (event.target === event.currentTarget) setPanel(null);
           }}
         >
-          <div className="absolute inset-x-3 bottom-[calc(5.4rem+env(safe-area-inset-bottom))] max-h-[min(70dvh,34rem)] overflow-y-auto overscroll-contain rounded-3xl border border-white/10 bg-[#151515] p-3 text-white shadow-2xl">
+          <div className="absolute inset-x-3 bottom-[calc(5.4rem+env(safe-area-inset-bottom))] max-h-[min(70dvh,34rem)] overflow-y-auto overscroll-contain rounded-3xl border border-[var(--p-line)] bg-[var(--p-surface)] p-3 text-[var(--p-ink)] shadow-2xl">
             <div className="flex items-center justify-between px-2 pb-2 pt-1">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[.18em] text-white/40">
+                <p className="text-xs font-semibold uppercase tracking-[.18em] text-[var(--p-muted)]">
                   Navigation
                 </p>
-                <p className={`mt-1 text-lg font-semibold ${panelColor}`}>{panelTitle}</p>
+                <p className="mt-1 text-lg font-semibold text-[var(--p-accent)]">{panelTitle}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setPanel(null)}
-                className="vsmi-press grid size-10 place-items-center rounded-full border border-white/10 bg-white/[.07] text-white"
+                className="vsmi-press grid size-10 place-items-center rounded-full border border-[var(--p-line)] bg-[var(--p-soft)] text-[var(--p-ink)]"
                 aria-label={`Fermer le menu ${panelTitle}`}
               >
                 <X size={18} />
@@ -114,14 +113,13 @@ export function MobileNavigation({ photoAccess = false, osteoAccess = false }: {
                 return (
                   <Link
                     key={item.href}
+                    aria-current={active ? "page" : undefined}
                     href={item.href}
                     prefetch={item.href === "/osteo" ? false : undefined}
                     className={`vsmi-press flex min-h-13 items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
                       active
-                        ? panel === "common"
-                          ? "bg-[#D9DADD] text-black"
-                          : "bg-[#D2AE57] text-black"
-                        : "bg-white/[.06] text-white"
+                        ? "bg-[var(--p-button)] text-[var(--p-button-ink)]"
+                        : "bg-[var(--p-soft)] text-[var(--p-ink)] hover:bg-[var(--p-accent-soft)]"
                     }`}
                   >
                     <Icon size={ICON_SIZE} strokeWidth={1.9} />
@@ -136,7 +134,7 @@ export function MobileNavigation({ photoAccess = false, osteoAccess = false }: {
 
       <nav
         aria-label="Navigation mobile"
-        className="premium-mobile-nav fixed inset-x-0 bottom-0 z-[90] border-t border-white/10 bg-[#111111]/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_30px_rgba(0,0,0,.35)] backdrop-blur lg:hidden"
+        className="premium-mobile-nav fixed inset-x-0 bottom-0 z-[90] border-t border-white/10 bg-[#202b3d]/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_30px_rgba(0,0,0,.35)] backdrop-blur lg:hidden"
       >
         <div className="mx-auto grid max-w-lg grid-cols-5 items-end gap-1">
           {persoLink(
@@ -157,7 +155,7 @@ export function MobileNavigation({ photoAccess = false, osteoAccess = false }: {
             <Link
               href="/perso?vue=finances&quick=movement"
               aria-label="Ajouter un débit ou un crédit"
-              className="vsmi-press relative -top-3 mx-auto grid size-14 place-items-center rounded-full border-4 border-[#111111] bg-[#D2AE57] text-black shadow-lg transition hover:bg-[#E0C27E]"
+              className="vsmi-press relative -top-3 mx-auto grid size-14 place-items-center rounded-full border-4 border-[#202b3d] bg-[#e1d1ac] text-black shadow-lg transition hover:bg-[#eee5d2]"
             >
               <Plus size={25} strokeWidth={2.2} />
             </Link>
@@ -166,7 +164,7 @@ export function MobileNavigation({ photoAccess = false, osteoAccess = false }: {
               href="/aujourd-hui"
               aria-label="Ouvrir Aujourd’hui"
               title="Aujourd’hui"
-              className="vsmi-press relative -top-3 mx-auto grid size-14 place-items-center rounded-full border-4 border-[#111111] bg-[#D2AE57] text-black shadow-lg transition hover:bg-[#E0C27E]"
+              className="vsmi-press relative -top-3 mx-auto grid size-14 place-items-center rounded-full border-4 border-[#202b3d] bg-[#e1d1ac] text-black shadow-lg transition hover:bg-[#eee5d2]"
             >
               <LayoutDashboard size={24} strokeWidth={2} />
             </Link>
@@ -178,8 +176,8 @@ export function MobileNavigation({ photoAccess = false, osteoAccess = false }: {
             aria-expanded={panel === "common"}
             className={`vsmi-press flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-medium leading-none transition ${
               pathname === "/commun" || panel === "common"
-                ? "bg-white/10 text-[#D2AE57]"
-                : "text-white/55"
+                ? "bg-white/10 text-[#e1d1ac]"
+                : "text-[#bfcdc3]"
             }`}
           >
             <UsersRound size={ICON_SIZE} strokeWidth={1.9} />
@@ -193,8 +191,8 @@ export function MobileNavigation({ photoAccess = false, osteoAccess = false }: {
               aria-expanded={panel === "photo"}
               className={`vsmi-press flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-medium leading-none transition ${
                 (pathname !== "/perso" && pathname !== "/commun" && pathname !== "/aujourd-hui") || panel === "photo"
-                  ? "bg-[#D2AE57] text-black"
-                  : "text-white/55"
+                  ? "bg-[#e1d1ac] text-black"
+                  : "text-[#bfcdc3]"
               }`}
             >
               <Camera size={ICON_SIZE} strokeWidth={1.9} />
@@ -204,7 +202,7 @@ export function MobileNavigation({ photoAccess = false, osteoAccess = false }: {
             <Link
               href="/osteo"
               className={`vsmi-press flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-medium leading-none transition ${
-                pathname === "/osteo" ? "bg-[#9B7CC1] text-black" : "text-white/55"
+                pathname === "/osteo" ? "bg-[#9B7CC1] text-black" : "text-[#bfcdc3]"
               }`}
             >
               <Stethoscope size={ICON_SIZE} strokeWidth={1.9} />
